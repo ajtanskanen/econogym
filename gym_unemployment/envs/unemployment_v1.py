@@ -1617,7 +1617,8 @@ class UnemploymentLargeEnv(gym.Env):
         Palkkaprosessi lähteestä Määttänen, 2013 
         '''
         #group_sigmas=[0.08,0.10,0.15]
-        group_sigmas=[0.09,0.10,0.13]
+        #group_sigmas=[0.09,0.10,0.13]
+        group_sigmas=[0.05,0.05,0.05]
         sigma=group_sigmas[g]
         eps=np.random.normal(loc=0,scale=sigma,size=1)[0]
         c1=0.89
@@ -1932,7 +1933,7 @@ class UnemploymentLargeEnv(gym.Env):
 
         # set up salary for the entire career
         #group=np.random.randint(self.n_groups)
-        g=random.choices(np.array([0,1,2],dtype=int),weights=[0.3,0.5,0.2])[0]
+        g=random.choices(np.array([0,1,2],dtype=int),weights=[0.25,0.5,0.25])[0]
         gender=random.choices(np.array([0,1],dtype=int),weights=[0.5,0.5])[0]
         group=int(g+gender*3)
         self.compute_salary_TK(group=group)
