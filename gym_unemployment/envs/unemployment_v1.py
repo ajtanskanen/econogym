@@ -483,7 +483,7 @@ class UnemploymentLargeEnv(gym.Env):
 
         return mort
 
-    def get_disability_rate(self,debug=False):
+    def get_disability_rate_unisex(self,debug=False):
         '''
         Työkyvyttömyys-alkavuudet eri ryhmille
         '''
@@ -542,6 +542,29 @@ class UnemploymentLargeEnv(gym.Env):
 
         disab=disab/1000
         return disab
+        
+    def get_disability_rate(self,debug=False):
+        '''
+        Työkyvyttömyys-alkavuudet eri ryhmille
+        '''
+        disab=np.zeros((self.max_age+1,self.n_groups))
+        # male low, male mid, male high, female low, female mid, female high
+        if debug:
+            dfactor=np.array([1.0,1.0,1.0,1.0,1.0,1.0])
+        else:
+            dfactor=np.array([1.5,1.0,0.5,1.2,1.0,0.8])
+            
+        dis_miehet=np.array([ 0.004630,0.004356,0.003559,0.003081,0.003381,0.002937,0.002835,0.002951,0.002232,0.002088,0.001808,0.002747,0.002540,0.002851,0.002854,0.002704,0.002764,0.002691,0.002923,0.003033,0.003231,0.002886,0.002947,0.003319,0.003487,0.003864,0.003816,0.004289,0.005225,0.005248,0.005923,0.006897,0.006780,0.008412,0.009394,0.010691,0.012313,0.013471,0.015919,0.020455,0.026545,0.022420,0.015017,0.003898,0.000286,0.015017,0.015017,0.015017,0.015017,0.015017,0.015017 ])
+        dis_naiset=np.array([ 0.005557,0.005064,0.004733,0.003931,0.003340,0.003180,0.002937,0.003415,0.002572,0.002710,0.002500,0.003701,0.002778,0.003217,0.003242,0.003512,0.003326,0.003402,0.003504,0.004077,0.004424,0.004442,0.004355,0.005005,0.005032,0.005847,0.005579,0.006115,0.006144,0.006849,0.008927,0.007070,0.008676,0.010337,0.008784,0.012450,0.013127,0.015199,0.019386,0.022249,0.029828,0.026609,0.016825,0.003603,0.000211,0.016825,0.016825,0.016825,0.016825,0.016825,0.016825 ])
+            
+        for g in range(3):
+            disab[20:70,g]=dfactor[g]*dis_miehet
+            disab[70:(self.max_age+1),g]=24.45*dfactor[g]/1000
+        for g in range(3,6):
+            disab[20:70,g]=dfactor[g]*dis_naiset
+            disab[70:(self.max_age+1),g]=24.45*dfactor[g]/1000
+
+        return disab        
 
     def get_birth_rate(self,debug=False):
         birth=np.zeros((69,self.n_groups)) # 
