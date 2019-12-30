@@ -1490,7 +1490,7 @@ class UnemploymentLargeEnv(gym.Env):
         '''
 
         # kappa tells how much person values free-time
-        kappa_kokoaika=0.78
+        kappa_kokoaika=0.79
         kappa_osaaika=2/3*kappa_kokoaika
         kappa_ve=0.55
         
