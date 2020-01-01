@@ -1519,9 +1519,10 @@ class UnemploymentLargeEnv(gym.Env):
 
         # kappa tells how much person values free-time
         kappa_kokoaika=0.80
-        kappa_osaaika=2/3*kappa_kokoaika
+        #kappa_osaaika=2/3*kappa_kokoaika
         kappa_osaaika=1/2*kappa_kokoaika
         kappa_ve=1.0
+        #kappa_ve=0.6
         
         if g==0 or g==3: # pienituloinen ryhmä
             kappa_opiskelija=2.0
@@ -1533,6 +1534,7 @@ class UnemploymentLargeEnv(gym.Env):
             kappa_opiskelija=0
             
         mu=0.05 # how much penalty is associated with work increase with age
+        #mu=0.075 # how much penalty is associated with work increase with age
         min_student_age=20
         max_student_age=25
 
