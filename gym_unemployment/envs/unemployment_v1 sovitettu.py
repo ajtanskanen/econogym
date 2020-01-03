@@ -486,6 +486,7 @@ class UnemploymentLargeEnv(gym.Env):
     def get_disability_rate_unisex(self,debug=False):
         '''
         Työkyvyttömyys-alkavuudet eri ryhmille
+        Data ETK:sta
         '''
         disab=np.zeros((self.max_age+1,self.n_groups))
         # male low, male mid, male high, female low, female mid, female high
@@ -546,6 +547,7 @@ class UnemploymentLargeEnv(gym.Env):
     def get_disability_rate(self,debug=False):
         '''
         Työkyvyttömyys-alkavuudet eri ryhmille
+        Data ETK:n tilastotietokannasta ja skaalattu ikäluokittaisillä miesten ja naisten määrillä
         '''
         disab=np.zeros((self.max_age+1,self.n_groups))
         # male low, male mid, male high, female low, female mid, female high
@@ -556,6 +558,9 @@ class UnemploymentLargeEnv(gym.Env):
             
         dis_miehet=np.array([ 0.004630,0.004356,0.003559,0.003081,0.003381,0.002937,0.002835,0.002951,0.002232,0.002088,0.001808,0.002747,0.002540,0.002851,0.002854,0.002704,0.002764,0.002691,0.002923,0.003033,0.003231,0.002886,0.002947,0.003319,0.003487,0.003864,0.003816,0.004289,0.005225,0.005248,0.005923,0.006897,0.006780,0.008412,0.009394,0.010691,0.012313,0.013471,0.015919,0.020455,0.026545,0.022420,0.015017,0.003898,0.000286,0.015017,0.015017,0.015017,0.015017,0.015017,0.015017 ])
         dis_naiset=np.array([ 0.005557,0.005064,0.004733,0.003931,0.003340,0.003180,0.002937,0.003415,0.002572,0.002710,0.002500,0.003701,0.002778,0.003217,0.003242,0.003512,0.003326,0.003402,0.003504,0.004077,0.004424,0.004442,0.004355,0.005005,0.005032,0.005847,0.005579,0.006115,0.006144,0.006849,0.008927,0.007070,0.008676,0.010337,0.008784,0.012450,0.013127,0.015199,0.019386,0.022249,0.029828,0.026609,0.016825,0.003603,0.000211,0.016825,0.016825,0.016825,0.016825,0.016825,0.016825 ])
+        # ei varhaiseläkkeitä mukana, joten oletetaan ettei tk-intensiteetti laske
+        dis_miehet[41:51]=np.maximum(dis_miehet[41:51],0.022420)
+        dis_naiset[41:51]=np.maximum(dis_naiset[41:51],0.026609)
             
         for g in range(3):
             disab[20:71,g]=dfactor[g]*dis_miehet
@@ -1513,9 +1518,10 @@ class UnemploymentLargeEnv(gym.Env):
         '''
 
         # kappa tells how much person values free-time
-        kappa_kokoaika=0.78
+        kappa_kokoaika=0.80
         kappa_osaaika=2/3*kappa_kokoaika
-        kappa_ve=0.55
+        kappa_osaaika=1/2*kappa_kokoaika
+        kappa_ve=1.0
         
         if g==0 or g==3: # pienituloinen ryhmä
             kappa_opiskelija=2.0
@@ -1526,7 +1532,7 @@ class UnemploymentLargeEnv(gym.Env):
         else: # muissa ryhmissä ei opiskelupreferenssiä
             kappa_opiskelija=0
             
-        mu=0.10 # how much penalty is associated with work increase with age
+        mu=0.05 # how much penalty is associated with work increase with age
         min_student_age=20
         max_student_age=25
 
