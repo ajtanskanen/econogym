@@ -132,10 +132,10 @@ class UnemploymentLargeEnv(gym.Env):
                     self.timestep=value
             elif key=='mortstop':
                 if value is not None:
-                    self.mortstop=value**self.timestep
+                    self.mortstop=value
             elif key=='gamma':
                 if value is not None:
-                    self.gamma=value**self.timestep
+                    self.gamma=value
             elif key=='min_age':
                 if value is not None:
                     self.min_age=value
@@ -178,6 +178,8 @@ class UnemploymentLargeEnv(gym.Env):
             elif key=='plotdebug':
                 if value is not None:
                     self.plotdebug=value  
+ 
+        self.explain()
  
         # ei skaalata!
         #self.ansiopvraha_kesto400=self.ansiopvraha_kesto400/(12*21.5)
@@ -227,11 +229,11 @@ class UnemploymentLargeEnv(gym.Env):
             else:
                 print('Mortality included, not stopped')
 
-            self.n_empl=14 # state of employment, 0,1,2,3,4
+            self.n_empl=14 # number of states of employment
             self.state_encode=self.state_encode_mort
         else:
             print('No mortality included')
-            self.n_empl=13 # state of employment, 0,1,2,3,4
+            self.n_empl=13 # number of states of employment
             self.state_encode=self.state_encode_nomort
 
         self.action_space = spaces.Discrete(4)
@@ -486,7 +488,7 @@ class UnemploymentLargeEnv(gym.Env):
     def get_disability_rate_unisex(self,debug=False):
         '''
         Työkyvyttömyys-alkavuudet eri ryhmille
-        Data ETK:sta
+        Data ETK:sta. Ei käytössä
         '''
         disab=np.zeros((self.max_age+1,self.n_groups))
         # male low, male mid, male high, female low, female mid, female high
@@ -2193,3 +2195,13 @@ class UnemploymentLargeEnv(gym.Env):
                 out_max])
         if debug:  
             print(self.low.shape,self.high.shape)
+            
+    def explain(self):
+        '''
+        Tulosta laskennan parametrit
+        '''
+        print('Parameters of lifecycle:\ntimestep {}\ngamma {} ({} per anno)\nmin_age {}\nmax_age {}\nmin_retirementage {}'.format(self.timestep,self.gamma,self.gamma**(1.0/self.timestep),self.min_age,self.max_age,self.min_retirementage))
+        print('max_retirementage {}\nansiopvraha_kesto300 {}\nansiopvraha_kesto400 {}\nansiopvraha_toe {}'.format(self.max_retirementage,self.ansiopvraha_kesto300,self.ansiopvraha_kesto400,self.toe_vaatimus))
+        print('perustulo {}\nkarenssi_kesto {}\nmortality {}\nrandomness {}'.format(self.perustulo,self.karenssi_kesto,self.include_mort,self.randomness))
+        print('include_putki {}\ninclude_pinkslip {}\n'.format(self.include_putki,self.include_pinkslip))
+
