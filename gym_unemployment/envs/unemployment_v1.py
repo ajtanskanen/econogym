@@ -758,39 +758,47 @@ class UnemploymentLargeEnv(gym.Env):
 
         return employment_status,paid_pension,pension,wage,time_in_state,netto,out_of_work
 
-    def move_to_unemp(self,pension,old_wage,age,toe,irtisanottu,out_of_work,tyoura):
+    def move_to_unemp(self,pension,old_wage,age,paid_pension,toe,irtisanottu,out_of_work,tyoura):
         '''
         Siirtymä työttömyysturvalle
         '''
-        if age>=self.min_tyottputki_ika and self.include_putki:
-            if toe>=self.toe_vaatimus:
-                employment_status  = 4 # switch
-                #toe=0
-            else:
-                employment_status  = 13 # switch
+        if age>=self.min_retirementage:
+            employment_status=4
+            employment_status,paid_pension,pension,wage,time_in_state,netto,out_of_work=\
+                self.move_to_retirement(pension,old_wage,age,paid_pension,employment_status,out_of_work,all_acc=True)
+            return employment_status,paid_pension,pension,wage,time_in_state,netto,toe,out_of_work
         else:
-            if toe>=self.toe_vaatimus:
-                employment_status  = 0 # switch
-                #toe=0
+            if age>=self.min_tyottputki_ika and self.include_putki:
+                if toe>=self.toe_vaatimus:
+                    employment_status  = 4 # switch
+                    #toe=0
+                else:
+                    employment_status  = 13 # switch
             else:
-                employment_status  = 13 # switch
+                if toe>=self.toe_vaatimus:
+                    employment_status  = 0 # switch
+                    #toe=0
+                else:
+                    employment_status  = 13 # switch
                 
-        time_in_state=self.timestep
-        out_of_work+=self.timestep    
-        toe=max(0,toe-self.timestep)
+                
+            time_in_state=self.timestep
+            out_of_work+=self.timestep    
+            toe=max(0,toe-self.timestep)
             
-        intage=int(np.floor(age))
-        wage=self.get_wage(intage,0)
-        if age<65:
-            pension=pension*self.palkkakerroin+self.acc_unemp*old_wage
+            intage=int(np.floor(age))
+            wage=self.get_wage(intage,0)
+            if age<65:
+                pension=pension*self.palkkakerroin+self.acc_unemp*old_wage
 
-        # hmm, omavastuupäivät puuttuvat!
-        # omavastuupäiviä on 5/(21.5*12*self.timestep), kerroin tällöin
-        # 1-5/(21.5*12*self.timestep)
-        netto=self.comp_benefits(0,old_wage,0,employment_status,time_in_state,age,
-                                 irtisanottu=irtisanottu,tyohistoria=tyoura)
+            # hmm, omavastuupäivät puuttuvat!
+            # omavastuupäiviä on 5/(21.5*12*self.timestep), kerroin tällöin
+            # 1-5/(21.5*12*self.timestep)
+            netto=self.comp_benefits(0,old_wage,0,employment_status,time_in_state,age,
+                                     irtisanottu=irtisanottu,tyohistoria=tyoura)
 
-        return employment_status,pension,wage,time_in_state,netto,toe,out_of_work
+        #return employment_status,pension,wage,time_in_state,netto,toe,out_of_work
+        return employment_status,paid_pension,pension,wage,time_in_state,netto,toe,out_of_work
 
     def move_to_outsider(self,pension,old_wage,age,toe,irtisanottu,out_of_work):
         '''
@@ -976,7 +984,7 @@ class UnemploymentLargeEnv(gym.Env):
         elif employment_status == 0:
             time_in_state+=self.timestep
             out_of_work+=self.timestep
-            if age>65:
+            if age>=65:
                 employment_status,paid_pension,pension,wage,time_in_state,netto,out_of_work\
                     =self.move_to_retirement(pension,0,age,paid_pension,employment_status,out_of_work,all_acc=True)
             elif action == 0: # or (action == 2 and age < self.min_retirementage):
@@ -993,8 +1001,8 @@ class UnemploymentLargeEnv(gym.Env):
 
                 netto=self.comp_benefits(0,old_wage,0,employment_status,time_in_state,age,tyohistoria=tyoura)
                 kesto=12*21.5*time_in_state
-                if ((tyoura>=self.tyohistoria_vaatimus and kesto>self.ansiopvraha_kesto400) \
-                    or (tyoura<self.tyohistoria_vaatimus and kesto>self.ansiopvraha_kesto300)):
+                if ((tyoura>=self.tyohistoria_vaatimus and kesto>=self.ansiopvraha_kesto400) \
+                    or (tyoura<self.tyohistoria_vaatimus and kesto>=self.ansiopvraha_kesto300)):
                     employment_status = 13 # siirto työmarkkinatuelle
                     
             elif action == 1: # 
@@ -1032,7 +1040,7 @@ class UnemploymentLargeEnv(gym.Env):
         elif employment_status == 13: # työmarkkinatuki
             time_in_state+=self.timestep
             out_of_work+=self.timestep
-            if age>65:
+            if age>=65:
                 employment_status,paid_pension,pension,wage,time_in_state,netto,out_of_work\
                     =self.move_to_retirement(pension,0,age,paid_pension,employment_status,out_of_work,all_acc=True)
             elif action == 0: # or (action == 2 and age < self.min_retirementage):
@@ -1040,10 +1048,7 @@ class UnemploymentLargeEnv(gym.Env):
                 wage=old_wage # self.get_wage(intage,time_in_state)
                 toe=max(0.0,toe-self.timestep) # approksimaatio, oletus että työjakso korvautuu työttömyysjaksolla
                 if age<65:                
-                    if time_in_state<self.ansiopvraha_kesto400: # 1.5 years
-                        pension=pension*self.palkkakerroin+self.acc_unemp*old_wage
-                    else:
-                        pension=pension*self.palkkakerroin+self.acc*self.accbasis_tmtuki
+                    pension=pension*self.palkkakerroin+self.acc*self.accbasis_tmtuki
                 else:
                     pension=pension*self.palkkakerroin
 
@@ -1150,8 +1155,8 @@ class UnemploymentLargeEnv(gym.Env):
                     
                 netto=self.comp_benefits(wage,0,0,employment_status,time_in_state,age)
             elif action == 1: # työttömäksi
-                employment_status,pension,wage,time_in_state,netto,toe,out_of_work=\
-                    self.move_to_unemp(pension,old_wage,age,toe,pinkslip,out_of_work,tyoura)
+                employment_status,paid_pension,pension,wage,time_in_state,netto,toe,out_of_work=\
+                    self.move_to_unemp(pension,old_wage,age,paid_pension,toe,pinkslip,out_of_work,tyoura)
             elif action==2:
                 if age >= self.min_retirementage: # ve
                     employment_status,paid_pension,pension,wage,time_in_state,netto,out_of_work=\
@@ -1227,7 +1232,8 @@ class UnemploymentLargeEnv(gym.Env):
                     pension=pension*self.palkkakerroin
                     netto=1 #self.comp_benefits(0,0,0,employment_status,time_in_state,age)
                 elif action == 1: # työttömäksi
-                    employment_status,pension,wage,time_in_state,netto,toe,out_of_work=self.move_to_unemp(pension,old_wage,age,toe,0,out_of_work,tyoura)
+                    employment_status,paid_pension,pension,wage,time_in_state,netto,toe,out_of_work\
+                        =self.move_to_unemp(pension,old_wage,age,paid_pension,toe,0,out_of_work,tyoura)
                 elif action == 2: # töihin
                     employment_status,pension,wage,time_in_state,netto,toe,tyoura,out_of_work,pinkslip\
                         =self.move_to_work(pension,old_wage,age,time_in_state,toe,tyoura,out_of_work,pinkslip)
@@ -1247,7 +1253,8 @@ class UnemploymentLargeEnv(gym.Env):
             if time_in_state>self.aitiysvapaa_kesto:
                 pinkslip=0
                 if action == 0:
-                    employment_status,pension,wage,time_in_state,netto,toe,out_of_work=self.move_to_unemp(pension,old_wage,age,toe,pinkslip,out_of_work,tyoura)
+                    employment_status,paid_pension,pension,wage,time_in_state,netto,toe,out_of_work=\
+                        self.move_to_unemp(pension,old_wage,age,paid_pension,toe,pinkslip,out_of_work,tyoura)
                 elif action == 1: # 
                     employment_status,pension,wage,time_in_state,netto,toe,tyoura,out_of_work,pinkslip=\
                         self.move_to_work(pension,old_wage,age,time_in_state,toe,tyoura,out_of_work,pinkslip)
@@ -1273,7 +1280,8 @@ class UnemploymentLargeEnv(gym.Env):
             if time_in_state>=self.isyysvapaa_kesto:
                 pinkslip=0
                 if action == 0 or action==2:
-                    employment_status,pension,wage,time_in_state,netto,toe,out_of_work=self.move_to_unemp(pension,old_wage,age,toe,pinkslip,out_of_work,tyoura)
+                    employment_status,paid_pension,pension,wage,time_in_state,netto,toe,out_of_work\
+                        =self.move_to_unemp(pension,old_wage,age,paid_pension,toe,pinkslip,out_of_work,tyoura)
                 elif action == 1: # 
                     # ei vaikutusta palkkaan
                     employment_status,pension,wage,time_in_state,netto,toe,tyoura,out_of_work,pinkslip=\
@@ -1308,7 +1316,8 @@ class UnemploymentLargeEnv(gym.Env):
                 netto=self.comp_benefits(0,old_wage,0,employment_status,time_in_state,age)
             elif action == 2: # 
                 pinkslip=0
-                employment_status,pension,wage,time_in_state,netto,toe,out_of_work=self.move_to_unemp(pension,old_wage,age,toe,pinkslip,out_of_work,tyoura)
+                employment_status,paid_pension,pension,wage,time_in_state,netto,toe,out_of_work=\
+                    self.move_to_unemp(pension,old_wage,age,paid_pension,toe,pinkslip,out_of_work,tyoura)
             elif action == 1: # 
                 employment_status,pension,wage,time_in_state,netto,toe,tyoura,out_of_work,pinkslip=\
                     self.move_to_work(pension,old_wage,age,time_in_state,toe,tyoura,out_of_work,pinkslip)
@@ -1322,7 +1331,8 @@ class UnemploymentLargeEnv(gym.Env):
                 employment_status,pension,paid_pension,wage,time_in_state,netto,out_of_work=self.move_to_disab(pension,old_wage,age,out_of_work)
             elif time_in_state>self.kht_kesto: # 
                 pinkslip=0
-                employment_status,pension,wage,time_in_state,netto,toe,out_of_work=self.move_to_unemp(pension,old_wage,age,toe,pinkslip,out_of_work,tyoura)
+                employment_status,paid_pension,pension,wage,time_in_state,netto,toe,out_of_work\
+                    =self.move_to_unemp(pension,old_wage,age,paid_pension,toe,pinkslip,out_of_work,tyoura)
             else:
                 print('Error 25')
         elif employment_status == 8: # töissä ja ve:llä
@@ -1419,8 +1429,8 @@ class UnemploymentLargeEnv(gym.Env):
                     pension=pension*self.palkkakerroin
                 netto=self.comp_benefits(parttimewage,0,0,employment_status,time_in_state,age)
             elif action == 1: # työttömäksi
-                employment_status,pension,wage,time_in_state,netto,toe,out_of_work=\
-                    self.move_to_unemp(pension,old_wage,age,toe,pinkslip,out_of_work,tyoura)
+                employment_status,paid_pension,pension,wage,time_in_state,netto,toe,out_of_work=\
+                    self.move_to_unemp(pension,old_wage,age,paid_pension,toe,pinkslip,out_of_work,tyoura)
             elif action==2:
                 if age >= self.min_retirementage: # ve
                     employment_status,paid_pension,pension,wage,time_in_state,netto,out_of_work=\
@@ -1460,7 +1470,8 @@ class UnemploymentLargeEnv(gym.Env):
                     self.move_to_work(pension,old_wage,age,time_in_state,toe,tyoura,out_of_work,pinkslip)
                 pinkslip=0
             elif action == 2: # 
-                employment_status,pension,wage,time_in_state,netto,toe,out_of_work=self.move_to_unemp(pension,old_wage,age,toe,pinkslip,out_of_work,tyoura)
+                employment_status,paid_pension,pension,wage,time_in_state,netto,toe,out_of_work=\
+                    self.move_to_unemp(pension,old_wage,age,paid_pension,toe,pinkslip,out_of_work,tyoura)
                 pinkslip=0
             elif action==5:
                 employment_status,pension,wage,time_in_state,netto,out_of_work=self.move_to_motherleave(pension,old_wage,age,out_of_work)
@@ -1500,7 +1511,8 @@ class UnemploymentLargeEnv(gym.Env):
                     employment_status,paid_pension,pension,wage,time_in_state,toe,netto,out_of_work=\
                         self.move_to_outsider(pension,old_wage,age,toe,0,out_of_work)
                 else: # 
-                    employment_status,pension,wage,time_in_state,netto,toe,out_of_work=self.move_to_unemp(pension,old_wage,age,toe,pinkslip,out_of_work,tyoura)
+                    employment_status,paid_pension,pension,wage,time_in_state,netto,toe,out_of_work\
+                        =self.move_to_unemp(pension,old_wage,age,paid_pension,toe,pinkslip,out_of_work,tyoura)
                 pinkslip=0
             elif action == 3: # 
                 employment_status,pension,wage,time_in_state,netto,toe,tyoura,out_of_work=self.move_to_parttime(pension,old_wage,age,toe,tyoura,0,out_of_work)
@@ -1616,28 +1628,28 @@ class UnemploymentLargeEnv(gym.Env):
         if g<3: # miehet
             if age<30:
                 kappa_outsider=0.20 #((30-age)*0.3)/10
-                kappa_kokoaika=0.62 #((30-age)*0.45+(age-20)*0.87)/10
+                kappa_kokoaika=0.64 #((30-age)*0.45+(age-20)*0.87)/10
             else:
                 if age<self.min_retirementage:
-                    kappa_outsider=0.20 +(age-30)*0.03
+                    kappa_outsider=0.20+(min(age,50)-30)/20*0.15
                 else:
                     kappa_outsider=0
-                kappa_kokoaika=0.62
+                kappa_kokoaika=0.64
         else: # naiset
             if age<30:
                 kappa_outsider=0.20 #((30-age)*0.3)/10
-                kappa_kokoaika=0.58 #((30-age)*0.40+(age-20)*0.80)/10
+                kappa_kokoaika=0.56 #((30-age)*0.40+(age-20)*0.80)/10
             else:
                 if age<self.min_retirementage:
-                    kappa_outsider=0.20 +(age-30)*0.03
+                    kappa_outsider=0.20+(min(age,50)-30)/20*0.15
                 else:
                     kappa_outsider=0
-                kappa_kokoaika=0.58
+                kappa_kokoaika=0.56
             
         #kappa_osaaika=2/3*kappa_kokoaika
         kappa_osaaika=1/2*kappa_kokoaika
         #kappa_ve=1.0 # FINAL
-        kappa_ve=0.65
+        kappa_ve=0.60
         
         #if g==0 or g==3: # pienituloinen ryhmä
         #    kappa_opiskelija=1
@@ -1648,12 +1660,12 @@ class UnemploymentLargeEnv(gym.Env):
         #else: # muissa ryhmissä ei opiskelupreferenssiä
         #    kappa_opiskelija=0
         
-        kappa_opiskelija=1.13
+        kappa_opiskelija=1.10
             
         # mu=0.05 # how much penalty is associated with work increase with age # FINAL
         # mu_age=58 # Final
-        mu=0.15 # how much penalty is associated with work increase with age after mu_age
-        mu_age=60 # P.O. 60??
+        mu=0.20 # how much penalty is associated with work increase with age after mu_age
+        mu_age=59 # P.O. 60??
         min_student_age=20
         #max_student_age=25 # FINAL
         max_student_age=30
@@ -1672,10 +1684,10 @@ class UnemploymentLargeEnv(gym.Env):
             u=np.log(income)+kappa_outsider
         elif employment_state == 12:
             if age<max_student_age:
-                kappa=max(0.7,(max_student_age-max(min_student_age,age))/(max_student_age-min_student_age)*kappa_opiskelija)
+                kappa=max(0.6,(max_student_age-max(min_student_age,age))/(max_student_age-min_student_age)*kappa_opiskelija)
                 u=np.log(income)+kappa
             elif age<60:
-                kappa=0.7 # max(0,(60-max(30,age))/30)*0.4
+                kappa=0.6 # max(0,(60-max(30,age))/30)*0.4
                 u=np.log(income)+kappa
             else:
                 u=np.log(income)
