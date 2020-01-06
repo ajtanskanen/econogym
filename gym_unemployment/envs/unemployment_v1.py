@@ -1627,8 +1627,8 @@ class UnemploymentLargeEnv(gym.Env):
         # kappa_kokoaika=0.80 # FINAL
         if g<3: # miehet
             if age<30:
-                kappa_outsider=0.20 #((30-age)*0.3)/10
-                kappa_kokoaika=0.64 #((30-age)*0.45+(age-20)*0.87)/10
+                kappa_outsider=0.20
+                kappa_kokoaika=0.64
             else:
                 if age<self.min_retirementage:
                     kappa_outsider=0.20+(min(age,45)-30)/15*0.20
@@ -1637,8 +1637,8 @@ class UnemploymentLargeEnv(gym.Env):
                 kappa_kokoaika=0.64
         else: # naiset
             if age<30:
-                kappa_outsider=0.20 #((30-age)*0.3)/10
-                kappa_kokoaika=0.56 #((30-age)*0.40+(age-20)*0.80)/10
+                kappa_outsider=0.20
+                kappa_kokoaika=0.56
             else:
                 if age<self.min_retirementage:
                     kappa_outsider=0.20+(min(age,45)-30)/15*0.20
@@ -1646,28 +1646,14 @@ class UnemploymentLargeEnv(gym.Env):
                     kappa_outsider=0
                 kappa_kokoaika=0.56
             
-        #kappa_osaaika=2/3*kappa_kokoaika
         kappa_osaaika=1/2*kappa_kokoaika
-        #kappa_ve=1.0 # FINAL
         kappa_ve=0.60
-        
-        #if g==0 or g==3: # pienituloinen ryhmä
-        #    kappa_opiskelija=1
-        #elif g==1 or g==4: # keskituloinen ryhmä
-        #    kappa_opiskelija=1
-        #elif g==2 or g==5:  # suurituloisin ryhmä
-        #    kappa_opiskelija=1
-        #else: # muissa ryhmissä ei opiskelupreferenssiä
-        #    kappa_opiskelija=0
         
         kappa_opiskelija=1.10
             
-        # mu=0.05 # how much penalty is associated with work increase with age # FINAL
-        # mu_age=58 # Final
         mu=0.20 # how much penalty is associated with work increase with age after mu_age
         mu_age=60 # P.O. 60??
         min_student_age=20
-        #max_student_age=25 # FINAL
         max_student_age=30
 
         if age>mu_age:
