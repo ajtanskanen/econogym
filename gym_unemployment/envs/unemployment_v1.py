@@ -1631,7 +1631,7 @@ class UnemploymentLargeEnv(gym.Env):
                 kappa_kokoaika=0.64 #((30-age)*0.45+(age-20)*0.87)/10
             else:
                 if age<self.min_retirementage:
-                    kappa_outsider=0.20+(min(age,50)-30)/20*0.15
+                    kappa_outsider=0.20+(min(age,45)-30)/15*0.20
                 else:
                     kappa_outsider=0
                 kappa_kokoaika=0.64
@@ -1641,7 +1641,7 @@ class UnemploymentLargeEnv(gym.Env):
                 kappa_kokoaika=0.56 #((30-age)*0.40+(age-20)*0.80)/10
             else:
                 if age<self.min_retirementage:
-                    kappa_outsider=0.20+(min(age,50)-30)/20*0.15
+                    kappa_outsider=0.20+(min(age,45)-30)/15*0.20
                 else:
                     kappa_outsider=0
                 kappa_kokoaika=0.56
@@ -1665,7 +1665,7 @@ class UnemploymentLargeEnv(gym.Env):
         # mu=0.05 # how much penalty is associated with work increase with age # FINAL
         # mu_age=58 # Final
         mu=0.20 # how much penalty is associated with work increase with age after mu_age
-        mu_age=59 # P.O. 60??
+        mu_age=60 # P.O. 60??
         min_student_age=20
         #max_student_age=25 # FINAL
         max_student_age=30
