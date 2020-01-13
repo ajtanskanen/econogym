@@ -1639,30 +1639,30 @@ class UnemploymentLargeEnv(gym.Env):
         if g<3: # miehet
             if age<30:
                 kappa_outsider=0.20
-                kappa_kokoaika=0.74
+                kappa_kokoaika=0.70
             else:
                 if age<self.min_retirementage:
                     kappa_outsider=0.20#+(min(age,45)-30)/15*0.20
                 else:
                     kappa_outsider=0
-                kappa_kokoaika=0.74
+                kappa_kokoaika=0.70
         else: # naiset
             if age<30:
                 kappa_outsider=0.20
-                kappa_kokoaika=0.64
+                kappa_kokoaika=0.60
             else:
                 if age<self.min_retirementage:
                     kappa_outsider=0.20#+(min(age,45)-30)/15*0.20
                 else:
                     kappa_outsider=0
-                kappa_kokoaika=0.64
+                kappa_kokoaika=0.60
             
         kappa_osaaika=0.4*kappa_kokoaika
         kappa_ve=0.40
         
         kappa_opiskelija=1.10
             
-        mu=0.30 # how much penalty is associated with work increase with age after mu_age
+        mu=0.25 # how much penalty is associated with work increase with age after mu_age
         mu_age=60 # P.O. 60??
         min_student_age=20
         max_student_age=30
