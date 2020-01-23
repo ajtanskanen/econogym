@@ -101,7 +101,6 @@ class UnemploymentLargeEnv(gym.Env):
         self.min_salary=1000
 
         self.timestep=0.25
-        self.gamma=0.92**self.timestep # discounting
         self.max_age=71
         self.min_age=20
         self.min_retirementage=63.5 #65
@@ -109,9 +108,6 @@ class UnemploymentLargeEnv(gym.Env):
 
         self.elinaikakerroin=0.925 # etk:n arvio 1962 syntyneille
         reaalinen_palkkojenkasvu=1.016
-        self.palkkakerroin=(0.8*1+0.2*1.0/reaalinen_palkkojenkasvu)**self.timestep
-        self.elakeindeksi=(0.2*1+0.8*1.0/reaalinen_palkkojenkasvu)**self.timestep
-        self.kelaindeksi=(1.0/reaalinen_palkkojenkasvu)**self.timestep
 
         self.include_mort=False # onko kuolleisuus mukana laskelmissa
         #self.include300=True # onko työuran kesto mukana laskelmissa
@@ -120,6 +116,7 @@ class UnemploymentLargeEnv(gym.Env):
         self.mortstop=True # pysäytä kuolleisuuden jälkeen
         self.include_putki=True # työttömyysputki mukana
         self.include_pinkslip=True # irtisanomiset mukana
+        gamma=0.92
 
         self.plotdebug=False # tulostetaanko rivi riviltä tiloja
 
@@ -137,7 +134,7 @@ class UnemploymentLargeEnv(gym.Env):
                     self.mortstop=value
             elif key=='gamma':
                 if value is not None:
-                    self.gamma=value
+                    gamma=value
             elif key=='min_age':
                 if value is not None:
                     self.min_age=value
@@ -186,6 +183,11 @@ class UnemploymentLargeEnv(gym.Env):
         # ei skaalata!
         #self.ansiopvraha_kesto400=self.ansiopvraha_kesto400/(12*21.5)
         #self.ansiopvraha_kesto300=self.ansiopvraha_kesto300/(12*21.5)              
+
+        self.gamma=gamma**self.timestep # discounting
+        self.palkkakerroin=(0.8*1+0.2*1.0/reaalinen_palkkojenkasvu)**self.timestep
+        self.elakeindeksi=(0.2*1+0.8*1.0/reaalinen_palkkojenkasvu)**self.timestep
+        self.kelaindeksi=(1.0/reaalinen_palkkojenkasvu)**self.timestep
 
         # paljonko työstä poissaolo vaikuttaa palkkaan
         self.salary_const=0.05*self.timestep
@@ -1745,7 +1747,7 @@ class UnemploymentLargeEnv(gym.Env):
         if income<1:
             print('inf: state ',employment_state)
 
-        return u/10 # skaalataan
+        return u/10*self.timestep # skaalataan
 
     # From Määttänen, 2013
     def wage_process(self,w,age,ave=3300*12):
