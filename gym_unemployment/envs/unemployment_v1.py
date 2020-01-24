@@ -482,7 +482,7 @@ class UnemploymentLargeEnv(gym.Env):
         if debug:
             dfactor=np.array([1.0,1.0,1.0,1.0,1.0,1.0])
         else:
-            dfactor=np.array([1.3,1.0,0.7,1.2,1.0,0.8])
+            dfactor=np.array([1.3,1.0,0.8,1.15,1.0,0.85])
         # tilastokeskuksen kuolleisuusdata 2017 sukupuolittain
         mort[:,1]=np.array([2.12,0.32,0.17,0.07,0.07,0.10,0.00,0.09,0.03,0.13,0.03,0.07,0.10,0.10,0.10,0.23,0.50,0.52,0.42,0.87,0.79,0.66,0.71,0.69,0.98,0.80,0.77,1.07,0.97,0.76,0.83,1.03,0.98,1.20,1.03,0.76,1.22,1.29,1.10,1.26,1.37,1.43,1.71,2.32,2.22,1.89,2.05,2.15,2.71,2.96,3.52,3.54,4.30,4.34,5.09,4.75,6.17,5.88,6.67,8.00,9.20,10.52,10.30,12.26,12.74,13.22,15.03,17.24,18.14,17.78,20.35,25.57,23.53,26.50,28.57,31.87,34.65,40.88,42.43,52.28,59.26,62.92,68.86,72.70,94.04,99.88,113.11,128.52,147.96,161.89,175.99,199.39,212.52,248.32,260.47,284.01,319.98,349.28,301.37,370.17,370.17])/1000.0
         mort[:,0]=dfactor[0]*mort[:,1]
@@ -564,7 +564,7 @@ class UnemploymentLargeEnv(gym.Env):
         if debug:
             dfactor=np.array([1.0,1.0,1.0,1.0,1.0,1.0])
         else:
-            dfactor=np.array([1.5,1.0,0.5,1.2,1.0,0.8])
+            dfactor=np.array([1.3,1.0,0.4,1.2,1.0,0.5]) # uusitalon selvityksestä Työkyvyttömyyden vuoksi menetetty työura
             
         dis_miehet=np.array([ 0.004630,0.004356,0.003559,0.003081,0.003381,0.002937,0.002835,0.002951,0.002232,0.002088,0.001808,0.002747,0.002540,0.002851,0.002854,0.002704,0.002764,0.002691,0.002923,0.003033,0.003231,0.002886,0.002947,0.003319,0.003487,0.003864,0.003816,0.004289,0.005225,0.005248,0.005923,0.006897,0.006780,0.008412,0.009394,0.010691,0.012313,0.013471,0.015919,0.020455,0.026545,0.022420,0.015017,0.003898,0.000286,0.015017,0.015017,0.015017,0.015017,0.015017,0.015017 ])
         dis_naiset=np.array([ 0.005557,0.005064,0.004733,0.003931,0.003340,0.003180,0.002937,0.003415,0.002572,0.002710,0.002500,0.003701,0.002778,0.003217,0.003242,0.003512,0.003326,0.003402,0.003504,0.004077,0.004424,0.004442,0.004355,0.005005,0.005032,0.005847,0.005579,0.006115,0.006144,0.006849,0.008927,0.007070,0.008676,0.010337,0.008784,0.012450,0.013127,0.015199,0.019386,0.022249,0.029828,0.026609,0.016825,0.003603,0.000211,0.016825,0.016825,0.016825,0.016825,0.016825,0.016825 ])
@@ -955,14 +955,14 @@ class UnemploymentLargeEnv(gym.Env):
             acc=self.acc
 
         if state in set([0,4]):
-            if age>=52 and age<63:
-                acc=self.acc_unemp_over_52
-            else:
+        	if age<52:
                 acc=self.acc_unemp
+            else 
+                acc=self.acc_unemp_over_52
             
-            if age<65:
+            if age<self.min_retirement:
                 pension=pension*self.palkkakerroin+acc*wage
-            else:
+            else: # muuten ei karttumaa
                 pension=pension*self.palkkakerroin
         elif state in set([1,10]):
             if age<self.max_retirementage:
@@ -991,7 +991,7 @@ class UnemploymentLargeEnv(gym.Env):
             else:
                 pension=pension*self.palkkakerroin
         elif state == 13: # tm-tuki
-            if age<65:
+            if age<self.min_retirementage:
                 pension=pension*self.palkkakerroin+self.accbasis_tmtuki*acc
             else:
                 pension=pension*self.palkkakerroin
@@ -1181,10 +1181,10 @@ class UnemploymentLargeEnv(gym.Env):
                 print('error 17')
         elif employment_status == 4: # työttömyysputki
             time_in_state+=self.timestep
-            if age >= self.min_retirementage:
-                employment_status,paid_pension,pension,wage,time_in_state,netto,out_of_work,wage_reduction=\
-                    self.move_to_retirement(pension,0,age,paid_pension,employment_status,out_of_work,wage_reduction,all_acc=True)
-            elif action == 0: # or (action == 2 and age < self.min_retirementage):
+            #if age >= self.min_retirementage:
+            #    employment_status,paid_pension,pension,wage,time_in_state,netto,out_of_work,wage_reduction=\
+            #        self.move_to_retirement(pension,0,age,paid_pension,employment_status,out_of_work,wage_reduction,all_acc=True)
+            if action == 0: # or (action == 2 and age < self.min_retirementage):
                 employment_status  = 4 # unchanged
                 wage=old_wage # self.get_wage(intage,time_in_state)
                 toe=max(0,toe-self.timestep)
@@ -1605,7 +1605,7 @@ class UnemploymentLargeEnv(gym.Env):
             tyoura=0
             toe=0
 
-            if action == 0 or (action==2 and age<25):
+            if action == 0: # or (action==2 and age<25):
                 employment_status = 12 # unchanged
                 time_in_state+=self.timestep
                 wage=old_wage
@@ -1683,31 +1683,32 @@ class UnemploymentLargeEnv(gym.Env):
         Log-utiliteettifunktio muokattuna lähteestä Määttänen, 2013 & Hakola & Määttänen, 2005
 
         Käytetään, jos laskelmissa on mukana satunnaisuutta
+        Tulot _income_ ovat vuositasolla, jotta askelpituuden muutos ei vaikuta vapaa-aika-vakioihin
         '''
 
         # kappa tells how much person values free-time
         # kappa_kokoaika=0.80 # FINAL
         if g<3: # miehet
             kappa_kokoaika=0.73
-            mu_scale=0.11 # how much penalty is associated with work increase with age after mu_age
+            mu_scale=0.10 # how much penalty is associated with work increase with age after mu_age
             mu_age=59 # P.O. 60??
             if age < 60:
-                kappa_opiskelija=0.45
+                kappa_opiskelija=0.40
             else:
                 kappa_opiskelija=0
         else: # naiset
-            kappa_kokoaika=0.54
-            mu_scale=0.13 # how much penalty is associated with work increase with age after mu_age
+            kappa_kokoaika=0.49
+            mu_scale=0.10 # how much penalty is associated with work increase with age after mu_age
             mu_age=59 # P.O. 60??
             if age < 60:
-                kappa_opiskelija=0.60
+                kappa_opiskelija=0.55
             else:
                 kappa_opiskelija=0
             
-        kappa_outsider=-0.03
-        kappa_ve=0.30
+        kappa_outsider=-0.1
+        kappa_ve=0.40
             
-        kappa_osaaika=0.5*kappa_kokoaika
+        kappa_osaaika=0.6*kappa_kokoaika
         
         
         if age<25:
@@ -1717,7 +1718,7 @@ class UnemploymentLargeEnv(gym.Env):
             if pinkslip>0: # irtisanottu
                 kappa_pinkslip = 0 # irtisanotuille ei vaikutuksia
             else:
-                kappa_pinkslip = 0.2 # irtisanoutumisesta seuraava alennus
+                kappa_pinkslip = 0.1 # irtisanoutumisesta seuraava alennus
         
         if age>mu_age:
             kappa_kokoaika *= (1+mu_scale*max(0,age-mu_age))
@@ -1747,7 +1748,8 @@ class UnemploymentLargeEnv(gym.Env):
         if income<1:
             print('inf: state ',employment_state)
 
-        return u/10*self.timestep # skaalataan
+        #return u/10*self.timestep # tulot ovat vuositasolla, mutta skaalataan hyöty
+        return u/10 # tulot ovat vuositasolla, mutta skaalataan hyöty
 
     # From Määttänen, 2013
     def wage_process(self,w,age,ave=3300*12):
