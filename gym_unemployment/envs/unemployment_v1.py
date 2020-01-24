@@ -955,12 +955,12 @@ class UnemploymentLargeEnv(gym.Env):
             acc=self.acc
 
         if state in set([0,4]):
-        	if age<52:
+            if age<52:
                 acc=self.acc_unemp
-            else 
+            else:
                 acc=self.acc_unemp_over_52
             
-            if age<self.min_retirement:
+            if age<self.min_retirementage:
                 pension=pension*self.palkkakerroin+acc*wage
             else: # muuten ei karttumaa
                 pension=pension*self.palkkakerroin
