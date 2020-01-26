@@ -67,7 +67,7 @@ class UnemploymentEnv(gym.Env):
         self.elakeindeksi=0.2*1+0.8*1.0/1.016
         
         self.timestep=1.0
-        self.gamma=0.92 # discounting
+        gamma=0.92 # discounting
         self.max_age=75
         self.min_age=25
         self.min_retirementage=65
@@ -87,7 +87,7 @@ class UnemploymentEnv(gym.Env):
                     self.timestep==value
             elif key=='gamma':
                 if value is not None:
-                    self.gamma==value
+                    gamma==value
             elif key=='min_age':
                 if value is not None:
                     self.min_age=value
@@ -112,6 +112,7 @@ class UnemploymentEnv(gym.Env):
         #self.ansiopvraha_kesto400=self.ansiopvraha_kesto400/(12*21.5)
 
         self.salary_const=0.05*self.timestep
+        self.gamma=gamma**self.timestep
         
         self.acc=0.015*self.timestep
         self.acc_unemp=0.75*self.acc
