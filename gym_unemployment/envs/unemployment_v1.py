@@ -110,6 +110,7 @@ class UnemploymentLargeEnv(gym.Env):
         reaalinen_palkkojenkasvu=1.016
 
         self.include_mort=False # onko kuolleisuus mukana laskelmissa
+        self.include_preferencenoise=False # onko työllisyyspreferenssissä hajonta mukana 
         #self.include300=True # onko työuran kesto mukana laskelmissa
         self.perustulo=False # onko Kelan perustulo laskelmissa
         self.randomness=True # onko stokastiikka mukana
@@ -254,16 +255,13 @@ class UnemploymentLargeEnv(gym.Env):
 
         self.steps_beyond_done = None
 
-        if self.randomness:
-            self.log_utility=self.log_utility_randomness
-        else:
-            self.log_utility=self.log_utility_norandomness
+        self.log_utility=self.log_utility_randomness
 
         #if self.perustulo:
         #    self.log_utility=self.log_utility_perustulo
 
         self.ben = fin_benefits.Benefits()
-        #self.explain()
+        self.explain()
 
     def comp_npv(self):
         '''
@@ -591,6 +589,9 @@ class UnemploymentLargeEnv(gym.Env):
         return disab        
 
     def get_birth_rate(self,debug=False):
+        '''
+        Syntyvyysdata
+        '''
         birth=np.zeros((69,self.n_groups)) # 
         if debug:
             dfactor=np.array([1.0,1.0,1.0,1.0,1.0,1.0])
@@ -937,7 +938,7 @@ class UnemploymentLargeEnv(gym.Env):
     def decode_info_state(self):
         '''
         Ei käytössä
-        Tapa tallentaa lapsia yms
+        Tällä menetelmällä voi tallentaa tarkempia tietoja lapsista,puolisoista yms
         '''
         tyoura,lapsia,lapsen_ika,lapsia_paivakodissa,n_lapsilisa,n_tyotturva=self.infostate
         return tyoura,lapsia,lapsen_ika,lapsia_paivakodissa,n_lapsilisa,n_tyotturva
@@ -945,14 +946,14 @@ class UnemploymentLargeEnv(gym.Env):
     def encode_info_state(self,tyoura,lapsia,lapsen_ika,lapsia_paivakodissa,n_lapsilisa,n_tyotturva):
         '''
         Ei käytössä
-        Tapa tallentaa lapsia yms
+        Tällä menetelmällä voi tallentaa tarkempia tietoja lapsista,puolisoista yms
         '''
         self.infostate=(tyoura,lapsia,lapsen_ika,lapsia_paivakodissa,n_lapsilisa,n_tyotturva)
 
     def update_info_state(self):
         '''
         Ei käytössä
-        Tapa tallentaa lapsia yms
+        Tällä menetelmällä voi tallentaa tarkempia tietoja lapsista,puolisoista yms
         '''
         tyoura,lapsia,lapsen_ika,lapsia_paivakodissa,n_lapsilisa,n_tyotturva=self.decode_info_state()
 
@@ -1106,7 +1107,8 @@ class UnemploymentLargeEnv(gym.Env):
                 done = bool(done)
 
             self.state = self.state_encode(employment_status,g,pension,wage,age+self.timestep,
-                            time_in_state,paid_pension,pinkslip,toe,tyoura,nextwage,out_of_work)
+                            time_in_state,paid_pension,pinkslip,toe,tyoura,nextwage,out_of_work,
+                            used_unemp_benefit,wage_reduction)
             reward=0
             return np.array(self.state), reward, done, {}
         elif age>=self.max_retirementage:
@@ -1125,9 +1127,9 @@ class UnemploymentLargeEnv(gym.Env):
                 #toe=max(0.0,toe-self.timestep)
 
                 netto=self.comp_benefits(0,old_wage,0,employment_status,used_unemp_benefit,age,tyohistoria=tyoura)
+                used_unemp_benefit+=self.timestep
+                out_of_work+=self.timestep
                 kesto=12*21.5*used_unemp_benefit
-                
-                #print('age {} ura {} vaade {} kesto {} vs {} tai {}'.format(age,tyoura,self.tyohistoria_vaatimus,kesto,self.ansiopvraha_kesto400,self.ansiopvraha_kesto300))
                     
                 if ((tyoura>=self.tyohistoria_vaatimus and kesto>=self.ansiopvraha_kesto400) \
                     or (tyoura<self.tyohistoria_vaatimus and kesto>=self.ansiopvraha_kesto300)):
@@ -1140,9 +1142,6 @@ class UnemploymentLargeEnv(gym.Env):
                 else:
                     pension=self.pension_accrual(age,old_wage,pension,state=0)
 
-                used_unemp_benefit+=self.timestep
-                out_of_work+=self.timestep
-                    
             elif action == 1: # 
                 employment_status,pension,wage,time_in_state,netto,toe,tyoura,out_of_work,pinkslip,wage_reduction=\
                     self.move_to_work(pension,old_wage,age,time_in_state,toe,tyoura,out_of_work,pinkslip,wage_reduction)
@@ -1699,9 +1698,14 @@ class UnemploymentLargeEnv(gym.Env):
 
         # seuraava palkka tiedoksi valuaatioapproksimaattorille
         next_wage=self.get_wage(int(np.floor(age+self.timestep)),wage_reduction)
-
-        self.state = self.state_encode(employment_status,g,pension,wage,age+self.timestep,time_in_state,
-                                paid_pension,pinkslip,toe,tyoura,next_wage,out_of_work,used_unemp_benefit,wage_reduction)
+        
+        if self.include_preferencenoise:
+            self.state = self.state_encode(employment_status,g,pension,wage,age+self.timestep,time_in_state,
+                                    paid_pension,pinkslip,toe,tyoura,next_wage,out_of_work,used_unemp_benefit,wage_reduction,
+                                    prefnoise=prefnoise)
+        else:
+            self.state = self.state_encode(employment_status,g,pension,wage,age+self.timestep,time_in_state,
+                                    paid_pension,pinkslip,toe,tyoura,next_wage,out_of_work,used_unemp_benefit,wage_reduction)
 
         if self.plotdebug:
             self.render(done=done,reward=reward, netto=netto)
@@ -1709,7 +1713,7 @@ class UnemploymentLargeEnv(gym.Env):
         return np.array(self.state), reward, done, {}
 
     # WITH RANDOMNESS
-    def log_utility_randomness(self,income,employment_state,age,g=0,pinkslip=0):
+    def log_utility_randomness(self,income,employment_state,age,g=0,pinkslip=0,prefnoise=0):
         '''
         Log-utiliteettifunktio muokattuna lähteestä Määttänen, 2013 & Hakola & Määttänen, 2005
 
@@ -1718,33 +1722,39 @@ class UnemploymentLargeEnv(gym.Env):
         '''
 
         # kappa tells how much person values free-time
-        # kappa_kokoaika=0.80 # FINAL
         if g<3: # miehet
             kappa_kokoaika=0.70
-            mu_scale=0.15 # how much penalty is associated with work increase with age after mu_age
+            mu_scale=0.10 # how much penalty is associated with work increase with age after mu_age
             mu_age=59 # P.O. 60??
             if age < 60:
-                kappa_opiskelija=0.45
+                kappa_opiskelija=0.48
             else:
                 kappa_opiskelija=0
         else: # naiset
-            kappa_kokoaika=0.59
-            mu_scale=0.15 # how much penalty is associated with work increase with age after mu_age
+            kappa_kokoaika=0.60
+            mu_scale=0.10 # how much penalty is associated with work increase with age after mu_age
             mu_age=59 # P.O. 60??
             if age < 60:
-                kappa_opiskelija=0.56
+                kappa_opiskelija=0.58
             else:
                 kappa_opiskelija=0
+                
+        if self.include_preferencenoise:
+            kappa_kokoaika+=prefnoise
             
-        kappa_outsider=-0.1
-        kappa_ve=0.20
+        # tarpeen?
+        if age>40:
+            kappa_outsider=0.0
+        else: # alle 40-vuotiaalla prefenssi hienoisesti eri kuin 40 vuotta täyttäneellä
+            kappa_outsider=-0.1
             
-        kappa_osaaika=0.6*kappa_kokoaika
+        kappa_ve=0.10
+        kappa_osaaika=0.55*kappa_kokoaika
         
         
         if age<25:
             # alle 25-vuotiaalla eri säännöt, vanhempien tulot huomioidaan jne
-            kappa_pinkslip = 0.3
+            kappa_pinkslip = 0.25
         else:
             if pinkslip>0: # irtisanottu
                 kappa_pinkslip = 0 # irtisanotuille ei vaikutuksia
@@ -1779,7 +1789,6 @@ class UnemploymentLargeEnv(gym.Env):
         if income<1:
             print('inf: state ',employment_state)
 
-        #return u/10*self.timestep # tulot ovat vuositasolla, mutta skaalataan hyöty
         return u/10 # tulot ovat vuositasolla, mutta skaalataan hyöty
 
     # From Määttänen, 2013
@@ -1889,16 +1898,17 @@ class UnemploymentLargeEnv(gym.Env):
 
 
     def state_encode_mort(self,emp,g,pension,old_wage,age,time_in_state,paid_pension,pink,
-                          toe,tyohist,next_wage,out_of_work,used_unemp_benefit):
+                          toe,tyohist,next_wage,out_of_work,used_unemp_benefit,wage_reduction,
+                          prefnoise=0):
         '''
         Tilan koodaus neuroverkkoa varten. Arvot skaalataan ja tilat one-hot-enkoodataan
 
         Käytetään, jos kuolleisuus mukana
         '''
-        #if self.include300:
-        d=np.zeros(self.n_empl+self.n_groups+13)
-        #else:
-        #    d=np.zeros(self.n_empl+self.n_groups+7)
+        if self.include_preferencenoise:
+            d=np.zeros(self.n_empl+self.n_groups+14)
+        else:
+            d=np.zeros(self.n_empl+self.n_groups+13)
 
         states=self.n_empl
         if emp==1:
@@ -1977,8 +1987,10 @@ class UnemploymentLargeEnv(gym.Env):
         d[states2+9]=retaged
         d[states2+10]=(next_wage-40_000)/15_000
         #d[states2+11]=(out_of_work-3)/10
-        d[states2+12]=used_unemp_benefit
+        d[states2+11]=used_unemp_benefit
         d[states2+12]=wage_reduction
+        if self.include_preferencenoise:
+            d[states2+13]=prefnoise
         
         #d[states2+10]=lapsia # lapsien lkm
         #d[states2+11]=lapsia_paivakodissa # nuorimman lapsen ika
@@ -1987,16 +1999,18 @@ class UnemploymentLargeEnv(gym.Env):
 
 
     def state_encode_nomort(self,emp,g,pension,old_wage,age,time_in_state,paid_pension,pink,
-                            toe,tyohist,next_wage,out_of_work,used_unemp_benefit,wage_reduction):
+                            toe,tyohist,next_wage,out_of_work,used_unemp_benefit,wage_reduction,
+                              prefnoise=0):
         '''
         Tilan koodaus neuroverkkoa varten. Arvot skaalataan ja tilat one-hot-enkoodataan
 
         Käytetään, jos kuolleisuus ei mukana
         '''
-        #if self.include300:
-        d=np.zeros(self.n_empl+self.n_groups+13)
-        #else:
-        #    d=np.zeros(self.n_empl+self.n_groups+8)
+        if self.include_preferencenoise:
+            d=np.zeros(self.n_empl+self.n_groups+14)
+        else:
+            d=np.zeros(self.n_empl+self.n_groups+13)
+            
         states=self.n_empl
         if emp==1:
             d[0:states]=np.array([0,1,0,0,0,0,0,0,0,0,0,0,0,0])
@@ -2078,6 +2092,8 @@ class UnemploymentLargeEnv(gym.Env):
         #d[states2+11]=(out_of_work-3)/10        
         d[states2+11]=used_unemp_benefit
         d[states2+12]=wage_reduction
+        if self.include_preferencenoise:
+            d[states2+13]=prefnoise
         
         return d
 
@@ -2141,7 +2157,7 @@ class UnemploymentLargeEnv(gym.Env):
         pink=0
         toe=0
         tyohist=0
-
+        
         # set up salary for the entire career
         g=random.choices(np.array([0,1,2],dtype=int),weights=[0.3,0.5,0.2])[0]
         gender=random.choices(np.array([0,1],dtype=int),weights=[0.5,0.5])[0]
@@ -2169,9 +2185,15 @@ class UnemploymentLargeEnv(gym.Env):
         if self.plotdebug:
             print('emp {} gender {} g {} old_wage {} next_wage {}'.format(employment_status,gender,g,old_wage,next_wage))
 
-        self.state = self.state_encode(employment_status,group,pension,old_wage,self.min_age,
-                                        time_in_state,0,pink,toe,tyohist,next_wage,out_of_w,
-                                        used_unemp_benefit,wage_reduction)
+        if self.include_preferencenoise:
+            prefnoise=np.random.normal(loc=0,scale=0.1,size=1)[0]
+            self.state = self.state_encode(employment_status,group,pension,old_wage,self.min_age,
+                                            time_in_state,0,pink,toe,tyohist,next_wage,out_of_w,
+                                            used_unemp_benefit,wage_reduction,prefnoise=prefnoise)
+        else:
+            self.state = self.state_encode(employment_status,group,pension,old_wage,self.min_age,
+                                            time_in_state,0,pink,toe,tyohist,next_wage,out_of_w,
+                                            used_unemp_benefit,wage_reduction)
         self.steps_beyond_done = None
 
         return np.array(self.state)
@@ -2241,12 +2263,14 @@ class UnemploymentLargeEnv(gym.Env):
         ben_max=3
         wr_min=0
         wr_max=1
+        pref_min=-5
+        pref_max=5
 
         # korjaa
         if self.include_mort: # and not self.mortstop:
             #if self.include300:
             # Limits on states
-            self.low = np.array([
+            low = [
                 state_min,
                 state_min,
                 state_min,
@@ -2281,8 +2305,8 @@ class UnemploymentLargeEnv(gym.Env):
                 wage_min,
                 #out_min,
                 ben_min,
-                wr_min])
-            self.high = np.array([
+                wr_min]
+            high = [
                 state_max,
                 state_max,
                 state_max,
@@ -2317,9 +2341,9 @@ class UnemploymentLargeEnv(gym.Env):
                 wage_max,
                 #out_max,
                 ben_max,
-                wr_max])  
+                wr_max] 
         else:
-            self.low = np.array([
+            low = [
                 state_min,
                 state_min,
                 state_min,
@@ -2353,8 +2377,8 @@ class UnemploymentLargeEnv(gym.Env):
                 wage_min,
                 #out_min,
                 ben_min,
-                wr_min])
-            self.high = np.array([
+                wr_min]
+            high = [
                 state_max,
                 state_max,
                 state_max,
@@ -2388,7 +2412,15 @@ class UnemploymentLargeEnv(gym.Env):
                 wage_max,
                 #out_max,
                 ben_max,
-                wr_max])
+                wr_max]
+                
+        if self.include_preferencenoise:
+            low.append(pref_min)
+            high.append(pref_max)
+                
+        self.low=np.array(low)
+        self.high=np.array(high)
+        
         if debug:  
             print(self.low.shape,self.high.shape)
             
@@ -2400,52 +2432,3 @@ class UnemploymentLargeEnv(gym.Env):
         print('max_retirementage {}\nansiopvraha_kesto300 {}\nansiopvraha_kesto400 {}\nansiopvraha_toe {}'.format(self.max_retirementage,self.ansiopvraha_kesto300,self.ansiopvraha_kesto400,self.toe_vaatimus))
         print('perustulo {}\nkarenssi_kesto {}\nmortality {}\nrandomness {}'.format(self.perustulo,self.karenssi_kesto,self.include_mort,self.randomness))
         print('include_putki {}\ninclude_pinkslip {}\n'.format(self.include_putki,self.include_pinkslip))
-
-    # NO RANDOMNESS, älä käytä
-    def log_utility_norandomness(self,income,employment_state,age,g=0,pinkslip=0):
-        '''
-        Log-utiliteettifunktio hieman muokattuna lähteestä Määttänen, 2013 & Hakola & Määttänen, 2005
-
-        Käytetään, jos laskelmissa ei satunnaisuutta
-        '''
-        # kappa tells how much person values free-time
-        # kappa_kokoaika=0.58 # vuositasolla sopiva
-        # kappa_osaaika=0.29 # vuositasolla sopiva
-
-        kappa_kokoaika=0.70
-        kappa_osaaika=0.66*kappa_kokoaika
-        kappa_ve=0.20
-        kappa_opiskelija=2.00
-        mu=0.20 # how much penalty increase (with age) is associated with work
-        min_student_age=20
-        max_student_age=27
-
-        if age>=58:
-            kappa_kokoaika *= (1+mu*max(0,age-58))
-            kappa_osaaika *= (1+mu*max(0,age-58))
-
-        if employment_state == 1 or employment_state == 8:
-            u=np.log(income)-kappa_kokoaika
-        elif employment_state == 10 or employment_state == 9:
-            u=np.log(income)-kappa_osaaika
-        elif employment_state == 2 and age>=self.min_retirementage:
-            u=np.log(income)+kappa_ve
-        elif employment_state == 11:
-            u=np.log(income)+kappa_ve
-        elif employment_state == 12:
-            if age < max_student_age:
-                kappa=max(0,(max_student_age-age)/(max_student_age-min_student_age)*kappa_opiskelija)
-                u=np.log(income)+kappa
-            else:
-                u=np.log(income)+kappa_ve
-        else:
-            u=np.log(income)
-
-        if u is np.inf:
-            print('inf: state ',employment_state)
-
-        if income<1:
-            print('inf: state ',employment_state)
-
-        return u/10 # skaalataan
-
