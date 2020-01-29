@@ -1737,17 +1737,17 @@ class UnemploymentLargeEnv(gym.Env):
 
         # kappa tells how much person values free-time
         if g<3: # miehet
-            kappa_kokoaika=0.66
-            mu_scale=0.10 # how much penalty is associated with work increase with age after mu_age
-            mu_age=59 # P.O. 60??
+            kappa_kokoaika=0.63
+            mu_scale=0.12 # how much penalty is associated with work increase with age after mu_age
+            mu_age=60 # P.O. 60??
             if age < 60:
                 kappa_opiskelija=0.48
             else:
                 kappa_opiskelija=0
         else: # naiset
-            kappa_kokoaika=0.56
-            mu_scale=0.10 # how much penalty is associated with work increase with age after mu_age
-            mu_age=59 # P.O. 60??
+            kappa_kokoaika=0.53
+            mu_scale=0.12 # how much penalty is associated with work increase with age after mu_age
+            mu_age=60 # P.O. 60??
             if age < 60:
                 kappa_opiskelija=0.58
             else:
