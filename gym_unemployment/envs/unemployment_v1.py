@@ -94,6 +94,7 @@ class UnemploymentLargeEnv(gym.Env):
         self.isyysvapaa_kesto=0.25 # = 3kk
         self.aitiysvapaa_kesto=0.75 # = 9kk ml vanhempainvapaa
         self.min_tyottputki_ika=61 # vuotta. Ikä, jonka täytyttyä pääsee putkeen
+        self.tyohistoria_tyottputki=5 # vuotta. vähimmäistyöura putkeenpääsylle
         self.kht_kesto=2.0 # kotihoidontuen kesto 2 v
         self.tyohistoria_vaatimus=3.0 # 3 vuotta
         self.tyohistoria_vaatimus500=5.0 # 5 vuotta
@@ -811,15 +812,13 @@ class UnemploymentLargeEnv(gym.Env):
         else:
             if toe>=self.toe_vaatimus:
                 kesto=12*21.5*used_unemp_benefit
-                if not (age>=self.minage_500 and tyoura>=self.tyohistoria_vaatimus500 and kesto<self.ansiopvraha_kesto500):
-                    if ((tyoura>=self.tyohistoria_vaatimus and kesto>=self.ansiopvraha_kesto400) \
-                        or (tyoura<self.tyohistoria_vaatimus and kesto>=self.ansiopvraha_kesto300)):
-                        if self.include_putki and age>=self.min_tyottputki_ika: 
-                            employment_status = 4 # siirto lisäpäiville
-                        else:
-                            employment_status = 13 # siirto työmarkkinatuelle
+                if ((tyoura>=self.tyohistoria_vaatimus500 and kesto>=self.ansiopvraha_kesto500 and age>=self.minage_500) \
+                    or (tyoura>=self.tyohistoria_vaatimus and kesto>=self.ansiopvraha_kesto400) \
+                    or (tyoura<self.tyohistoria_vaatimus and kesto>=self.ansiopvraha_kesto300)):
+                    if self.include_putki and age>=self.min_tyottputki_ika and tyoura>=self.tyohistoria_tyottputki: 
+                        employment_status = 4 # siirto lisäpäiville
                     else:
-                        employment_status  = 0 # switch
+                        employment_status = 13 # siirto työmarkkinatuelle
                 else:
                     employment_status  = 0 # switch
             else:
@@ -1145,9 +1144,10 @@ class UnemploymentLargeEnv(gym.Env):
                 out_of_work+=self.timestep
                 kesto=12*21.5*used_unemp_benefit
                     
-                if ((tyoura>=self.tyohistoria_vaatimus and kesto>=self.ansiopvraha_kesto400) \
+                if ((tyoura>=self.tyohistoria_vaatimus500 and kesto>=self.ansiopvraha_kesto500 and age>=self.minage_500) \
+                    or (tyoura>=self.tyohistoria_vaatimus and kesto>=self.ansiopvraha_kesto400) \
                     or (tyoura<self.tyohistoria_vaatimus and kesto>=self.ansiopvraha_kesto300)):
-                    if self.include_putki and age>=self.min_tyottputki_ika: 
+                    if self.include_putki and age>=self.min_tyottputki_ika and tyoura>=self.tyohistoria_tyottputki: 
                         employment_status = 4 # siirto lisäpäiville
                         pension=self.pension_accrual(age,old_wage,pension,state=4)
                     else:
@@ -1738,16 +1738,16 @@ class UnemploymentLargeEnv(gym.Env):
         # kappa tells how much person values free-time
         if g<3: # miehet
             kappa_kokoaika=0.63
-            mu_scale=0.12 # how much penalty is associated with work increase with age after mu_age
-            mu_age=60 # P.O. 60??
+            mu_scale=0.14 # how much penalty is associated with work increase with age after mu_age
+            mu_age=61 # P.O. 60??
             if age < 60:
                 kappa_opiskelija=0.48
             else:
                 kappa_opiskelija=0
         else: # naiset
-            kappa_kokoaika=0.53
-            mu_scale=0.12 # how much penalty is associated with work increase with age after mu_age
-            mu_age=60 # P.O. 60??
+            kappa_kokoaika=0.52
+            mu_scale=0.14 # how much penalty is associated with work increase with age after mu_age
+            mu_age=61 # P.O. 60??
             if age < 60:
                 kappa_opiskelija=0.58
             else:
@@ -1762,7 +1762,7 @@ class UnemploymentLargeEnv(gym.Env):
         else: # alle 40-vuotiaalla prefenssi hienoisesti eri kuin 40 vuotta täyttäneellä
             kappa_outsider=-0.08
             
-        kappa_ve=0.10
+        kappa_ve=0.10 # ehkä 0.10?
         kappa_osaaika=0.60*kappa_kokoaika
         
         
