@@ -157,6 +157,12 @@ class UnemploymentEnv(gym.Env):
         
         self.ben = fin_benefits.Benefits()
         
+    def get_n_states():
+        '''
+        Palauta parametrien arvoja
+        '''
+        return self.n_empl,self.n_actions
+        
     def comp_benefits(self,wage,old_wage,pension,employment_status,time_in_state,ika=25):
         '''
         Laske etuuksien arvo, kun 

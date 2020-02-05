@@ -56,7 +56,8 @@ class UnemploymentLargeEnv(gym.Env):
         11  Työvoiman ulkopuolella, ei tukia
         12  Opiskelija
         13  Työmarkkinatuki
-        14  Kuollut (jos kuolleisuus mukana)
+        14  Armeijassa
+        15  Kuollut (jos kuolleisuus mukana)
 
     Actions:
         These really depend on the state (see function step)
@@ -243,6 +244,7 @@ class UnemploymentLargeEnv(gym.Env):
         self.student_inrate,self.student_outrate=self.get_student_rate()
         self.student_inrate=self.student_inrate*self.timestep
         self.student_outrate=self.student_outrate*self.timestep
+        self.army_outrate=self.get_army_rate()*self.timestep
         self.npv=self.comp_npv()
 
         self.set_state_limits()
@@ -252,12 +254,14 @@ class UnemploymentLargeEnv(gym.Env):
             else:
                 print('Mortality included, not stopped')
 
-            self.n_empl=15 # state of employment, 0,1,2,3,4
+            self.n_empl=16 # state of employment, 0,1,2,3,4
             self.state_encode=self.state_encode_mort
         else:
             print('No mortality included')
-            self.n_empl=14 # state of employment, 0,1,2,3,4
+            self.n_empl=15 # state of employment, 0,1,2,3,4
             self.state_encode=self.state_encode_nomort
+
+        self.n_actions=4 # valittavien toimenpiteiden määrä
 
         self.action_space = spaces.Discrete(4)
         self.observation_space = spaces.Box(self.low, self.high, dtype=np.float32)
@@ -275,6 +279,12 @@ class UnemploymentLargeEnv(gym.Env):
 
         self.ben = fin_benefits.Benefits()
         self.explain()
+
+    def get_n_states():
+        '''
+        Palauta parametrien arvoja
+        '''
+        return self.n_empl,self.n_actions
 
     def comp_npv(self):
         '''
@@ -451,6 +461,12 @@ class UnemploymentLargeEnv(gym.Env):
             p['saa_ansiopaivarahaa']=0
             p['t']=0
             p['vakiintunutpalkka']=0
+        elif employment_status==14: # armeijassa, korjaa! ei tosin vaikuta tuloksiin.
+            p['tyoton']=0
+            p['opiskelija']=1
+            p['saa_ansiopaivarahaa']=0
+            p['t']=0
+            p['vakiintunutpalkka']=0
         else:
             print('Unknown employment_status ',employment_status)
 
@@ -512,7 +528,7 @@ class UnemploymentLargeEnv(gym.Env):
 
     def get_student_rate(self,debug=False):
         '''
-        Kuolleisuus-intensiteetit eri ryhmille
+        opiskelijoiden intensiteetit eri ryhmille
         '''
         inrate=np.zeros((101,self.n_groups))
         miehet_in=np.array([0.03809 ,0.00474 ,0.00000 ,0.00000 ,0.00000 ,0.00000 ,0.00000 ,0.00000 ,0.00000 ,0.00000 ,0.02938 ,0.02443 ,0.01947 ,0.01838 ,0.01624 ,0.01480 ,0.01368 ,0.01317 ,0.01199 ,0.01082 ,0.00991 ,0.00984 ,0.00847 ,0.00765 ,0.00740 ,0.00714 ,0.00672 ,0.00660 ,0.00646 ,0.00561 ,0.00519 ,0.00482 ,0.00449 ,0.00362 ,0.00380 ,0.00340 ,0.00354 ,0.00304 ,0.00231 ,0.00188 ,0.00143 ,0.00146 ,0.00084 ,0.00103 ,0.00097 ,0.00087 ,0.00068 ,0.00071 ,0.00072 ,0.00078 ])
@@ -534,6 +550,22 @@ class UnemploymentLargeEnv(gym.Env):
         outrate[20:70,5]=naiset_ulos
 
         return inrate,outrate
+
+    def get_army_rate(self,debug=False):
+        '''
+        armeija intensiteetit eri ryhmille
+        '''
+        outrate=np.zeros((101,self.n_groups))
+        miehet_ulos=np.array([0.826082957,0.593698994,0.366283368,0.43758429,0.219910436,0.367689675,0.111588214,0.234498521,0.5,0.96438943,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1])
+        naiset_ulos=np.array([0.506854911,0.619103706,0.181591468,0.518294319,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1])
+        outrate[20:70,0]=miehet_ulos
+        outrate[20:70,1]=miehet_ulos
+        outrate[20:70,2]=miehet_ulos
+        outrate[20:70,3]=naiset_ulos
+        outrate[20:70,4]=naiset_ulos
+        outrate[20:70,5]=naiset_ulos
+
+        return outrate
 
     def get_disability_rate_unisex(self,debug=False):
         '''
@@ -925,7 +957,7 @@ class UnemploymentLargeEnv(gym.Env):
         '''
         Siirtymä tilaan kuollut
         '''
-        employment_status = 14 # deceiced
+        employment_status = 15 # deceiced
         wage=old_wage
         pension=pension
         netto=0
@@ -1076,7 +1108,7 @@ class UnemploymentLargeEnv(gym.Env):
                 pension=pension*self.palkkakerroin+self.accbasis_tmtuki*acc
             else:
                 pension=pension*self.palkkakerroin
-        else: # 2,3,11,12 # ei karttumaa
+        else: # 2,3,11,12,14 # ei karttumaa
             pension=pension*self.palkkakerroin # vastainen eläke, ei alkanut, ei karttumaa
             
         return pension
@@ -1098,7 +1130,7 @@ class UnemploymentLargeEnv(gym.Env):
             wage_reduction=wage_reduction
         elif state in set([7,2]): # kotihoidontuki tai ve tai tk
             wage_reduction+=self.salary_const
-        elif state in set([3]): # ei muutosta
+        elif state in set([3,14]): # ei muutosta
             wage_reduction=wage_reduction
         else: # ylivuoto, ei tiloja
             wage_reduction=wage_reduction
@@ -1126,7 +1158,7 @@ class UnemploymentLargeEnv(gym.Env):
 
         if self.randomness:
             # kaikki satunnaisuus kerralla
-            sattuma = np.random.uniform(size=6)
+            sattuma = np.random.uniform(size=7)
             # tk-alkavuus
             if sattuma[0]<self.disability_intensity[intage,g]: # age<self.min_retirementage and 
                 action=11 # disability
@@ -1146,9 +1178,9 @@ class UnemploymentLargeEnv(gym.Env):
                 employment_status,time_in_state,out_of_work,wage_reduction=self.move_to_student(age,out_of_work,wage_reduction)
         else:
             # tn ei ole koskaan alle rajan, jos tämä on 1
-            sattuma = np.ones(6)
+            sattuma = np.ones(7)
 
-        if employment_status==14: # deceiced
+        if employment_status==15: # deceiced
             #time_in_state+=self.timestep
             if not self.include_mort:
                 print('emp state 13')
@@ -1616,6 +1648,7 @@ class UnemploymentLargeEnv(gym.Env):
     
                 wage=self.get_wage(intage,wage_reduction)
                 parttimewage=0.5*wage
+                tyoura+=self.timestep
                 toe=min(self.max_toe,toe+self.timestep)
                 if toe>=self.toe_vaatimus:
                     used_unemp_benefit=0
@@ -1669,17 +1702,17 @@ class UnemploymentLargeEnv(gym.Env):
                 pinkslip=0
                 employment_status,paid_pension,pension,wage,time_in_state,netto,toe,out_of_work,wage_reduction,used_unemp_benefit=\
                     self.move_to_unemp(pension,old_wage,age,paid_pension,toe,pinkslip,out_of_work,tyoura,wage_reduction,used_unemp_benefit)
-            elif action==5:
-                employment_status,pension,wage,time_in_state,netto,out_of_work,pinkslip,wage_reduction=\
-                    self.move_to_motherleave(pension,old_wage,age,out_of_work,wage_reduction)
-            elif action==6: 
-                employment_status,pension,wage,time_in_state,netto,out_of_work,pinkslip,wage_reduction=\
-                    self.move_to_fatherleave(pension,old_wage,age,out_of_work,wage_reduction)
             elif action == 3: # 
                 employment_status,pension,wage,time_in_state,netto,toe,tyoura,out_of_work,pinkslip,wage_reduction=\
                     self.move_to_parttime(pension,old_wage,age,toe,tyoura,time_in_state,out_of_work,wage_reduction)
                 pinkslip=0
-            elif action==11: # tk
+            elif action == 5:
+                employment_status,pension,wage,time_in_state,netto,out_of_work,pinkslip,wage_reduction=\
+                    self.move_to_motherleave(pension,old_wage,age,out_of_work,wage_reduction)
+            elif action == 6: 
+                employment_status,pension,wage,time_in_state,netto,out_of_work,pinkslip,wage_reduction=\
+                    self.move_to_fatherleave(pension,old_wage,age,out_of_work,wage_reduction)
+            elif action == 11: # tk
                 employment_status,pension,paid_pension,wage,time_in_state,netto,out_of_work,wage_reduction=\
                     self.move_to_disab(pension,old_wage,age,out_of_work,wage_reduction)
                 pinkslip=0
@@ -1708,9 +1741,9 @@ class UnemploymentLargeEnv(gym.Env):
             elif action == 0:
                 employment_status,pension,wage,time_in_state,netto,toe,tyoura,out_of_work,pinkslip,wage_reduction=\
                     self.move_to_parttime(pension,old_wage,age,toe,tyoura,time_in_state,out_of_work,wage_reduction)
-            elif action == 3: # 
-                employment_status,pension,wage,time_in_state,netto,toe,tyoura,out_of_work,pinkslip,wage_reduction=\
-                    self.move_to_parttime(pension,old_wage,age,toe,tyoura,0,out_of_work,wage_reduction)
+            elif action == 3:
+				employment_status,paid_pension,pension,wage,time_in_state,toe,netto,out_of_work,wage_reduction=\
+					self.move_to_outsider(pension,old_wage,age,toe,pinkslip,out_of_work,wage_reduction)
             elif action == 5:
                 employment_status,pension,wage,time_in_state,netto,out_of_work,pinkslip,wage_reduction=\
                     self.move_to_motherleave(pension,old_wage,age,out_of_work,wage_reduction)
@@ -1722,18 +1755,17 @@ class UnemploymentLargeEnv(gym.Env):
                     self.move_to_disab(pension,old_wage,age,out_of_work,wage_reduction)
             else:
                 print('error 19: ',action)
-        elif employment_status == 112: # old opiskelija
+        elif employment_status == 14: # armeijassa
             out_of_work=0 #self.timestep
             pinkslip=0
             tyoura=0
             toe=0
-
-            if action == 0: # or (action==2 and age<25):
-                employment_status = 12 # unchanged
+            if sattuma[6]>=self.army_outrate[intage,g]: # vain ulos
+                employment_status = 14 # unchanged
                 time_in_state+=self.timestep
                 wage=old_wage
-                toe=max(0,toe-self.timestep)
-                pension=self.pension_accrual(age,0,pension,state=13)
+                #toe=max(0,toe-self.timestep)
+                #pension=self.pension_accrual(age,0,pension,state=13)
                 netto=self.comp_benefits(0,0,0,employment_status,time_in_state,age,tyohistoria=tyoura)
                 # opiskelu parantaa tuloja
                 wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)
@@ -1743,22 +1775,60 @@ class UnemploymentLargeEnv(gym.Env):
             elif action == 2:
                 employment_status,paid_pension,pension,wage,time_in_state,netto,toe,out_of_work,wage_reduction,used_unemp_benefit=\
                     self.move_to_unemp(pension,old_wage,age,paid_pension,toe,pinkslip,out_of_work,tyoura,wage_reduction,used_unemp_benefit)
-                pinkslip=0
-            elif action == 3: # 
+            elif action == 0:
                 employment_status,pension,wage,time_in_state,netto,toe,tyoura,out_of_work,pinkslip,wage_reduction=\
-                    self.move_to_parttime(pension,old_wage,age,toe,tyoura,0,out_of_work,wage_reduction)
-            elif action==5:
+                    self.move_to_parttime(pension,old_wage,age,toe,tyoura,time_in_state,out_of_work,wage_reduction)
+            elif action == 3:
+				employment_status,paid_pension,pension,wage,time_in_state,toe,netto,out_of_work,wage_reduction=\
+					self.move_to_outsider(pension,old_wage,age,toe,pinkslip,out_of_work,wage_reduction)
+            elif action == 5:
                 employment_status,pension,wage,time_in_state,netto,out_of_work,pinkslip,wage_reduction=\
                     self.move_to_motherleave(pension,old_wage,age,out_of_work,wage_reduction)
-            elif action==6: 
+            elif action == 6: 
                 employment_status,pension,wage,time_in_state,netto,out_of_work,pinkslip,wage_reduction=\
                     self.move_to_fatherleave(pension,old_wage,age,out_of_work,wage_reduction)
-            elif action==11: # tk
+            elif action == 11: # tk
                 employment_status,pension,paid_pension,wage,time_in_state,netto,out_of_work,wage_reduction=\
                     self.move_to_disab(pension,old_wage,age,out_of_work,wage_reduction)
-                pinkslip=0
             else:
-                print('error 19: ',action)
+                print('error 19: ',action)                
+#         elif employment_status == 112: # old opiskelija
+#             out_of_work=0 #self.timestep
+#             pinkslip=0
+#             tyoura=0
+#             toe=0
+# 
+#             if action == 0: # or (action==2 and age<25):
+#                 employment_status = 12 # unchanged
+#                 time_in_state+=self.timestep
+#                 wage=old_wage
+#                 toe=max(0,toe-self.timestep)
+#                 pension=self.pension_accrual(age,0,pension,state=13)
+#                 netto=self.comp_benefits(0,0,0,employment_status,time_in_state,age,tyohistoria=tyoura)
+#                 # opiskelu parantaa tuloja
+#                 wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)
+#             elif action == 1: # 
+#                 employment_status,pension,wage,time_in_state,netto,toe,tyoura,out_of_work,pinkslip,wage_reduction=\
+#                     self.move_to_work(pension,old_wage,age,0,toe,tyoura,out_of_work,pinkslip,wage_reduction)
+#             elif action == 2:
+#                 employment_status,paid_pension,pension,wage,time_in_state,netto,toe,out_of_work,wage_reduction,used_unemp_benefit=\
+#                     self.move_to_unemp(pension,old_wage,age,paid_pension,toe,pinkslip,out_of_work,tyoura,wage_reduction,used_unemp_benefit)
+#                 pinkslip=0
+#             elif action == 3: # 
+#                 employment_status,pension,wage,time_in_state,netto,toe,tyoura,out_of_work,pinkslip,wage_reduction=\
+#                     self.move_to_parttime(pension,old_wage,age,toe,tyoura,0,out_of_work,wage_reduction)
+#             elif action==5:
+#                 employment_status,pension,wage,time_in_state,netto,out_of_work,pinkslip,wage_reduction=\
+#                     self.move_to_motherleave(pension,old_wage,age,out_of_work,wage_reduction)
+#             elif action==6: 
+#                 employment_status,pension,wage,time_in_state,netto,out_of_work,pinkslip,wage_reduction=\
+#                     self.move_to_fatherleave(pension,old_wage,age,out_of_work,wage_reduction)
+#             elif action==11: # tk
+#                 employment_status,pension,paid_pension,wage,time_in_state,netto,out_of_work,wage_reduction=\
+#                     self.move_to_disab(pension,old_wage,age,out_of_work,wage_reduction)
+#                 pinkslip=0
+#             else:
+#                 print('error 19: ',action)
         else:
             print('Unknown employment_status {s} of type {t}'.format(s=employment_status,t=type(employment_status)))
 
@@ -1833,7 +1903,7 @@ class UnemploymentLargeEnv(gym.Env):
                 kappa_opiskelija=0
                 
         if self.include_preferencenoise:
-            kappa_kokoaika+=prefnoise
+            kappa_kokoaika += prefnoise
             
         # tarpeen?
         if age>40:
@@ -1842,7 +1912,7 @@ class UnemploymentLargeEnv(gym.Env):
             kappa_outsider=-0.13
             
         kappa_ve=0.05 # ehkä 0.10?
-        kappa_osaaika=0.60*kappa_kokoaika
+        kappa_osaaika=0.66*kappa_kokoaika
         
         
         #if age<25:
@@ -1870,7 +1940,7 @@ class UnemploymentLargeEnv(gym.Env):
             kappa=kappa_outsider
         elif employment_state == 12:
             kappa=kappa_opiskelija
-        else: # states 3, 5, 6, 7
+        else: # states 3, 5, 6, 7, 14
             kappa=0
         
         # hyöty/score
@@ -2005,35 +2075,37 @@ class UnemploymentLargeEnv(gym.Env):
 
         states=self.n_empl
         if emp==1:
-            d[0:states]=np.array([0,1,0,0,0,0,0,0,0,0,0,0,0,0,0])
+            d[0:states]=np.array([0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0])
         elif emp==0:
-            d[0:states]=np.array([1,0,0,0,0,0,0,0,0,0,0,0,0,0,0])
+            d[0:states]=np.array([1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0])
         elif emp==2:
-            d[0:states]=np.array([0,0,1,0,0,0,0,0,0,0,0,0,0,0,0])
+            d[0:states]=np.array([0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0])
         elif emp==3:
-            d[0:states]=np.array([0,0,0,1,0,0,0,0,0,0,0,0,0,0,0])
+            d[0:states]=np.array([0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0])
         elif emp==4:
-            d[0:states]=np.array([0,0,0,0,1,0,0,0,0,0,0,0,0,0,0])
+            d[0:states]=np.array([0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0])
         elif emp==5:
-            d[0:states]=np.array([0,0,0,0,0,1,0,0,0,0,0,0,0,0,0])
+            d[0:states]=np.array([0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0])
         elif emp==6:
-            d[0:states]=np.array([0,0,0,0,0,0,1,0,0,0,0,0,0,0,0])
+            d[0:states]=np.array([0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0])
         elif emp==7:
-            d[0:states]=np.array([0,0,0,0,0,0,0,1,0,0,0,0,0,0,0])
+            d[0:states]=np.array([0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0])
         elif emp==8:
-            d[0:states]=np.array([0,0,0,0,0,0,0,0,1,0,0,0,0,0,0])
+            d[0:states]=np.array([0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0])
         elif emp==9:
-            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,1,0,0,0,0,0])
+            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0])
         elif emp==10:
-            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,1,0,0,0,0])
+            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0])
         elif emp==11:
-            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,1,0,0,0])
+            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0])
         elif emp==12:
-            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,0,1,0,0])
+            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0])
         elif emp==13:
-            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,1,0])
+            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0])
         elif emp==14:
-            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,1])
+            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0])
+        elif emp==15:
+            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1])
         else:
             print('state_encode error '+str(emp))
 
@@ -2106,35 +2178,37 @@ class UnemploymentLargeEnv(gym.Env):
             
         states=self.n_empl
         if emp==1:
-            d[0:states]=np.array([0,1,0,0,0,0,0,0,0,0,0,0,0,0])
+            d[0:states]=np.array([0,1,0,0,0,0,0,0,0,0,0,0,0,0,0])
         elif emp==0:
-            d[0:states]=np.array([1,0,0,0,0,0,0,0,0,0,0,0,0,0])
+            d[0:states]=np.array([1,0,0,0,0,0,0,0,0,0,0,0,0,0,0])
         elif emp==2:
-            d[0:states]=np.array([0,0,1,0,0,0,0,0,0,0,0,0,0,0])
+            d[0:states]=np.array([0,0,1,0,0,0,0,0,0,0,0,0,0,0,0])
         elif emp==3:
-            d[0:states]=np.array([0,0,0,1,0,0,0,0,0,0,0,0,0,0])
+            d[0:states]=np.array([0,0,0,1,0,0,0,0,0,0,0,0,0,0,0])
         elif emp==4:
-            d[0:states]=np.array([0,0,0,0,1,0,0,0,0,0,0,0,0,0])
+            d[0:states]=np.array([0,0,0,0,1,0,0,0,0,0,0,0,0,0,0])
         elif emp==5:
-            d[0:states]=np.array([0,0,0,0,0,1,0,0,0,0,0,0,0,0])
+            d[0:states]=np.array([0,0,0,0,0,1,0,0,0,0,0,0,0,0,0])
         elif emp==6:
-            d[0:states]=np.array([0,0,0,0,0,0,1,0,0,0,0,0,0,0])
+            d[0:states]=np.array([0,0,0,0,0,0,1,0,0,0,0,0,0,0,0])
         elif emp==7:
-            d[0:states]=np.array([0,0,0,0,0,0,0,1,0,0,0,0,0,0])
+            d[0:states]=np.array([0,0,0,0,0,0,0,1,0,0,0,0,0,0,0])
         elif emp==8:
-            d[0:states]=np.array([0,0,0,0,0,0,0,0,1,0,0,0,0,0])
+            d[0:states]=np.array([0,0,0,0,0,0,0,0,1,0,0,0,0,0,0])
         elif emp==9:
-            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,1,0,0,0,0])
+            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,1,0,0,0,0,0])
         elif emp==10:
-            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,1,0,0,0])
+            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,1,0,0,0,0])
         elif emp==11:
-            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,1,0,0])
+            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,1,0,0,0])
         elif emp==12:
-            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,0,1,0])
+            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,0,1,0,0])
         elif emp==13:
-            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,1])
+            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,1,0])
         elif emp==14:
-            print('no state 14 in state_encode_nomort')
+            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,1])
+        elif emp==15:
+            print('no state 15 in state_encode_nomort')
         else:
             print('state_encode error '+str(emp))
 
@@ -2268,9 +2342,9 @@ class UnemploymentLargeEnv(gym.Env):
         wage_reduction=0
         
         if gender==0: # miehet
-            employment_status=random.choices(np.array([13,0,1,3,11,12],dtype=int),weights=[0.133*3/5,0.133*2/5,0.374,0.014412417,0.151+0.089,0.240])[0]
+            employment_status=random.choices(np.array([13,0,1,3,11,12,14],dtype=int),weights=[0.133*3/5,0.133*2/5,0.374,0.014412417,0.151,0.240,0.089])[0]
         else: # naiset
-            employment_status=random.choices(np.array([13,0,1,3,11,12],dtype=int),weights=[0.073*3/5,0.073*2/5,0.550,0.0121151,0.082,0.283])[0]
+            employment_status=random.choices(np.array([13,0,1,3,11,12,14],dtype=int),weights=[0.073*3/5,0.073*2/5,0.550,0.0121151,0.077,0.283,0.00362])[0] 
 
         if employment_status==0:
             tyohist=1.0
@@ -2365,153 +2439,83 @@ class UnemploymentLargeEnv(gym.Env):
         pref_max=5
 
         # korjaa
-        if self.include_mort: # and not self.mortstop:
-            #if self.include300:
-            # Limits on states
-            low = [
-                state_min,
-                state_min,
-                state_min,
-                state_min,
-                state_min,
-                state_min,
-                state_min,
-                state_min,
-                state_min,
-                state_min,
-                state_min,
-                state_min,
-                state_min,
-                state_min,
-                state_min,
-                group_min,
-                group_min,
-                group_min,
-                group_min,
-                group_min,
-                group_min,
-                pension_min,
-                wage_min,
-                age_min,
-                tis_min,
-                paid_pension_min,
-                pink_min,
-                toe_min,
-                thist_min,
-                state_min,
-                state_min,
-                wage_min,
-                #out_min,
-                ben_min,
-                wr_min]
-            high = [
-                state_max,
-                state_max,
-                state_max,
-                state_max,
-                state_max,
-                state_max,
-                state_max,
-                state_max,
-                state_max,
-                state_max,
-                state_max,
-                state_max,
-                state_max,
-                state_max,
-                state_max,
-                group_max,
-                group_max,
-                group_max,
-                group_max,
-                group_max,
-                group_max,
-                pension_max,
-                wage_max,
-                age_max,
-                tis_max,
-                paid_pension_max,
-                pink_max,
-                toe_max,
-                thist_max,
-                state_max,
-                state_max,
-                wage_max,
-                #out_max,
-                ben_max,
-                wr_max] 
-        else:
-            low = [
-                state_min,
-                state_min,
-                state_min,
-                state_min,
-                state_min,
-                state_min,
-                state_min,
-                state_min,
-                state_min,
-                state_min,
-                state_min,
-                state_min,
-                state_min,
-                state_min,
-                group_min,
-                group_min,
-                group_min,
-                group_min,
-                group_min,
-                group_min,
-                pension_min,
-                wage_min,
-                age_min,
-                tis_min,
-                paid_pension_min,
-                pink_min,
-                toe_min,
-                thist_min,
-                state_min,
-                state_min,
-                wage_min,
-                #out_min,
-                ben_min,
-                wr_min]
-            high = [
-                state_max,
-                state_max,
-                state_max,
-                state_max,
-                state_max,
-                state_max,
-                state_max,
-                state_max,
-                state_max,
-                state_max,
-                state_max,
-                state_max,
-                state_max,
-                state_max,
-                group_max,
-                group_max,
-                group_max,
-                group_max,
-                group_max,
-                group_max,
-                pension_max,
-                wage_max,
-                age_max,
-                tis_max,
-                paid_pension_max,
-                pink_max,
-                toe_max,
-                thist_max,
-                state_max,
-                state_max,
-                wage_max,
-                #out_max,
-                ben_max,
-                wr_max]
-                
+        low = [
+            state_min,
+            state_min,
+            state_min,
+            state_min,
+            state_min,
+            state_min,
+            state_min,
+            state_min,
+            state_min,
+            state_min,
+            state_min,
+            state_min,
+            state_min,
+            state_min,
+            state_min,
+            group_min,
+            group_min,
+            group_min,
+            group_min,
+            group_min,
+            group_min,
+            pension_min,
+            wage_min,
+            age_min,
+            tis_min,
+            paid_pension_min,
+            pink_min,
+            toe_min,
+            thist_min,
+            state_min,
+            state_min,
+            wage_min,
+            #out_min,
+            ben_min,
+            wr_min]
+        high = [
+            state_max,
+            state_max,
+            state_max,
+            state_max,
+            state_max,
+            state_max,
+            state_max,
+            state_max,
+            state_max,
+            state_max,
+            state_max,
+            state_max,
+            state_max,
+            state_max,
+            state_max,
+            group_max,
+            group_max,
+            group_max,
+            group_max,
+            group_max,
+            group_max,
+            pension_max,
+            wage_max,
+            age_max,
+            tis_max,
+            paid_pension_max,
+            pink_max,
+            toe_max,
+            thist_max,
+            state_max,
+            state_max,
+            wage_max,
+            #out_max,
+            ben_max,
+            wr_max]
+            
+        if self.include_mort: # if mortality is included, add one more state
+              low.prepend(state_min)
+              high.prepend(state_max)
+                  
         if self.include_preferencenoise:
             low.append(pref_min)
             high.append(pref_max)
