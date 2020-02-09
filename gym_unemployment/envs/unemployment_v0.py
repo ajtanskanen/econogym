@@ -157,7 +157,7 @@ class UnemploymentEnv(gym.Env):
         
         self.ben = fin_benefits.Benefits()
         
-    def get_n_states():
+    def get_n_states(self):
         '''
         Palauta parametrien arvoja
         '''
