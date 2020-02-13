@@ -1262,7 +1262,7 @@ class UnemploymentLargeEnv(gym.Env):
                 employment_status,paid_pension,pension,wage,time_in_state,netto,out_of_work,wage_reduction=\
                     self.move_to_retirement(pension,0,age,paid_pension,employment_status,out_of_work,wage_reduction,all_acc=True)
             elif action == 0 or (action == 2 and age < self.min_retirementage):
-                employment_status = 0 # unchanged
+                employment_status = 13 # unchanged
                 wage=old_wage # self.get_wage(intage,time_in_state)
                 toe=max(0.0,toe-self.timestep) # approksimaatio, oletus että työjakso korvautuu työttömyysjaksolla
                 pension=self.pension_accrual(age,wage,pension,state=13)
@@ -1809,8 +1809,6 @@ class UnemploymentLargeEnv(gym.Env):
         done = age >= self.max_age
         done = bool(done)
 
-        print('emp state',employment_status)
-
         if not done:
             reward = self.log_utility(netto,int(employment_status),age,g=g,pinkslip=pinkslip)
         elif self.steps_beyond_done is None:
@@ -1863,29 +1861,15 @@ class UnemploymentLargeEnv(gym.Env):
         # kappa tells how much person values free-time
         if g<3: # miehet
             kappa_kokoaika=0.710 # 0.665
-            mu_scale=0.23 # 0.16 # how much penalty is associated with work increase with age after mu_age
-            mu_age=58 # P.O. 60??
-            if age < 60:
-                kappa_opiskelija=0.45
-            else:
-                kappa_opiskelija=0
+            mu_scale=0.18 # 0.16 # how much penalty is associated with work increase with age after mu_age
+            mu_age=60 # P.O. 60??
         else: # naiset
             kappa_kokoaika=0.595 # 0.58
-            mu_scale=0.23 # 0.17 # how much penalty is associated with work increase with age after mu_age
-            mu_age=58 # P.O. 60??
-            if age < 60:
-                kappa_opiskelija=0.55 # p.o. 0.54
-            else:
-                kappa_opiskelija=0
+            mu_scale=0.18 # 0.17 # how much penalty is associated with work increase with age after mu_age
+            mu_age=60 # P.O. 60??
                 
         if self.include_preferencenoise:
             kappa_kokoaika += prefnoise
-            
-        # tarpeen?
-        #if age>40: # 20% vähennys nettotuloissa on noin -0.22
-        #    kappa_outsider=-0.25 # 0.085 # 0.08
-        #else: # alle 40-vuotiaalla prefenssi hienoisesti eri kuin 40 vuotta täyttäneellä
-        #    kappa_outsider=-0.35 # 0.15 # 0.13
             
         kappa_ve=0.0 # ehkä 0.10?
         kappa_osaaika=0.65*kappa_kokoaika
@@ -1914,7 +1898,7 @@ class UnemploymentLargeEnv(gym.Env):
         elif employment_state == 11:
             kappa=0 #kappa_outsider
         elif employment_state == 12:
-            kappa=kappa_opiskelija
+            kappa=0 #kappa_opiskelija
         else: # states 3, 5, 6, 7, 14, 15
             kappa=0
         
