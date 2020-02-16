@@ -231,7 +231,9 @@ class UnemploymentLargeEnv(gym.Env):
         self.salary=np.zeros(self.max_age+1)
 
         # ryhmäkohtaisia muuttujia
-        self.disability_intensity=self.get_disability_rate()*self.timestep # tn tulla työkyvyttömäksi
+        #self.disability_intensity=self.get_disability_rate()*self.timestep # tn tulla työkyvyttömäksi
+        self.disability_intensity=self.get_eff_disab_rate()*self.timestep # tn tulla työkyvyttömäksi
+        
         if self.include_pinkslip:
             self.pinkslip_intensity=np.zeros(6)
             self.pinkslip_intensity[0:3]=0.07*self.timestep # todennäköisyys tulla irtisanotuksi vuodessa, miehet
@@ -611,15 +613,39 @@ class UnemploymentLargeEnv(gym.Env):
              # uusitalon selvityksestä Työkyvyttömyyden vuoksi menetetty työura
              # skaalattu alaspäin, jotta tk:laisten kokonaismäärä menee paremmin oikein
             dfactor=np.array([1.2,0.8,0.4,1.1,0.8,0.5])*0.9
-            
-        #dis_miehet=np.array([ 0.004630,0.004356,0.003559,0.003081,0.003381,0.002937,0.002835,0.002951,0.002232,0.002088,0.001808,0.002747,0.002540,0.002851,0.002854,0.002704,0.002764,0.002691,0.002923,0.003033,0.003231,0.002886,0.002947,0.003319,0.003487,0.003864,0.003816,0.004289,0.005225,0.005248,0.005923,0.006897,0.006780,0.008412,0.009394,0.010691,0.012313,0.013471,0.015919,0.020455,0.026545,0.022420,0.015017,0.003898,0.000286,0.015017,0.015017,0.015017,0.015017,0.015017,0.015017 ])
-        #dis_naiset=np.array([ 0.005557,0.005064,0.004733,0.003931,0.003340,0.003180,0.002937,0.003415,0.002572,0.002710,0.002500,0.003701,0.002778,0.003217,0.003242,0.003512,0.003326,0.003402,0.003504,0.004077,0.004424,0.004442,0.004355,0.005005,0.005032,0.005847,0.005579,0.006115,0.006144,0.006849,0.008927,0.007070,0.008676,0.010337,0.008784,0.012450,0.013127,0.015199,0.019386,0.022249,0.029828,0.026609,0.016825,0.003603,0.000211,0.016825,0.016825,0.016825,0.016825,0.016825,0.016825 ])
         
         dis_miehet=np.array([0.004697942,0.004435302,0.003631736,0.003141361,0.003457091,0.003005607,0.002905609,0.003029283,0.002289213,0.002137714,0.001854558,0.002813517,0.002607335,0.00292628,0.002937462,0.002784612,0.002846377,0.002776506,0.003017675,0.003129845,0.003349059,0.002991577,0.00305634,0.003446143,0.003633971,0.004045113,0.004002001,0.004517725,0.005527525,0.005565513,0.006319492,0.007399175,0.00731299,0.009142823,0.010254463,0.011784364,0.013783743,0.015299156,0.018282001,0.024051257,0.032338044,0.028290544,0.019444444,0.00454486,0.000330718,0,0,0,0,0,0])
         dis_naiset=np.array([0.00532654,0.004917401,0.00453191,0.003799551,0.003253733,0.003092307,0.002822592,0.003309772,0.002482279,0.002615887,0.002416545,0.003546203,0.002665276,0.003095104,0.003129633,0.003406418,0.003171677,0.003320357,0.003391292,0.004007371,0.004310094,0.00438571,0.004267343,0.004889399,0.005043702,0.005793425,0.005569451,0.006298434,0.006363081,0.007043361,0.009389811,0.007457667,0.009251373,0.011154836,0.009524088,0.013689796,0.014658423,0.017440417,0.022804727,0.02677838,0.037438459,0.034691279,0.022649573,0.004414073,0.000264568,0,0,0,0,0,0])
         # ei varhaiseläkkeitä mukana, joten oletetaan ettei tk-intensiteetti laske
         dis_miehet[41:51]=np.maximum(dis_miehet[41:51],0.02829054)
         dis_naiset[41:51]=np.maximum(dis_naiset[41:51],0.03469128)
+            
+        for g in range(3):
+            disab[20:71,g]=dfactor[g]*dis_miehet
+            disab[70:(self.max_age+1),g]=24.45*dfactor[g]/1000
+        for g in range(3,6):
+            disab[20:71,g]=dfactor[g]*dis_naiset
+            disab[70:(self.max_age+1),g]=24.45*dfactor[g]/1000
+
+        return disab        
+        
+    def get_eff_disab_rate(self,debug=False):
+        '''
+        Työkyvyttömyys-alkavuudet eri ryhmille
+        Laskettu havaitusta työkyvyttömien lukumäärästä
+        Siksi efektiivinen 
+        '''
+        disab=np.zeros((self.max_age+1,self.n_groups))
+        # male low, male mid, male high, female low, female mid, female high
+        if debug:
+            dfactor=np.array([1.0,1.0,1.0,1.0,1.0,1.0])
+        else:
+             # uusitalon selvityksestä Työkyvyttömyyden vuoksi menetetty työura
+             # skaalattu alaspäin, jotta tk:laisten kokonaismäärä menee paremmin oikein
+            dfactor=np.array([1.3,0.95,0.6,1.2,0.95,0.7])
+            
+        dis_miehet=np.array([0.0068168,0.003341014,0,0.004279685,0.001118673,0.001802593,0.00217149,0,0,0.002157641,0,0.002545172,0,0.002960375,0.000767293,0,0.002265829,0.000286527,0,0.004899931,0,0.000677208,0.001155069,0.003796412,0.004896709,0.001921327,0.004668376,0.004630126,0.002478899,0.00642266,0.005795605,0.00558426,0.008096878,0.004548654,0.010179089,0.016100661,0.015144889,0.011688053,0.024563474,0.036719657,0.036573355,0.026898066,0.027508352,0.024176173,0.023621633,0.02058014,0.020290345,0.0202976,0.020304995,0.020282729,0.020282729])
+        dis_naiset=np.array([0.004962318,0.002850008,0.004703008,0,0.001625749,0.000940874,0.001050232,0,0,4.34852E-05,0.003516261,0,8.21901E-05,0.002276047,0.000443789,0.002472653,0,0.001866348,0.002269429,0.001480588,0.00139571,0.002185668,0.002003531,0.003662852,0.003271301,0.003629155,0.002690071,0.003977974,0.005051223,0.00303663,0.008097507,0.004912787,0.005008356,0.007536173,0.007618452,0.017496524,0.012431715,0.020801345,0.025163258,0.027521298,0.039852895,0.023791604,0.025422742,0.02230225,0.021684456,0.01894045,0.018676988,0.018654938,0.01865384,0.018650795,0.018650795])
             
         for g in range(3):
             disab[20:71,g]=dfactor[g]*dis_miehet
@@ -865,7 +891,7 @@ class UnemploymentLargeEnv(gym.Env):
             if toe>=self.toe_vaatimus: # täyttyykö työssäoloehto
                 kesto=12*21.5*used_unemp_benefit
                 if ((tyoura>=self.tyohistoria_vaatimus500 and kesto>=self.ansiopvraha_kesto500 and age>=self.minage_500) \
-                    or (tyoura>=self.tyohistoria_vaatimus and kesto>=self.ansiopvraha_kesto400) \
+                    or (tyoura>=self.tyohistoria_vaatimus and kesto>=self.ansiopvraha_kesto400 and (age<self.minage_500 or tyoura<self.tyohistoria_vaatimus500)) \
                     or (tyoura<self.tyohistoria_vaatimus and kesto>=self.ansiopvraha_kesto300)):
                     if self.include_putki and age>=self.min_tyottputki_ika and tyoura>=self.tyohistoria_tyottputki: 
                         employment_status = 4 # siirto lisäpäiville
@@ -1860,19 +1886,20 @@ class UnemploymentLargeEnv(gym.Env):
 
         # kappa tells how much person values free-time
         if g<3: # miehet
-            kappa_kokoaika=0.710 # 0.665
-            mu_scale=0.18 # 0.16 # how much penalty is associated with work increase with age after mu_age
+            kappa_kokoaika=0.635 # 0.665
+            mu_scale=0.20 # 0.16 # how much penalty is associated with work increase with age after mu_age
             mu_age=60 # P.O. 60??
+            kappa_osaaika=0.55*kappa_kokoaika
         else: # naiset
             kappa_kokoaika=0.595 # 0.58
-            mu_scale=0.18 # 0.17 # how much penalty is associated with work increase with age after mu_age
+            mu_scale=0.20 # 0.17 # how much penalty is associated with work increase with age after mu_age
             mu_age=60 # P.O. 60??
+            kappa_osaaika=0.42*kappa_kokoaika
                 
         if self.include_preferencenoise:
             kappa_kokoaika += prefnoise
             
         kappa_ve=0.0 # ehkä 0.10?
-        kappa_osaaika=0.65*kappa_kokoaika
         
         #if age<25:
         # alle 25-vuotiaalla eri säännöt, vanhempien tulot huomioidaan jne
