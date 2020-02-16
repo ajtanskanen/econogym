@@ -1887,13 +1887,13 @@ class UnemploymentLargeEnv(gym.Env):
         # kappa tells how much person values free-time
         if g<3: # miehet
             kappa_kokoaika=0.635 # 0.665
-            mu_scale=0.20 # 0.16 # how much penalty is associated with work increase with age after mu_age
-            mu_age=60 # P.O. 60??
+            mu_scale=0.25 # 0.16 # how much penalty is associated with work increase with age after mu_age
+            mu_age=61 # P.O. 60??
             kappa_osaaika=0.55*kappa_kokoaika
         else: # naiset
             kappa_kokoaika=0.595 # 0.58
-            mu_scale=0.20 # 0.17 # how much penalty is associated with work increase with age after mu_age
-            mu_age=60 # P.O. 60??
+            mu_scale=0.30 # 0.17 # how much penalty is associated with work increase with age after mu_age
+            mu_age=61 # P.O. 60??
             kappa_osaaika=0.42*kappa_kokoaika
                 
         if self.include_preferencenoise:
@@ -2331,9 +2331,9 @@ class UnemploymentLargeEnv(gym.Env):
         wage_reduction=0
         
         if gender==0: # miehet
-            employment_state=random.choices(np.array([13,0,1,3,11,12,14],dtype=int),weights=[0.133*3/5,0.133*2/5,0.374,0.014412417,0.151,0.240,0.089])[0]
+            employment_state=random.choices(np.array([13,0,1,10,3,11,12,14],dtype=int),weights=[0.133*3/5,0.133*2/5,0.68*0.374,0.32*0.374,0.014412417,0.151,0.240,0.089])[0]
         else: # naiset
-            employment_state=random.choices(np.array([13,0,1,3,11,12,14],dtype=int),weights=[0.073*3/5,0.073*2/5,0.550,0.0121151,0.077,0.283,0.00362])[0] 
+            employment_state=random.choices(np.array([13,0,1,10,3,11,12,14],dtype=int),weights=[0.073*3/5,0.073*2/5,0.44*0.550,0.56*0.550,0.0121151,0.077,0.283,0.00362])[0] 
 
         if employment_state==0:
             tyohist=1.0
