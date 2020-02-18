@@ -912,7 +912,7 @@ class UnemploymentLargeEnv(gym.Env):
             # hmm, omavastuupäivät puuttuvat!
             # omavastuupäiviä on 5/(21.5*12*self.timestep), kerroin tällöin
             # 1-5/(21.5*12*self.timestep)
-            netto=self.comp_benefits(0,old_wage,0,employment_status,time_in_state,age,
+            netto=self.comp_benefits(0,old_wage,0,employment_status,used_unemp_benefit,age,
                                      irtisanottu=irtisanottu,tyohistoria=tyoura)
             time_in_state=self.timestep
             out_of_work+=self.timestep    
