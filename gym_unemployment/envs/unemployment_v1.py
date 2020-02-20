@@ -642,7 +642,7 @@ class UnemploymentLargeEnv(gym.Env):
         else:
              # uusitalon selvityksestä Työkyvyttömyyden vuoksi menetetty työura
              # skaalattu alaspäin, jotta tk:laisten kokonaismäärä menee paremmin oikein
-            dfactor=np.array([1.3,0.95,0.6,1.2,0.95,0.7])
+            dfactor=np.array([1.3,0.95,0.6,1.2,1.0,0.9])
             
         dis_miehet=np.array([0.0068168,0.003341014,0,0.004279685,0.001118673,0.001802593,0.00217149,0,0,0.002157641,0,0.002545172,0,0.002960375,0.000767293,0,0.002265829,0.000286527,0,0.004899931,0,0.000677208,0.001155069,0.003796412,0.004896709,0.001921327,0.004668376,0.004630126,0.002478899,0.00642266,0.005795605,0.00558426,0.008096878,0.004548654,0.010179089,0.016100661,0.015144889,0.011688053,0.024563474,0.036719657,0.036573355,0.026898066,0.027508352,0.024176173,0.023621633,0.02058014,0.020290345,0.0202976,0.020304995,0.020282729,0.020282729])
         dis_naiset=np.array([0.004962318,0.002850008,0.004703008,0,0.001625749,0.000940874,0.001050232,0,0,4.34852E-05,0.003516261,0,8.21901E-05,0.002276047,0.000443789,0.002472653,0,0.001866348,0.002269429,0.001480588,0.00139571,0.002185668,0.002003531,0.003662852,0.003271301,0.003629155,0.002690071,0.003977974,0.005051223,0.00303663,0.008097507,0.004912787,0.005008356,0.007536173,0.007618452,0.017496524,0.012431715,0.020801345,0.025163258,0.027521298,0.039852895,0.023791604,0.025422742,0.02230225,0.021684456,0.01894045,0.018676988,0.018654938,0.01865384,0.018650795,0.018650795])
@@ -1887,19 +1887,19 @@ class UnemploymentLargeEnv(gym.Env):
         # kappa tells how much person values free-time
         if g<3: # miehet
             kappa_kokoaika=0.635 # 0.665
-            mu_scale=0.25 # 0.16 # how much penalty is associated with work increase with age after mu_age
-            mu_age=61 # P.O. 60??
+            mu_scale=0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+            mu_age=60 # P.O. 60??
             kappa_osaaika=0.55*kappa_kokoaika
         else: # naiset
-            kappa_kokoaika=0.595 # 0.58
-            mu_scale=0.30 # 0.17 # how much penalty is associated with work increase with age after mu_age
+            kappa_kokoaika=0.605 # 0.58
+            mu_scale=0.20 # 0.25 # 0.17 # how much penalty is associated with work increase with age after mu_age
             mu_age=61 # P.O. 60??
             kappa_osaaika=0.42*kappa_kokoaika
                 
         if self.include_preferencenoise:
             kappa_kokoaika += prefnoise
             
-        kappa_ve=0.0 # ehkä 0.10?
+        kappa_ve=0.15 # ehkä 0.10?
         
         #if age<25:
         # alle 25-vuotiaalla eri säännöt, vanhempien tulot huomioidaan jne
