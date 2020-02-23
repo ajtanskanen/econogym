@@ -1892,8 +1892,8 @@ class UnemploymentLargeEnv(gym.Env):
             kappa_osaaika=0.55*kappa_kokoaika
         else: # naiset
             kappa_kokoaika=0.605 # 0.58
-            mu_scale=0.20 # 0.25 # 0.17 # how much penalty is associated with work increase with age after mu_age
-            mu_age=61 # P.O. 60??
+            mu_scale=0.25 # 0.25 # 0.17 # how much penalty is associated with work increase with age after mu_age
+            mu_age=62 # P.O. 60??
             kappa_osaaika=0.42*kappa_kokoaika
                 
         if self.include_preferencenoise:
