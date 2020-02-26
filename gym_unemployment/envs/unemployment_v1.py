@@ -122,6 +122,7 @@ class UnemploymentLargeEnv(gym.Env):
         self.mortstop=True # pysäytä kuolleisuuden jälkeen
         self.include_putki=True # työttömyysputki mukana
         self.include_pinkslip=True # irtisanomiset mukana
+        self.use_sigma_reduction=False # kumpi palkkareduktio        
         gamma=0.92
 
         self.plotdebug=False # tulostetaanko rivi riviltä tiloja
@@ -141,6 +142,9 @@ class UnemploymentLargeEnv(gym.Env):
             elif key=='gamma':
                 if value is not None:
                     gamma=value
+            elif key=='use_sigma_reduction':
+                if value is not None:
+                    self.use_sigma_reduction=value
             elif key=='min_age':
                 if value is not None:
                     self.min_age=value
@@ -270,6 +274,11 @@ class UnemploymentLargeEnv(gym.Env):
 
         self.action_space = spaces.Discrete(4)
         self.observation_space = spaces.Box(self.low, self.high, dtype=np.float32)
+        
+        if self.use_sigma_reduction:
+        	self.update_wage_reduction=self.update_wage_reduction_sigma
+        else:
+        	self.update_wage_reduction=self.update_wage_reduction_baseline
 
         #self.seed()
         self.viewer = None
@@ -876,15 +885,10 @@ class UnemploymentLargeEnv(gym.Env):
         Siirtymä työttömyysturvalle
         '''
         if age>=self.min_retirementage: # ei uusia työttömiä enää alimman ve-iän jälkeen, vanhat jatkavat
-            if self.include_putki:
-                employment_status=4
-            else:
-                employment_status=0
-                
+            pinkslip=0
+            employment_status=0
             employment_status,paid_pension,pension,wage,time_in_state,netto,out_of_work,wage_reduction=\
                 self.move_to_retirement(pension,old_wage,age,paid_pension,employment_status,out_of_work,wage_reduction,all_acc=True)
-                
-            pinkslip=0
                 
             return employment_status,paid_pension,pension,wage,time_in_state,netto,toe,out_of_work,wage_reduction,used_unemp_benefit,pinkslip
         else:
@@ -1121,7 +1125,7 @@ class UnemploymentLargeEnv(gym.Env):
             
         return pension
 
-    def update_wage_reduction(self,state,wage_reduction):
+    def update_wage_reduction_baseline(self,state,wage_reduction):
         '''
         Pidetään kirjaa siitä, kuinka paljon palkkaa alennetaan työttömyyden keston suhteen,
         ja miten siitä palaudutaan
@@ -1138,6 +1142,30 @@ class UnemploymentLargeEnv(gym.Env):
             wage_reduction=wage_reduction
         elif state in set([7,2]): # kotihoidontuki tai ve tai tk
             wage_reduction+=self.salary_const
+        elif state in set([3,14,15]): # ei muutosta
+            wage_reduction=wage_reduction
+        else: # ylivuoto, ei tiloja
+            wage_reduction=wage_reduction
+        
+        return wage_reduction
+
+    def update_wage_reduction_sigma(self,state,wage_reduction):
+        '''
+        Pidetään kirjaa siitä, kuinka paljon palkkaa alennetaan työttömyyden keston suhteen,
+        ja miten siitä palaudutaan
+        '''
+        if state in set([1,10]): # töissä
+            wage_reduction=max(0,wage_reduction-self.salary_const_up)
+        if state in set([8,9]): # ve+töissä
+            wage_reduction=max(0,wage_reduction-self.salary_const_up)
+        elif state==12: # opiskelee
+            wage_reduction=max(0,wage_reduction-self.salary_const_student)
+        elif state in set([0,4,13,11]): # työtön tai työelämän ulkopuolella
+            wage_reduction=max(0,1.0-((1-self.salary_const)**self.timestep)*(1-wage_reduction))
+        elif state in set([5,6]): # isyys tai vanhempainvapaa, ei vaikutusta
+            wage_reduction=wage_reduction
+        elif state in set([7,2]): # kotihoidontuki tai ve
+            wage_reduction=max(0,1.0-((1-self.salary_const)**self.timestep)*(1-wage_reduction))
         elif state in set([3,14,15]): # ei muutosta
             wage_reduction=wage_reduction
         else: # ylivuoto, ei tiloja
@@ -1252,7 +1280,7 @@ class UnemploymentLargeEnv(gym.Env):
                 kesto=12*21.5*used_unemp_benefit
                     
                 if ((tyoura>=self.tyohistoria_vaatimus500 and kesto>=self.ansiopvraha_kesto500 and age>=self.minage_500) \
-                    or (tyoura>=self.tyohistoria_vaatimus and kesto>=self.ansiopvraha_kesto400) \
+                    or (tyoura>=self.tyohistoria_vaatimus and kesto>=self.ansiopvraha_kesto400 and (age<self.minage_500 or tyoura<self.tyohistoria_vaatimus500)) \
                     or (tyoura<self.tyohistoria_vaatimus and kesto>=self.ansiopvraha_kesto300)):
                     if self.include_putki and age>=self.min_tyottputki_ika and tyoura>=self.tyohistoria_tyottputki: 
                         employment_status = 4 # siirto lisäpäiville

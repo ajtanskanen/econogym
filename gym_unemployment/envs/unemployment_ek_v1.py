@@ -17,6 +17,9 @@ class UnemploymentEKLargeEnv(UnemploymentLargeEnv):
         super().__init__(**kwargs)
         self.ben = BenefitsEK()
         
+        self.ansiopvraha_kesto400=350
+        self.ansiopvraha_kesto300=250
+        
         if 'kwargs' in kwargs:
             kwarg=kwargs['kwargs']
         else:
