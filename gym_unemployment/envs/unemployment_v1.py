@@ -276,9 +276,9 @@ class UnemploymentLargeEnv(gym.Env):
         self.observation_space = spaces.Box(self.low, self.high, dtype=np.float32)
         
         if self.use_sigma_reduction:
-        	self.update_wage_reduction=self.update_wage_reduction_sigma
+            self.update_wage_reduction=self.update_wage_reduction_sigma
         else:
-        	self.update_wage_reduction=self.update_wage_reduction_baseline
+            self.update_wage_reduction=self.update_wage_reduction_baseline
 
         #self.seed()
         self.viewer = None
@@ -359,12 +359,16 @@ class UnemploymentLargeEnv(gym.Env):
             p['t']=wage/12
             p['vakiintunutpalkka']=wage/12
             p['saa_ansiopaivarahaa']=0
-        elif employment_state==0: # työtön, ansiopäiväraha alle 60
+        elif employment_state==0: # työtön, ansiopäivärahalla
             if ika<65:
+                #self.render()
                 p['tyoton']=1
                 p['t']=0
                 p['vakiintunutpalkka']=old_wage/12
-                p['tyottomyyden_kesto']=12*21.5*time_in_state
+                if irtisanottu>0:
+                    p['tyottomyyden_kesto']=12*21.5*time_in_state
+                else:
+                    p['tyottomyyden_kesto']=12*21.5*time_in_state-self.karenssi_kesto # tämän voisi tehdä täsmällisemmin
                 if ((tyohistoria>=self.tyohistoria_vaatimus and p['tyottomyyden_kesto']<=self.ansiopvraha_kesto400) \
                     or (p['tyottomyyden_kesto']<=self.ansiopvraha_kesto300) \
                     or (ika>=self.minage_500 and tyohistoria>=self.tyohistoria_vaatimus500 and p['tyottomyyden_kesto']<=self.ansiopvraha_kesto500)) \
@@ -402,6 +406,7 @@ class UnemploymentLargeEnv(gym.Env):
                 p['t']=0
                 p['vakiintunutpalkka']=old_wage/12
                 p['saa_ansiopaivarahaa']=1
+                p['tyottomyyden_kesto']=12*21.5*time_in_state
             else:
                 p['tyoton']=0 # ei oikeutta työttömyysturvaan
                 p['t']=0
@@ -920,7 +925,7 @@ class UnemploymentLargeEnv(gym.Env):
                                      irtisanottu=irtisanottu,tyohistoria=tyoura)
             time_in_state=self.timestep
             out_of_work+=self.timestep    
-            wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)   
+            wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)
             used_unemp_benefit+=self.timestep
             pinkslip=irtisanottu
 
