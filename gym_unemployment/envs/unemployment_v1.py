@@ -90,7 +90,7 @@ class UnemploymentLargeEnv(gym.Env):
     def __init__(self,**kwargs):
         super().__init__()
 
-        self.toe_vaatimus=0.5 # = 6kk
+        self.ansiopvraha_toe=0.5 # = 6kk
         self.karenssi_kesto=0.25 #0.25 # = 3kk
         self.isyysvapaa_kesto=0.25 # = 3kk
         self.aitiysvapaa_kesto=0.75 # = 9kk ml vanhempainvapaa
@@ -292,6 +292,7 @@ class UnemploymentLargeEnv(gym.Env):
         #    self.log_utility=self.log_utility_perustulo
 
         self.ben = fin_benefits.Benefits()
+        
         self.explain()
 
     def get_n_states(self):
@@ -897,7 +898,7 @@ class UnemploymentLargeEnv(gym.Env):
                 
             return employment_status,paid_pension,pension,wage,time_in_state,netto,toe,out_of_work,wage_reduction,used_unemp_benefit,pinkslip
         else:
-            if toe>=self.toe_vaatimus: # täyttyykö työssäoloehto
+            if toe>=self.ansiopvraha_toe: # täyttyykö työssäoloehto
                 kesto=12*21.5*used_unemp_benefit
                 if ((tyoura>=self.tyohistoria_vaatimus500 and kesto>=self.ansiopvraha_kesto500 and age>=self.minage_500) \
                     or (tyoura>=self.tyohistoria_vaatimus and kesto>=self.ansiopvraha_kesto400 and (age<self.minage_500 or tyoura<self.tyohistoria_vaatimus500)) \
@@ -926,7 +927,9 @@ class UnemploymentLargeEnv(gym.Env):
             time_in_state=self.timestep
             out_of_work+=self.timestep    
             wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)
-            used_unemp_benefit+=self.timestep
+            if irtisanottu: # muuten ei oikeutta ansiopäivärahaan karenssi vuoksi
+                used_unemp_benefit+=self.timestep
+                
             pinkslip=irtisanottu
 
         return employment_status,paid_pension,pension,wage,time_in_state,netto,toe,out_of_work,wage_reduction,used_unemp_benefit,pinkslip
@@ -1280,7 +1283,8 @@ class UnemploymentLargeEnv(gym.Env):
                 #toe=max(0.0,toe-self.timestep)
 
                 netto=self.comp_benefits(0,old_wage,0,employment_status,used_unemp_benefit,age,tyohistoria=tyoura)
-                used_unemp_benefit+=self.timestep
+                if pinkslip or time_in_state>=self.karenssi_kesto: # muuten ei oikeutta ansiopäivärahaan karenssi vuoksi
+                    used_unemp_benefit+=self.timestep
                 out_of_work+=self.timestep
                 kesto=12*21.5*used_unemp_benefit
                     
@@ -1364,7 +1368,8 @@ class UnemploymentLargeEnv(gym.Env):
                     
                 netto=self.comp_benefits(0,old_wage,0,employment_status,used_unemp_benefit,age,tyohistoria=tyoura)
                 out_of_work+=self.timestep
-                used_unemp_benefit+=self.timestep
+                if pinkslip or time_in_state>=self.karenssi_kesto: # muuten ei oikeutta ansiopäivärahaan karenssi vuoksi
+                    used_unemp_benefit+=self.timestep
             elif action == 1: # 
                 employment_status,pension,wage,time_in_state,netto,toe,tyoura,out_of_work,pinkslip,wage_reduction=\
                     self.move_to_work(pension,old_wage,age,time_in_state,toe,tyoura,out_of_work,pinkslip,wage_reduction)
@@ -1405,7 +1410,7 @@ class UnemploymentLargeEnv(gym.Env):
                 wage=self.get_wage(intage,wage_reduction)
                 wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)
                 toe=min(self.max_toe,toe+self.timestep)
-                if toe>=self.toe_vaatimus:
+                if toe>=self.ansiopvraha_toe:
                     used_unemp_benefit=0
                     
                 tyoura+=self.timestep
@@ -1675,7 +1680,7 @@ class UnemploymentLargeEnv(gym.Env):
                 parttimewage=0.5*wage
                 tyoura+=self.timestep
                 toe=min(self.max_toe,toe+self.timestep)
-                if toe>=self.toe_vaatimus:
+                if toe>=self.ansiopvraha_toe:
                     used_unemp_benefit=0
                 
                 pension=self.pension_accrual(age,parttimewage,pension,state=10)
@@ -1926,7 +1931,7 @@ class UnemploymentLargeEnv(gym.Env):
         else: # naiset
             kappa_kokoaika=0.605 # 0.58
             mu_scale=0.25 # 0.25 # 0.17 # how much penalty is associated with work increase with age after mu_age
-            mu_age=62 # P.O. 60??
+            mu_age=61 # P.O. 60??
             kappa_osaaika=0.42*kappa_kokoaika
                 
         if self.include_preferencenoise:
@@ -2559,6 +2564,27 @@ class UnemploymentLargeEnv(gym.Env):
         Tulosta laskennan parametrit
         '''
         print('Parameters of lifecycle:\ntimestep {}\ngamma {} ({} per anno)\nmin_age {}\nmax_age {}\nmin_retirementage {}'.format(self.timestep,self.gamma,self.gamma**(1.0/self.timestep),self.min_age,self.max_age,self.min_retirementage))
-        print('max_retirementage {}\nansiopvraha_kesto300 {}\nansiopvraha_kesto400 {}\nansiopvraha_toe {}'.format(self.max_retirementage,self.ansiopvraha_kesto300,self.ansiopvraha_kesto400,self.toe_vaatimus))
+        print('max_retirementage {}\nansiopvraha_kesto300 {}\nansiopvraha_kesto400 {}\nansiopvraha_toe {}'.format(self.max_retirementage,self.ansiopvraha_kesto300,self.ansiopvraha_kesto400,self.ansiopvraha_toe))
         print('perustulo {}\nkarenssi_kesto {}\nmortality {}\nrandomness {}'.format(self.perustulo,self.karenssi_kesto,self.include_mort,self.randomness))
         print('include_putki {}\ninclude_pinkslip {}\n'.format(self.include_putki,self.include_pinkslip))
+
+    def unempright_left(self,emp,tis,bu,ika,tyohistoria,oof):
+        '''
+        Tilastointia varten lasketaan jäljellä olevat ansiosidonnaiset työttömyysturvapäivät
+        '''
+        if ika>=self.minage_500 and tyohistoria>=self.tyohistoria_vaatimus500:
+            kesto=self.ansiopvraha_kesto500
+        elif tyohistoria>=self.tyohistoria_vaatimus:
+            kesto=self.ansiopvraha_kesto400
+        else:
+            kesto=self.ansiopvraha_kesto300
+        
+        kesto=kesto/(12*21.5)
+        #if irtisanottu<1 and time_in_state<self.karenssi_kesto: # karenssi, jos ei irtisanottu
+        
+        if emp==13:
+            return oof
+        else:
+            return kesto-bu
+            
+        
