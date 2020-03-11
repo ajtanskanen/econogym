@@ -15,7 +15,7 @@ from .unemployment_v1 import UnemploymentLargeEnv
 class UnemploymentStepsLargeEnv(UnemploymentLargeEnv):
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
-        self.ben = BenefitsPorrastus()
+        self.ben = BenefitsPorrastus(**kwargs)
         
         if 'kwargs' in kwargs:
             kwarg=kwargs['kwargs']
