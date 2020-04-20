@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='gym_unemployment',
-    version='0.4.0',
+    version='0.9.0',
     install_requires=['gym','fin_benefits','numpy'], #And any other dependencies required
 	packages=setuptools.find_packages(),
 	
