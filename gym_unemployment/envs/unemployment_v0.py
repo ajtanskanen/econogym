@@ -132,19 +132,21 @@ class UnemploymentEnv(gym.Env):
             0,
             0,
             0,
-            0,
-            0,
-            self.min_age,
-            0])
+            -100,
+            -100,
+            (self.min_age-(69+25)/2)/10,
+            (self.min_age-self.min_age)/10,
+            -100])
         self.high = np.array([
             1,
             1,
             1,
-            1000,
-            1000,
-            self.max_age+1,
+            100,
+            100,
+            (self.max_age-(69+25)/2)/10,
+            (self.max_age-self.min_age)/10,
             100])
-        
+                    
 
         self.action_space = spaces.Discrete(3)
         self.observation_space = spaces.Box(self.low, self.high, dtype=np.float32)
@@ -156,6 +158,8 @@ class UnemploymentEnv(gym.Env):
         self.steps_beyond_done = None
         
         self.ben = fin_benefits.Benefits()
+        
+        self.n_actions=3
         
     def get_n_states(self):
         '''
@@ -186,7 +190,7 @@ class UnemploymentEnv(gym.Env):
         p['lapsia_kotihoidontuella']=0
         p['alle3v']=0
         p['tyottomyyden_kesto']=1
-        p['puolison_tyottomyyden_kesto']=10
+        p['puoliso_tyottomyyden_kesto']=10
         p['isyysvapaalla']=0
         p['aitiysvapaalla']=0
         p['kotihoidontuella']=0
@@ -233,14 +237,13 @@ class UnemploymentEnv(gym.Env):
 
         p['ansiopvrahan_suojaosa']=1
         p['ansiopvraha_lapsikorotus']=1
-        p['puolison_tulot']=0
         p['puoliso_tyoton']=0  
         p['puoliso_vakiintunutpalkka']=0  
         p['puoliso_saa_ansiopaivarahaa']=0
-        p['puolison_tulot']=0
+        p['puoliso_tulot']=0
         
         netto,benefitq=self.ben.laske_tulot(p)
-        netto=max(0,netto-p['asumismenot_asumistuki']) # netotetaan asumismenot pois käteenjäävästä
+        #netto=max(0,netto-p['asumismenot_asumistuki']) # netotetaan asumismenot pois käteenjäävästä
         netto=netto*12
         
         #print('ben:',(wage,old_wage,pension,employment_status,time_in_state,ika),netto)
@@ -261,9 +264,15 @@ class UnemploymentEnv(gym.Env):
         np.random.seed(seed)
         #return [seed]
         
-    def get_wage(self,age,time_in_state):
+    def get_wage_with_tis(self,age,time_in_state):
         if age<=self.max_age and age>=self.min_age-1:
             return self.salary[int(np.floor(age))]*(1-min(time_in_state,5)*self.salary_const)
+        else:
+            return 0
+            
+    def get_wage(self,age,time_in_state):
+        if age<=self.max_age and age>=self.min_age-1:
+            return self.salary[int(np.floor(age))]
         else:
             return 0
             
@@ -284,16 +293,17 @@ class UnemploymentEnv(gym.Env):
     # from Hakola and Määttänen, 2005
     def log_utility(self,income,employment_state,age):
         # kappa tells how much person values free-time
-        kappa_kokoaika=0.60
+        kappa_kokoaika=0.40
+        kappa_retirement=0.70
         
-        if age>58:
-            mu=0.10
-            kappa_kokoaika *= (1+mu*max(0,age-58))
+        #if age>58:
+        #    mu=0.10
+        #    kappa_kokoaika *= (1+mu*max(0,age-58))
         
         if employment_state == 1:
             u=np.log(income)-kappa_kokoaika
         elif employment_state == 2:
-            u=np.log(income)+0.14
+            u=np.log(income)+kappa_retirement
         else:
             u=np.log(income)
             
@@ -319,6 +329,28 @@ class UnemploymentEnv(gym.Env):
             
         return wt
         
+    # wage process reparametrized
+    def wage_process_TK(self,w,age,a0=3300*12,a1=3300*12,g=1):
+        '''
+        Palkkaprosessi muokattu lähteestä Määttänen, 2013 
+        '''
+        #group_sigmas=[0.08,0.10,0.15]
+        #group_sigmas=[0.09,0.10,0.13]
+        group_sigmas=[0.05,0.05,0.05]
+        sigma=group_sigmas[g]
+        eps=np.random.normal(loc=0,scale=sigma,size=1)[0]
+        c1=0.89
+        if w>0:
+             # pidetään keskiarvo/a1 samana kuin w/a0
+            wt=a1*np.exp(c1*np.log(w/a0)+eps-0.5*sigma*sigma)
+        else:
+            wt=a1*np.exp(eps)
+
+        # täysiaikainen vuositulo vähintään self.min_salary
+        wt=np.maximum(self.min_salary,wt)
+
+        return wt
+        
     # From Määttänen, 2013
     def wage_process(self,w,age,ave=3300*12):
         eps=np.random.normal(loc=0,scale=0.02,size=1)[0]
@@ -342,8 +374,8 @@ class UnemploymentEnv(gym.Env):
     
         # asetetaan palkat samoiksi kaikkina ikävuosina
         for age in range(self.min_age+1,self.max_age+1):
-            #self.salary[age]=self.wage_process(self.salary[age-1],age,ave=a0)
-            self.salary[age]=self.salary[age-1]
+            self.salary[age]=self.wage_process(self.salary[age-1],age,ave=a0)
+            #self.salary[age]=self.salary[age-1]
         
     def scale_pension(self,pension,age):
         return self.elinaikakerroin*pension*self.elakeindeksi*(1+0.004*(age-self.min_retirementage)*12)
@@ -366,7 +398,7 @@ class UnemploymentEnv(gym.Env):
         Tässä versiossa vain kolme tilaa: töissä, työtön ja vanhuuseläkkeellä
         '''
         assert self.action_space.contains(action), "%r (%s) invalid"%(action, type(action))
-        employment_status,pension,old_wage,age,time_in_state=self.state_decode(self.state)
+        employment_status,pension,old_wage,age,time_in_state,next_wage=self.state_decode(self.state)
         intage=int(np.floor(age))
         
         # here age is age at the beginning of the period
@@ -381,7 +413,7 @@ class UnemploymentEnv(gym.Env):
         if action==15: # kuolee
             employment_status,pension,old_wage,time_in_state,wage,netto=(-1,0,0,0,0,0)
             done=True
-            self.state = self.state_encode(employment_status,pension,wage,age+self.timestep,time_in_state)
+            self.state = self.state_encode(employment_status,pension,wage,age+self.timestep,time_in_state,next_wage)
             reward=0
             return np.array(self.state), reward, done, {}
         # ei siirretä automaattisesti eläkkeelle
@@ -470,37 +502,41 @@ class UnemploymentEnv(gym.Env):
         else:
             print('Unknown employment_status {s} of type {t}'.format(s=employment_status,t=type(employment_status)))
         
-        self.state = self.state_encode(employment_status,pension,wage,age+self.timestep,time_in_state)
-        
         done = age >= self.max_age
         done = bool(done)
+
+        # seuraava palkka tiedoksi valuaatioapproksimaattorille
+        next_wage=self.get_wage(int(np.floor(age+self.timestep)),time_in_state)
 
         if dynprog:
             if not done:
                 reward = self.log_utility(netto,int(employment_status),age)
+                self.state = self.state_encode(employment_status,pension,wage,age+self.timestep,time_in_state,next_wage)
             else:
                 if age>self.max_age+0.001:
                     self.steps_beyond_done = 0
                     reward = 0
-                    self.state = self.state_encode(employment_status,pension,wage,age+self.timestep,0)
+                    self.state = self.state_encode(employment_status,pension,wage,age+self.timestep,0,next_wage)
                 else:
                     self.steps_beyond_done = 0
                     if employment_status==2:
                         reward = self.npv*self.log_utility(netto,2,age)
                     else:
                         reward = 0
-                    self.state = self.state_encode(employment_status,pension,wage,age+self.timestep,0)
+                    self.state = self.state_encode(employment_status,pension,wage,age+self.timestep,0,next_wage)
         else:
             if not done:
                 reward = self.log_utility(netto,int(employment_status),age)
+                self.state = self.state_encode(employment_status,pension,wage,age+self.timestep,time_in_state,next_wage)
             elif self.steps_beyond_done is None:
                 self.steps_beyond_done = 0
                 #if employment_status == 2:
                 reward = self.npv*self.log_utility(netto,2,age)
                 #else:
                 #    reward = 0.0
-                self.state = self.state_encode(employment_status,0,wage,age+self.timestep,0)
+                self.state = self.state_encode(employment_status,0,wage,age+self.timestep,0,next_wage)
             else:
+                self.state = self.state_encode(employment_status,pension,wage,age+self.timestep,time_in_state,next_wage)
                 if self.steps_beyond_done == 0:
                     logger.warn("You are calling 'step()' even though this environment has already returned done = True. You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior.")
                 self.steps_beyond_done += 1
@@ -508,8 +544,8 @@ class UnemploymentEnv(gym.Env):
             
         return np.array(self.state), reward, done, {'netto': netto, 'r': reward}
 
-    def state_encode(self,emp,pension,old_wage,age,time_in_state):
-        d=np.zeros(self.n_empl+4)
+    def state_encode(self,emp,pension,old_wage,age,time_in_state,nextwage):
+        d=np.zeros(self.n_empl+5)
         states=self.n_empl
         if emp==1:
             d[0:states]=np.array([0,1,0])
@@ -524,6 +560,7 @@ class UnemploymentEnv(gym.Env):
         d[states+1]=(old_wage-40_000)/15_000
         d[states+2]=(age-(69+25)/2)/10
         d[states+3]=time_in_state/10
+        d[states+4]=(nextwage-40_000)/15_000
         
         return d
 
@@ -541,8 +578,9 @@ class UnemploymentEnv(gym.Env):
         wage=vec[self.n_empl+1]*15_000+40_000
         age=vec[self.n_empl+2]*10+(69+25)/2
         time_in_state=vec[self.n_empl+3]*10
+        nextwage=vec[self.n_empl+4]*15_000+40_000
                 
-        return int(emp),pension,wage,age,time_in_state
+        return int(emp),pension,wage,age,time_in_state,nextwage
 
     def reset(self,init=None):
         '''
@@ -559,7 +597,7 @@ class UnemploymentEnv(gym.Env):
         self.compute_salary(group=group)
         old_wage=self.salary[self.min_age]
 
-        self.state = self.state_encode(employment_status,pension,old_wage,self.min_age,0)
+        self.state = self.state_encode(employment_status,pension,old_wage,self.min_age,0,old_wage)
         self.steps_beyond_done = None
         
         return np.array(self.state)

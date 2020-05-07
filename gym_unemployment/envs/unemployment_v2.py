@@ -1,10 +1,13 @@
 """
 
-    unemloyment_v1
+    unemloyment_v2
 
 
     Gym module implementing the Finnish social security including earnings-related components,
     e.g., the unemployment benefit
+    
+    Changes againt v1
+    - more accurate t-o-e computation
 
 """
 
@@ -205,9 +208,6 @@ class UnemploymentLargeEnv(gym.Env):
         #self.ansiopvraha_kesto400=self.ansiopvraha_kesto400/(12*21.5)
         #self.ansiopvraha_kesto300=self.ansiopvraha_kesto300/(12*21.5)              
 
-        #self.plotdebug=True
-        print('plotdebug',self.plotdebug)
-
         self.gamma=gamma**self.timestep # discounting
         self.palkkakerroin=(0.8*1+0.2*1.0/reaalinen_palkkojenkasvu)**self.timestep
         self.elakeindeksi=(0.2*1+0.8*1.0/reaalinen_palkkojenkasvu)**self.timestep
@@ -216,7 +216,7 @@ class UnemploymentLargeEnv(gym.Env):
         # paljonko työstä poissaolo vaikuttaa palkkaan
         self.salary_const=0.05*self.timestep
         self.salary_const_up=0.015*self.timestep # työssäolo palauttaa ansioita tämän verran vuodessa
-        self.salary_const_student=0.025*self.timestep # opiskelu nostaa leikkausta tämän verran vuodessa
+        self.salary_const_student=0.10*self.timestep # opiskelu nostaa leikkausta tämän verran vuodessa
 
         # karttumaprosentit
         self.acc=0.015*self.timestep
@@ -232,6 +232,7 @@ class UnemploymentLargeEnv(gym.Env):
         self.accbasis_tmtuki=1413.75*12
 
         self.n_age=self.max_age-self.min_age+1
+        self.n_time = int(np.round((self.n_age-1)*self.inv_timestep))+2
 
         # male low income, male mid, male high, female low, female mid, female high income
         self.n_groups=6
@@ -248,16 +249,8 @@ class UnemploymentLargeEnv(gym.Env):
         
         if self.include_pinkslip:
             self.pinkslip_intensity=np.zeros(6)
-            if True:
-                self.pinkslip_intensity[0:3]=0.07*self.timestep # todennäköisyys tulla irtisanotuksi vuodessa, miehet
-                self.pinkslip_intensity[3:6]=0.03*self.timestep # todennäköisyys tulla irtisanotuksi vuodessa, naiset
-            else:
-                self.pinkslip_intensity[0]=0.08*self.timestep # todennäköisyys tulla irtisanotuksi vuodessa, miehet
-                self.pinkslip_intensity[1]=0.05*self.timestep # todennäköisyys tulla irtisanotuksi vuodessa, miehet
-                self.pinkslip_intensity[2]=0.03*self.timestep # todennäköisyys tulla irtisanotuksi vuodessa, miehet
-                self.pinkslip_intensity[3]=0.05*self.timestep # todennäköisyys tulla irtisanotuksi vuodessa, naiset
-                self.pinkslip_intensity[4]=0.03*self.timestep # todennäköisyys tulla irtisanotuksi vuodessa, naiset
-                self.pinkslip_intensity[5]=0.02*self.timestep # todennäköisyys tulla irtisanotuksi vuodessa, naiset
+            self.pinkslip_intensity[0:3]=0.07*self.timestep # todennäköisyys tulla irtisanotuksi vuodessa, miehet
+            self.pinkslip_intensity[3:6]=0.03*self.timestep # todennäköisyys tulla irtisanotuksi vuodessa, naiset
         else:
             self.pinkslip_intensity=0 # .05*self.timestep # todennäköisyys tulla irtisanotuksi vuodessa, skaalaa!
         
@@ -291,7 +284,6 @@ class UnemploymentLargeEnv(gym.Env):
         self.action_space = spaces.Discrete(4)
         self.observation_space = spaces.Box(self.low, self.high, dtype=np.float32)
         
-        print(self.use_sigma_reduction)
         if self.use_sigma_reduction:
             self.update_wage_reduction=self.update_wage_reduction_sigma
         else:
@@ -1062,51 +1054,66 @@ class UnemploymentLargeEnv(gym.Env):
         wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)        
 
         return employment_status,pension,wage,time_in_state,netto,out_of_work,pinkslip,wage_reduction,benq
-# 
-#     def reset_info_state(self):
-#         '''
-#         Ei käytössä
-#         Tapa tallentaa lapsia yms
-#         '''
-#         self.infostate=(0,0,-1,-1,-1,-1)
-# 
-#     def decode_info_state(self):
-#         '''
-#         Ei käytössä
-#         Tällä menetelmällä voi tallentaa tarkempia tietoja lapsista,puolisoista yms
-#         '''
-#         tyoura,lapsia,lapsen_ika,lapsia_paivakodissa,n_lapsilisa,n_tyotturva=self.infostate
-#         return tyoura,lapsia,lapsen_ika,lapsia_paivakodissa,n_lapsilisa,n_tyotturva
-# 
-#     def encode_info_state(self,tyoura,lapsia,lapsen_ika,lapsia_paivakodissa,n_lapsilisa,n_tyotturva):
-#         '''
-#         Ei käytössä
-#         Tällä menetelmällä voi tallentaa tarkempia tietoja lapsista,puolisoista yms
-#         '''
-#         self.infostate=(tyoura,lapsia,lapsen_ika,lapsia_paivakodissa,n_lapsilisa,n_tyotturva)
-# 
-#     def update_info_state(self):
-#         '''
-#         Ei käytössä
-#         Tällä menetelmällä voi tallentaa tarkempia tietoja lapsista,puolisoista yms
-#         '''
-#         tyoura,lapsia,lapsen_ika,lapsia_paivakodissa,n_lapsilisa,n_tyotturva=self.decode_info_state()
-# 
-#         lapsia_paivakodissa=0
-#         n_lapsilisa=0
-#         n_tyotturva=0
-#         if lapsia<1:
-#             return
-#         for l in range(lapsia):
-#             lapsen_ika[l]+=self.timestep
-#             if lapsen_ika[l]>=1.0 and lapsen_ika[l]<7:
-#                 lapsia_paivakodissa += 1
-#             if lapsen_ika[l]<17:
-#                 n_lapsilisa += 1
-#             if lapsen_ika[l]<18:
-#                 n_tyotturva += 1
-# 
-#         self.encode_info_state(tyoura,lapsia,lapsen_ika,lapsia_paivakodissa,n_lapsilisa,n_tyotturva)
+
+    def infostate_reset(self):
+        '''
+        Ei käytössä
+        Tapa tallentaa lapsia yms
+        '''
+        # number, age first, age second etc
+        self.infostate_children=(0,0,-1,-1,-1,-1)
+        self.infostate_states=np.array((self.n_time,1))
+        self.infostate_now=0
+
+    def infostate_comp_tyoura(self):
+        career=0
+    
+        for k in range(self.infostate_now):
+            if self.infostate_states[k] in set([1,10]):
+                career += self.timestep
+                
+        return career
+
+    def decode_info_state(self):
+        '''
+        Ei käytössä
+        Tällä menetelmällä voi tallentaa tarkempia tietoja lapsista,puolisoista yms
+        '''
+        tyoura,lapsia,lapsen_ika,lapsia_paivakodissa,n_lapsilisa,n_tyotturva=self.infostate
+        
+        tyoura=self.info_comp_tyoura()
+        
+        return tyoura,lapsia,lapsen_ika,lapsia_paivakodissa,n_lapsilisa,n_tyotturva
+
+    def encode_info_state(self,tyoura,lapsia,lapsen_ika,lapsia_paivakodissa,n_lapsilisa,n_tyotturva):
+        '''
+        Ei käytössä
+        Tällä menetelmällä voi tallentaa tarkempia tietoja lapsista,puolisoista yms
+        '''
+        self.infostate=(tyoura,lapsia,lapsen_ika,lapsia_paivakodissa,n_lapsilisa,n_tyotturva)
+
+    def update_info_state(self):
+        '''
+        Ei käytössä
+        Tällä menetelmällä voi tallentaa tarkempia tietoja lapsista,puolisoista yms
+        '''
+        tyoura,lapsia,lapsen_ika,lapsia_paivakodissa,n_lapsilisa,n_tyotturva=self.decode_info_state()
+
+        lapsia_paivakodissa=0
+        n_lapsilisa=0
+        n_tyotturva=0
+        if lapsia<1:
+            return
+        for l in range(lapsia):
+            lapsen_ika[l]+=self.timestep
+            if lapsen_ika[l]>=1.0 and lapsen_ika[l]<7:
+                lapsia_paivakodissa += 1
+            if lapsen_ika[l]<17:
+                n_lapsilisa += 1
+            if lapsen_ika[l]<18:
+                n_tyotturva += 1
+
+        self.encode_info_state(tyoura,lapsia,lapsen_ika,lapsia_paivakodissa,n_lapsilisa,n_tyotturva)
         
     def pension_accrual(self,age,wage,pension,state=1):
         '''
@@ -1176,8 +1183,8 @@ class UnemploymentLargeEnv(gym.Env):
             wage_reduction=max(0,wage_reduction-self.salary_const_student)
         elif state in set([0,4,13,11]): # työtön tai työelämän ulkopuolella
             wage_reduction+=self.salary_const
-        elif state in set([5,6]): # isyys tai vanhempainvapaa
-            wage_reduction+=self.salary_const
+        elif state in set([5,6]): # isyys tai vanhempainvapaa, ei vaikutusta
+            wage_reduction=wage_reduction
         elif state in set([7,2]): # kotihoidontuki tai ve tai tk
             wage_reduction+=self.salary_const
         elif state in set([3,14,15]): # ei muutosta
@@ -1235,7 +1242,7 @@ class UnemploymentLargeEnv(gym.Env):
 
         intage=int(np.floor(age))
         moved=False
-        
+
         if self.randomness:
             # kaikki satunnaisuus kerralla
             sattuma = np.random.uniform(size=7)
@@ -1361,8 +1368,7 @@ class UnemploymentLargeEnv(gym.Env):
                     self.move_to_retirement(pension,0,age,paid_pension,employment_status,out_of_work,wage_reduction,all_acc=True)
             elif action == 0 or (action == 2 and age < self.min_retirementage):
                 employment_status = 13 # unchanged
-                wage=old_wage
-                #wage=self.get_wage(intage,wage_reduction)
+                wage=old_wage # self.get_wage(intage,time_in_state)
                 toe=max(0.0,toe-self.timestep) # approksimaatio, oletus että työjakso korvautuu työttömyysjaksolla
                 pension=self.pension_accrual(age,wage,pension,state=13)
 
@@ -1782,6 +1788,7 @@ class UnemploymentLargeEnv(gym.Env):
                 out_of_work=0 #self.timestep
                 pinkslip=0
                 tyoura=0
+                toe=0
                 if sattuma[5]>=self.student_outrate[intage,g]:
                     employment_status = 12 # unchanged
                     time_in_state+=self.timestep
@@ -1859,7 +1866,14 @@ class UnemploymentLargeEnv(gym.Env):
                 reward = self.npv[g]*self.log_utility(netto,employment_status,age,pinkslip=0)
                 
                 # npv0 is undiscounted
-                benq=self.scale_q(self.npv0[g],benq)                
+                benq['verot']*=self.npv0[g]
+                benq['etuustulo_brutto']*=self.npv0[g]
+                benq['valtionvero']*=self.npv0[g]
+                benq['kunnallisvero']*=self.npv0[g]
+                benq['asumistuki']*=self.npv0[g]
+                benq['elake_maksussa']*=self.npv0[g]
+                benq['kokoelake']*=self.npv0[g]
+                benq['toimtuki']*=self.npv0[g]
             else:
                 # giving up the pension
                 reward = 0.0 #-self.npv[g]*self.log_utility(netto,employment_status,age)
@@ -1885,23 +1899,9 @@ class UnemploymentLargeEnv(gym.Env):
                                     paid_pension,pinkslip,toe,tyoura,next_wage,out_of_work,used_unemp_benefit,wage_reduction)
 
         if self.plotdebug:
-            self.render(done=done,reward=reward, netto=netto)
+        	self.render(done=done,reward=reward, netto=netto)
 
         return np.array(self.state), reward, done, benq
-        
-    def scale_q(self,npv,benq):
-        benq['verot']*=npv
-        benq['etuustulo_brutto']*=npv
-        benq['valtionvero']*=npv
-        benq['kunnallisvero']*=npv
-        benq['asumistuki']*=npv
-        benq['elake_maksussa']*=npv
-        benq['kokoelake']*=npv
-        benq['perustulo']*=npv
-        benq['palkkatulot']*=npv
-        benq['kateen']*=npv
-
-        return benq        
 
     # WITH RANDOMNESS
     def log_utility_randomness(self,income,employment_state,age,g=0,pinkslip=0,prefnoise=0):
@@ -1914,15 +1914,15 @@ class UnemploymentLargeEnv(gym.Env):
 
         # kappa tells how much person values free-time
         if g<3: # miehet
-            kappa_kokoaika=0.645 # 0.635 # 0.665
-            mu_scale=0.16 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+            kappa_kokoaika=0.635 # 0.665
+            mu_scale=0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
             mu_age=60 # P.O. 60??
-            kappa_osaaika=0.57*kappa_kokoaika
+            kappa_osaaika=0.55*kappa_kokoaika
         else: # naiset
-            kappa_kokoaika=0.605 # 0.605 # 0.58
-            mu_scale=0.19 # 0.25 # 0.25 # 0.17 # how much penalty is associated with work increase with age after mu_age
-            mu_age=61 # 61 # P.O. 60??
-            kappa_osaaika=0.44*kappa_kokoaika # 0.42*kappa_kokoaika
+            kappa_kokoaika=0.605 # 0.58
+            mu_scale=0.25 # 0.25 # 0.17 # how much penalty is associated with work increase with age after mu_age
+            mu_age=61 # P.O. 60??
+            kappa_osaaika=0.42*kappa_kokoaika
                 
         if self.include_preferencenoise:
             kappa_kokoaika += prefnoise
@@ -2394,6 +2394,8 @@ class UnemploymentLargeEnv(gym.Env):
                                             time_in_state,0,pink,toe,tyohist,next_wage,out_of_w,
                                             used_unemp_benefit,wage_reduction)
         self.steps_beyond_done = None
+        
+        self.info_state=np.zeros((self.n_states,1))-1
 
         return np.array(self.state)
 
