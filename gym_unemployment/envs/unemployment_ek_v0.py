@@ -9,9 +9,9 @@ from gym import spaces, logger, utils, error
 from gym.utils import seeding
 import numpy as np
 from fin_benefits import BenefitsEK
-from .unemployment_v0 import UnemploymentEnv
+from .unemployment_v0 import UnemploymentEnv_v0
 
-class UnemploymentEKEnv(UnemploymentEnv):
+class UnemploymentEKEnv(UnemploymentEnv_v0):
     def __init__(self,kwargs=None):
-        super(UnemploymentEKEnv, self).__init__()
+        super(UnemploymentEKEnv_v0, self).__init__()
         self.ben = BenefitsEK()

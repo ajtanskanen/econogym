@@ -2,12 +2,17 @@ from gym.envs.registration import register
 
 register(
     id='unemployment-v0',
-    entry_point='gym_unemployment.envs:UnemploymentEnv',
+    entry_point='gym_unemployment.envs:UnemploymentEnv_v0',
 )
 
 register(
     id='unemployment-v1',
     entry_point='gym_unemployment.envs:UnemploymentLargeEnv',
+)
+
+register(
+    id='unemployment-v2',
+    entry_point='gym_unemployment.envs:UnemploymentLargeEnv_v2',
 )
 
 register(
