@@ -5,6 +5,10 @@
 
     Gym module implementing the Finnish social security including earnings-related components,
     e.g., the unemployment benefit
+    
+    korjauksia julkaistuun versioon:
+    - kansaeläkkeen yhteensovitus huomioitu väärin, joten kansaneläke huomioitiin liian pienenä, ei kuitenkaan vaikuttanut
+      takuueläkkeeseen, joten tulokset eivät välttämättä paljon muutu (tarkasta)
 
 """
 
@@ -827,7 +831,7 @@ class UnemploymentLargeEnv(gym.Env):
         tyoura+=self.timestep
         out_of_work=0
         #pinkslip=0
-        pension=self.pension_accrual(age,wage*0.5,pension,state=employment_status)
+        pension=self.pension_accrual(age,wage*0.5,pension,state=employment_status) # FIXME? 0.5?
         netto,benq=self.comp_benefits(wage,old_wage,0,employment_status,time_in_state,age)
         time_in_state=self.timestep
         wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)        
@@ -910,7 +914,7 @@ class UnemploymentLargeEnv(gym.Env):
                 else:
                     # lykkäyskorotus
                     paid_pension = self.scale_pension(pension,age,scale=scale_acc)
-                    paid_pension += self.ben.laske_kansanelake(age,paid_pension,1)
+                    paid_pension += self.ben.laske_kansanelake(age,paid_pension,1) # onko oikein, p.o. self.ben.laske_kansanelake(age,paid_pension/12,1)*12
                     pension=0
 
             time_in_state=self.timestep
@@ -2389,7 +2393,7 @@ class UnemploymentLargeEnv(gym.Env):
         group=int(g+gender*3)
         self.compute_salary_TK(group=group)
         old_wage=self.salary[self.min_age]
-        next_wage=old_wage
+        next_wage=old_wage # timestep < 1.0 year, hence ok
         out_of_w=0
         used_unemp_benefit=0
         wage_reduction=0

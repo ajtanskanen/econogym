@@ -831,7 +831,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
         tyoura+=self.timestep
         out_of_work=0
         #pinkslip=0
-        pension=self.pension_accrual(age,wage*0.5,pension,state=employment_status)
+        pension=self.pension_accrual(age,wage,pension,state=employment_status) # poistettu *0.5
         netto,benq=self.comp_benefits(wage,old_wage,0,employment_status,time_in_state,age)
         time_in_state=self.timestep
         wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)        
@@ -914,7 +914,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
                 else:
                     # lykkäyskorotus
                     paid_pension = self.scale_pension(pension,age,scale=scale_acc)
-                    paid_pension += self.ben.laske_kansanelake(age,paid_pension,1)
+                    paid_pension += self.ben.laske_kansanelake(age,paid_pension/12,1)*12 # ben-modulissa palkat kk-tasolla
                     pension=0
 
             time_in_state=self.timestep
