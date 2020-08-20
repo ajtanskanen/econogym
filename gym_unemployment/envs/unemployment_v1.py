@@ -914,7 +914,7 @@ class UnemploymentLargeEnv(gym.Env):
                 else:
                     # lykkäyskorotus
                     paid_pension = self.scale_pension(pension,age,scale=scale_acc)
-                    paid_pension += self.ben.laske_kansanelake(age,paid_pension,1) # onko oikein, p.o. self.ben.laske_kansanelake(age,paid_pension/12,1)*12
+                    paid_pension += self.ben.laske_kansanelake(age,paid_pension/12,1)*12 # onko oikein, p.o. self.ben.laske_kansanelake(age,paid_pension/12,1)*12
                     pension=0
 
             time_in_state=self.timestep
@@ -2375,7 +2375,6 @@ class UnemploymentLargeEnv(gym.Env):
 
         return int(emp),int(g),pension,wage,age,time_in_state,paid_pension,int(pink),toe,\
                tyohist,out_of_work,used_unemp_benefit,wage_reduction,prefnoise
-
     def reset(self,init=None):
         '''
         Open AI-interfacen mukainen reset-funktio, joka nollaa laskennan alkutilaan
