@@ -98,6 +98,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         self.reset_exploration_go=True
         self.reset_exploration_ratio=0.1
         self.train=False
+        self.zero_npv=True
         
         if 'kwargs' in kwargs:
             kwarg=kwargs['kwargs']
@@ -388,7 +389,11 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
             m=self.mort_intensity[intx]
             cpsum=m*1+(1-m)*(1+self.gamma*cpsum)
             #cpsum0=m*1+(1-m)*(1+cpsum0)
-        npv=cpsum
+            
+        if self.zero_npv:
+            npv=0*cpsum
+        else:
+            npv=cpsum
         #npv0[g]=cpsum0
             
         if self.plotdebug:
