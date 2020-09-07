@@ -139,6 +139,10 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
         self.elinaikakerroin=0.925 # etk:n arvio 1962 syntyneille
         reaalinen_palkkojenkasvu=1.016
+        
+        self.reset_exploration_go=True
+        self.reset_exploration_ratio=0.4
+        self.train=False
 
         self.include_mort=False # onko kuolleisuus mukana laskelmissa
         self.include_preferencenoise=False # onko työllisyyspreferenssissä hajonta mukana 
@@ -175,6 +179,9 @@ class UnemploymentLargeEnv_v2(gym.Env):
             elif key=='use_sigma_reduction':
                 if value is not None:
                     self.use_sigma_reduction=value
+            elif key=='train':
+                if value is not None:
+                    self.train=value
             elif key=='min_age':
                 if value is not None:
                     self.min_age=value
@@ -2013,17 +2020,18 @@ class UnemploymentLargeEnv_v2(gym.Env):
                 if sattuma[2]<s1/move_prob: # age<self.min_retirementage and 
                     action=11 # disability
                 elif sattuma[2]<s2/move_prob:
-                    if g>2: # naiset
-                        employment_status,pension,wage,time_in_state,netto,pinkslip,wage_reduction,benq=\
-                            self.move_to_motherleave(pension,old_wage,age,wage_reduction,children_under7,children_under18)
-                        pinkslip=0
-                        moved=True
-                    else: # miehet
-                        # ikä valittu äidin iän mukaan. oikeastaan tämä ei mene ihan oikein miehille
-                        if sattuma[4]<0.5:
+                    if self.infostat_can_have_children(age): # lasten väli vähintään vuosi
+                        if g>2: # naiset
                             employment_status,pension,wage,time_in_state,netto,pinkslip,wage_reduction,benq=\
-                                self.move_to_fatherleave(pension,old_wage,age,wage_reduction,children_under7,children_under18)
+                                self.move_to_motherleave(pension,old_wage,age,wage_reduction,children_under7,children_under18)
+                            pinkslip=0
                             moved=True
+                        else: # miehet
+                            # ikä valittu äidin iän mukaan. oikeastaan tämä ei mene ihan oikein miehille
+                            if sattuma[4]<0.5:
+                                employment_status,pension,wage,time_in_state,netto,pinkslip,wage_reduction,benq=\
+                                    self.move_to_fatherleave(pension,old_wage,age,wage_reduction,children_under7,children_under18)
+                                moved=True
                 elif sattuma[2]<s3/move_prob:
                     if employment_status not in set([2,3,8,9,11,12,14]): # and False:
                         employment_status,pension,wage,time_in_state,netto,pinkslip,wage_reduction,benq=\
@@ -2162,19 +2170,19 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
         # kappa tells how much person values free-time
         if g<3: # miehet
-            kappa_kokoaika=0.578 # 0.635 # 0.665
-            mu_scale=0.255 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+            kappa_kokoaika=0.570 # 0.635 # 0.665
+            mu_scale=0.253 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
             mu_age=59.5 # P.O. 60??
             kappa_osaaika=0.65*kappa_kokoaika
             kappa_hoitovapaa=0.04
             kappa_ve=0.00 # ehkä 0.10?
         else: # naiset
-            kappa_kokoaika=0.495 # 0.605 # 0.58
-            mu_scale=0.160 # 0.25 # 0.25 # 0.17 # how much penalty is associated with work increase with age after mu_age
-            mu_age=59.5 # 61 # P.O. 60??
-            kappa_osaaika=0.51*kappa_kokoaika # 0.42*kappa_kokoaika
-            kappa_hoitovapaa=0.05
-            kappa_ve=0.06 # ehkä 0.10?
+            kappa_kokoaika=0.520 # 0.605 # 0.58
+            mu_scale=0.155 # 0.25 # 0.25 # 0.17 # how much penalty is associated with work increase with age after mu_age
+            mu_age=59.75 # 61 # P.O. 60??
+            kappa_osaaika=0.48*kappa_kokoaika # 0.42*kappa_kokoaika
+            kappa_hoitovapaa=0.20
+            kappa_ve=0.08 # ehkä 0.10?
                 
         if self.include_preferencenoise:
             kappa_kokoaika += prefnoise
@@ -2186,7 +2194,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
         if pinkslip>0: # irtisanottu
             kappa_pinkslip = 0 # irtisanotuille ei vaikutuksia
         else:
-            kappa_pinkslip = 0.23 # irtisanoutumisesta seuraava alennus
+            kappa_pinkslip = 0.22 # irtisanoutumisesta seuraava alennus
         
         if age>mu_age:
             kappa_kokoaika *= (1+mu_scale*max(0,age-mu_age))
@@ -2289,7 +2297,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
         return wt
 
-    def compute_salary_TK(self,group=1,debug=False):
+    def compute_salary_TK(self,group=1,debug=False,initial_salary=None):
         '''
         Alussa ajettava funktio, joka tekee palkat yhtä episodia varten
         '''
@@ -2307,7 +2315,11 @@ class UnemploymentLargeEnv_v2(gym.Env):
         else: # randomness and time-development included
             if group>2: # naiset
                 r=g_r[group-3]
-                a0=palkat_ika_naiset[0]*r
+                if initial_salary is not None:
+                    a0=initial_salary
+                else:
+                    a0=palkat_ika_naiset[0]*r
+                
                 a1=palkat_ika_naiset[0]*r/5
                 self.salary[self.min_age-1]=np.maximum(self.min_salary,np.random.normal(loc=a0,scale=a1,size=1)[0]) # e/y
 
@@ -2317,7 +2329,10 @@ class UnemploymentLargeEnv_v2(gym.Env):
                     self.salary[age]=self.wage_process_TK(self.salary[age-1],age,a0,a1)
             else: # miehet
                 r=g_r[group]
-                a0=palkat_ika_miehet[0]*r
+                if initial_salary is not None:
+                    a0=initial_salary
+                else:
+                    a0=palkat_ika_miehet[0]*r
                 a1=palkat_ika_miehet[0]*r/5
                 self.salary[self.min_age-1]=np.maximum(self.min_salary,np.random.normal(loc=a0,scale=a1,size=1)[0]) # e/y
 
@@ -2661,7 +2676,18 @@ class UnemploymentLargeEnv_v2(gym.Env):
         g=random.choices(np.array([0,1,2],dtype=int),weights=[0.3,0.5,0.2])[0]
         gender=random.choices(np.array([0,1],dtype=int),weights=[0.5,0.5])[0]
         group=int(g+gender*3)
-        self.compute_salary_TK(group=group)
+        initial_salary=None
+        if self.reset_exploration_go and self.train:
+            if self.reset_exploration_ratio>np.random.uniform():
+                #print('exploration')
+                initial_salary=np.random.uniform(low=1_000,high=100_000)
+                pension=random.uniform(0,80_000)
+                toe=random.choices(np.array([0,0.25,0.5,0.75,1.0,1.5,2.0,2.5],dtype=int),
+                    weights=[0.3,0.1,0.1,0.1,0.1,0.1,0.1,0.1])[0]
+                toe=random.choices(np.array([0,0.25,0.5,0.75,1.0,1.5,2.0,2.5],dtype=int),
+                    weights=[0.3,0.1,0.1,0.1,0.1,0.1,0.1,0.1])[0]
+        
+        self.compute_salary_TK(group=group,initial_salary=initial_salary)
         old_wage=self.salary[self.min_age]
         next_wage=old_wage
         used_unemp_benefit=0
@@ -2671,6 +2697,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
         unempwage_basis=old_wage
         children_under7=0
         children_under18=0
+        
         
         self.init_infostate()
         
@@ -3018,5 +3045,18 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
         return toes,wage,children_under7,children_under18
 
+    def infostat_can_have_children(self,age):
+        children_under1=0
+        for k in range(self.infostate['children_n']):
+            c_age=age-self.infostate['children_date'][k]
+            if c_age<1.01:
+                children_under1=1
+                break
+
+        if children_under1>0:
+            return False
+        else:
+            return True
+            
     def infostat_check_80percent(self,t):
         pass

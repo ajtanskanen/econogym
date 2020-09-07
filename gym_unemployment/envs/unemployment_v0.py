@@ -84,7 +84,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         self.acc_unemp=0.75*self.acc
         self.acc_unemp_over_52=0.75*self.acc_over_52
 
-        self.max_age=75
+        self.max_age=70
         self.min_age=25
         self.min_retirementage=65
         self.max_retirementage=70        
@@ -92,13 +92,13 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         self.ansiopvraha_kesto=1.0
         self.karenssi_kesto=0.24 # vuotta
         self.accbasis_tmtuki=1413.75*12        
-        self.plotdebug=False 
+        self.plotdebug=False
         self.wage_without_tis=True
         self.include_mort=False
         self.reset_exploration_go=True
-        self.reset_exploration_ratio=0.1
+        self.reset_exploration_ratio=0.4
         self.train=False
-        self.zero_npv=True
+        self.zero_npv=False
         
         if 'kwargs' in kwargs:
             kwarg=kwargs['kwargs']
@@ -144,12 +144,13 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
                     self.randomness=value
             elif key=='plotdebug':
                 if value is not None:
-                    self.randomness=value
+                    self.plotdebug=value
             elif key=='wage_without_tis':
                 if value is not None:
                     self.no_tis=value
                     
         print('Train ',self.train)
+        print('plotdebug',self.plotdebug)
                 
          
         # ei skaalata!
@@ -212,6 +213,8 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         self.setup_salaries()
         
         self.n_actions=3
+        
+        self.explain()
         
     def get_n_states(self):
         '''
@@ -455,11 +458,14 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
             
          # pidetään keskiarvo/a1 samana kuin w/a0
         wt=a1*np.exp(c1*np.log(w/a0)+eps-0.5*sigma*sigma)
+        
+        #print('age {} wt {} a1 {} a0 {} w {}'.format(age,wt,a1,a0,w))
 
         # täysiaikainen vuositulo vähintään self.min_salary
         wt=np.maximum(self.min_salary,wt)
 
         return wt
+                
         
     # wage process cumulative function
     def wage_process_cumulative(self,w_cum,w_old,age):
@@ -498,14 +504,22 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         self.palkat_ika_miehet=12.5*np.array([2339.01,2489.09,2571.40,2632.58,2718.03,2774.21,2884.89,2987.55,3072.40,3198.48,3283.81,3336.51,3437.30,3483.45,3576.67,3623.00,3731.27,3809.58,3853.66,3995.90,4006.16,4028.60,4104.72,4181.51,4134.13,4157.54,4217.15,4165.21,4141.23,4172.14,4121.26,4127.43,4134.00,4093.10,4065.53,4063.17,4085.31,4071.25,4026.50,4031.17,4047.32,4026.96,4028.39,4163.14,4266.42,4488.40,4201.40,4252.15,4443.96,3316.92,3536.03,3536.03])
         self.palkat_ika_naiset=12.5*np.array([2223.96,2257.10,2284.57,2365.57,2443.64,2548.35,2648.06,2712.89,2768.83,2831.99,2896.76,2946.37,2963.84,2993.79,3040.83,3090.43,3142.91,3159.91,3226.95,3272.29,3270.97,3297.32,3333.42,3362.99,3381.84,3342.78,3345.25,3360.21,3324.67,3322.28,3326.72,3326.06,3314.82,3303.73,3302.65,3246.03,3244.65,3248.04,3223.94,3211.96,3167.00,3156.29,3175.23,3228.67,3388.39,3457.17,3400.23,3293.52,2967.68,2702.05,2528.84,2528.84])
 
-    def compute_salary(self,initial_salary=None):
+    def compute_salary(self,initial_salary=None,initial_age=None):
         if initial_salary is not None:
-            a1=initial_salary
+            loc=initial_salary
         else:
-            a1=self.palkat_ika_miehet[0]
-        s1=self.palkat_ika_miehet[0]/5
-        self.salary[self.min_age-1]=np.maximum(self.min_salary,np.random.normal(loc=a1,scale=s1,size=1)[0]) # e/y
-        for age in range(self.min_age,self.max_age+1):
+            loc=self.palkat_ika_miehet[0]
+
+        if initial_age is not None:
+            minage=initial_age
+        else:
+            minage=self.min_age
+            
+        s1=self.palkat_ika_miehet[minage-self.min_age]/5
+        self.salary[minage-1]=np.maximum(self.min_salary,np.random.normal(loc=loc,scale=s1,size=1)[0]) # e/y
+        a1=self.palkat_ika_miehet[0]
+        #print('age {} sal {}'.format(minage-1,self.salary[minage-1]))
+        for age in range(minage,self.max_age+1):
             a0=a1
             a1=self.palkat_ika_miehet[age-self.min_age]
             self.salary[age]=self.wage_process(self.salary[age-1],age,a0,a1)
@@ -671,7 +685,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
                     reward = self.npv*self.log_utility(netto,2,age)
                 else:
                     reward = 0.0
-                self.state = self.state_encode(employment_status,pension,wage,age+self.timestep,0,next_wage)
+                self.state = self.state_encode(employment_status,pension,wage,age+self.timestep,time_in_state,next_wage)
             else:
                 self.state = self.state_encode(employment_status,pension,wage,age+self.timestep,time_in_state,next_wage)
                 if self.steps_beyond_done == 0:
@@ -747,6 +761,14 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
                 
         return int(emp),pension,wage,age,time_in_state,nextwage
 
+    def explain(self):
+        '''
+        Tulosta laskennan parametrit
+        '''
+        print('Parameters of lifecycle:\ntimestep {}\ngamma {} ({} per anno)\nmin_age {}\nmax_age {}\nmin_retirementage {}'.format(self.timestep,self.gamma,self.gamma**(1.0/self.timestep),self.min_age,self.max_age,self.min_retirementage))
+        print('max_retirementage {} mortality {}'.format(self.max_retirementage,self.include_mort))
+        print('reset_exploration_go {} reset_exploration_ratio {} plotdebug {}\n'.format(self.reset_exploration_go,self.reset_exploration_ratio,self.plotdebug))
+
     def reset(self,init=None):
         '''
         Open AI-interfacen mukainen reset-funktio, joka nollaa laskennan alkutilaan
@@ -762,17 +784,21 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         
         # set up salary for the entire career
         initial_salary=None
+        initial_age=None
         if self.reset_exploration_go and self.train:
             if self.reset_exploration_ratio>np.random.uniform():
                 #print('exploration')
+                age=int(np.random.uniform(low=self.min_age,high=self.max_age-2))
                 initial_salary=np.random.uniform(low=1_000,high=100_000)
                 pension=random.uniform(0,80_000)
+                initial_age=age
+                #print('Explore: age {} initial {} pension {}'.format(age,initial_salary,pension))
 
-        self.compute_salary(initial_salary=initial_salary)
-        old_wage=self.salary[self.min_age-1]
-        wage=self.salary[self.min_age] # timestep == 1
+        self.compute_salary(initial_salary=initial_salary,initial_age=initial_age)
+        old_wage=self.salary[age-1]
+        wage=self.salary[age] # timestep == 1
 
-        self.state = self.state_encode(employment_status,pension,old_wage,self.min_age,time_in_state,wage)
+        self.state = self.state_encode(employment_status,pension,old_wage,age,time_in_state,wage)
         self.steps_beyond_done = None
         
         return np.array(self.state)
