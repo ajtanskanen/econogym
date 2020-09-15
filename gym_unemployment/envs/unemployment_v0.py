@@ -182,6 +182,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
             (self.min_age-(69+25)/2)/10,
             -10,
             -10,
+            0,
             0])
         self.high = np.array([
             1,
@@ -192,6 +193,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
             (self.max_age-(69+25)/2)/10,
             10,
             10,
+            1,
             1])
                     
 
@@ -585,7 +587,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
                 if not dynprog:
                     wage=self.get_wage(intage,time_in_state)
                 time_in_state=0
-                pension=self.pension_accrual(age,wage,pension,state=1,time_in_state=time_in_state)
+                pension=self.pension_accrual(age,wage,pension,state=employment_status,time_in_state=time_in_state)
                 netto=self.comp_benefits(wage,0,0,employment_status,time_in_state,age)
                 time_in_state+=self.timestep
                 if not dynprog:
@@ -597,8 +599,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
                     employment_status  = 2 
                     time_in_state=0
                     wage=0 #old_wage
-                    pension=self.scale_pension(pension,age)
-                    pension=pension+self.ben.laske_kansanelake(age,pension/12,1)*12
+                    pension=self.scale_pension(pension,age)+self.ben.laske_kansanelake(age,pension/12,1)*12
                     netto=self.comp_benefits(0,0,pension,employment_status,0,age)
                     time_in_state+=self.timestep
                     next_wage=0
@@ -634,8 +635,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
                 if age>=self.min_retirementage: # ve
                     employment_status  = 2 # unchanged
                     wage=0
-                    pension=self.scale_pension(pension,age)
-                    pension=pension+self.ben.laske_kansanelake(age,pension/12,1)*12
+                    pension=self.scale_pension(pension,age)+self.ben.laske_kansanelake(age,pension/12,1)*12
                     time_in_state=0
                     netto=self.comp_benefits(0,0,pension,employment_status,0,age)
                     time_in_state+=self.timestep
@@ -646,9 +646,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
                 print('error 12')
         elif employment_status == 2: # eläkkeellä, ei voi palata töihin
             employment_status = 2 # unchanged
-            #print(pension)
             pension=pension*self.elakeindeksi
-            #print(pension)
             wage=0
             netto=self.comp_benefits(0,0,pension,employment_status,0,age)
             time_in_state+=self.timestep
@@ -720,7 +718,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
             print('-------------------------------------------------------------------------------------------------------')
 
     def state_encode(self,emp,pension,old_wage,age,time_in_state,nextwage):
-        d=np.zeros(self.n_empl+6)
+        d=np.zeros(self.n_empl+7)
         states=self.n_empl
         if emp==1:
             d[0:states]=np.array([0,1,0])
@@ -740,6 +738,11 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
             d[states+5]=1
         else:
             d[states+5]=0
+            
+        if time_in_state<self.ansiopvraha_kesto:
+            d[states+6]=1
+        else:
+            d[states+6]=0
         
         return d
 

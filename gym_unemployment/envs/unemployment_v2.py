@@ -2170,19 +2170,19 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
         # kappa tells how much person values free-time
         if g<3: # miehet
-            kappa_kokoaika=0.570 # 0.635 # 0.665
+            kappa_kokoaika=0.557 # 0.635 # 0.665
             mu_scale=0.253 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
             mu_age=59.5 # P.O. 60??
             kappa_osaaika=0.65*kappa_kokoaika
             kappa_hoitovapaa=0.04
             kappa_ve=0.00 # ehkä 0.10?
         else: # naiset
-            kappa_kokoaika=0.520 # 0.605 # 0.58
-            mu_scale=0.155 # 0.25 # 0.25 # 0.17 # how much penalty is associated with work increase with age after mu_age
+            kappa_kokoaika=0.484 # 0.605 # 0.58
+            mu_scale=0.151 # 0.25 # 0.25 # 0.17 # how much penalty is associated with work increase with age after mu_age
             mu_age=59.75 # 61 # P.O. 60??
             kappa_osaaika=0.48*kappa_kokoaika # 0.42*kappa_kokoaika
-            kappa_hoitovapaa=0.20
-            kappa_ve=0.08 # ehkä 0.10?
+            kappa_hoitovapaa=0.08
+            kappa_ve=0.12 # ehkä 0.10?
                 
         if self.include_preferencenoise:
             kappa_kokoaika += prefnoise
@@ -3029,7 +3029,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
                     else:
                         nt=nt+1
                     t2=t2-1
-            if toes>=self.ansiopvraha_toe:
+            if toes>=self.ansiopvraha_toe and toes>0:
                 wage=wage/toes
             else:
                 wage=0
