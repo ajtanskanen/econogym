@@ -171,31 +171,8 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         self.pinkslip_intensity=0.05*self.timestep # todennäköisyys tulla irtisanotuksi vuodessa, skaalaa!
         self.mort_intensity=self.get_mort_rate()*self.timestep # todennäköisyys , skaalaa!
         self.npv=self.comp_npv()
-
-        # Limits on states
-        self.low = np.array([
-            0,
-            0,
-            0,
-            -10,
-            -10,
-            (self.min_age-(69+25)/2)/10,
-            -10,
-            -10,
-            0,
-            0])
-        self.high = np.array([
-            1,
-            1,
-            1,
-            10,
-            10,
-            (self.max_age-(69+25)/2)/10,
-            10,
-            10,
-            1,
-            1])
-                    
+        
+        self.state_limits()        
 
         self.action_space = spaces.Discrete(3)
         self.observation_space = spaces.Box(self.low, self.high, dtype=np.float32)
@@ -729,11 +706,11 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         else:
             print('state error '+str(emp))
             
-        d[states]=(pension-20_000)/10_000 # vastainen/alkanut eläke
-        d[states+1]=(old_wage-40_000)/15_000
+        d[states]=(pension-40_000)/40_000 # vastainen/alkanut eläke
+        d[states+1]=(old_wage-40_000)/40_000
         d[states+2]=(age-(69+25)/2)/10
         d[states+3]=(time_in_state-5)/10
-        d[states+4]=(nextwage-40_000)/15_000
+        d[states+4]=(nextwage-40_000)/40_000
         if age>=self.min_retirementage:
             d[states+5]=1
         else:
@@ -756,14 +733,39 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         if emp<0:
             print('state error '+str(vec))
             
-        pension=vec[self.n_empl]*10_000+20_000
-        wage=vec[self.n_empl+1]*15_000+40_000
+        pension=vec[self.n_empl]*40_000+40_000
+        wage=vec[self.n_empl+1]*40_000+40_000
         age=int(vec[self.n_empl+2]*10+(69+25)/2)
         time_in_state=vec[self.n_empl+3]*10+5
-        nextwage=vec[self.n_empl+4]*15_000+40_000
+        nextwage=vec[self.n_empl+4]*40_000+40_000
                 
         return int(emp),pension,wage,age,time_in_state,nextwage
 
+    def state_limits(self):
+        # Limits on states
+        self.low = np.array([
+            0,
+            0,
+            0,
+            -1.5,
+            -2,
+            (self.min_age-(69+25)/2)/10,
+            -0.5,
+            -2,
+            0,
+            0])
+        self.high = np.array([
+            1,
+            1,
+            1,
+            10,
+            10,
+            (self.max_age-(69+25)/2)/10,
+            10,
+            10,
+            1,
+            1])
+                    
     def explain(self):
         '''
         Tulosta laskennan parametrit
@@ -791,15 +793,21 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         if self.reset_exploration_go and self.train:
             if self.reset_exploration_ratio>np.random.uniform():
                 #print('exploration')
-                age=int(np.random.uniform(low=self.min_age,high=self.max_age-2))
+                employment_status=random.choices(np.array([0,1],dtype=int),weights=[0.5,0.5])[0]
+                if random.random()<0.5:
+                    age=int(np.random.uniform(low=self.min_age,high=self.max_age-1))
+                else:
+                    age=int(np.random.uniform(low=62,high=self.max_age-1))
                 initial_salary=np.random.uniform(low=1_000,high=100_000)
-                pension=random.uniform(0,80_000)
+                pension=np.random.uniform(low=0,high=80_000)
                 initial_age=age
                 #print('Explore: age {} initial {} pension {}'.format(age,initial_salary,pension))
 
         self.compute_salary(initial_salary=initial_salary,initial_age=initial_age)
         old_wage=self.salary[age-1]
         wage=self.salary[age] # timestep == 1
+        
+        #print(initial_salary,old_wage,wage)
 
         self.state = self.state_encode(employment_status,pension,old_wage,age,time_in_state,wage)
         self.steps_beyond_done = None

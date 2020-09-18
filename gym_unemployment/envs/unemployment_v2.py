@@ -2170,19 +2170,19 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
         # kappa tells how much person values free-time
         if g<3: # miehet
-            kappa_kokoaika=0.557 # 0.635 # 0.665
-            mu_scale=0.253 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-            mu_age=59.5 # P.O. 60??
+            kappa_kokoaika=0.607 # 0.635 # 0.665
+            mu_scale=0.203 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+            mu_age=59.25 # P.O. 60??
             kappa_osaaika=0.65*kappa_kokoaika
             kappa_hoitovapaa=0.04
             kappa_ve=0.00 # ehkä 0.10?
         else: # naiset
-            kappa_kokoaika=0.484 # 0.605 # 0.58
+            kappa_kokoaika=0.534 # 0.605 # 0.58
             mu_scale=0.151 # 0.25 # 0.25 # 0.17 # how much penalty is associated with work increase with age after mu_age
-            mu_age=59.75 # 61 # P.O. 60??
-            kappa_osaaika=0.48*kappa_kokoaika # 0.42*kappa_kokoaika
+            mu_age=59.25 # 61 # P.O. 60??
+            kappa_osaaika=0.44*kappa_kokoaika # 0.42*kappa_kokoaika
             kappa_hoitovapaa=0.08
-            kappa_ve=0.12 # ehkä 0.10?
+            kappa_ve=0.17 # ehkä 0.10?
                 
         if self.include_preferencenoise:
             kappa_kokoaika += prefnoise
@@ -2194,7 +2194,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
         if pinkslip>0: # irtisanottu
             kappa_pinkslip = 0 # irtisanotuille ei vaikutuksia
         else:
-            kappa_pinkslip = 0.22 # irtisanoutumisesta seuraava alennus
+            kappa_pinkslip = 0.26 # irtisanoutumisesta seuraava alennus
         
         if age>mu_age:
             kappa_kokoaika *= (1+mu_scale*max(0,age-mu_age))
@@ -2422,12 +2422,12 @@ class UnemploymentLargeEnv_v2(gym.Env):
             d[states2+14]=np.log(unempwage/40_000+self.eps)
             d[states2+15]=np.log(unempwage_basis/40_000+self.eps)
         else:
-            d[states2]=(pension-20_000)/10_000 # vastainen eläke
-            d[states2+1]=(old_wage-40_000)/15_000
-            d[states2+4]=(paid_pension-20_000)/10_000 # alkanut eläke
-            d[states2+10]=(next_wage-40_000)/15_000        
-            d[states2+14]=(unempwage-40_000)/15_000        
-            d[states2+15]=(unempwage_basis-40_000)/15_000
+            d[states2]=(pension-40_000)/40_000 # vastainen eläke
+            d[states2+1]=(old_wage-40_000)/40_000
+            d[states2+4]=(paid_pension-40_000)/40_000 # alkanut eläke
+            d[states2+10]=(next_wage-40_000)/40_000        
+            d[states2+14]=(unempwage-40_000)/40_000        
+            d[states2+15]=(unempwage_basis-40_000)/40_000
 
         if tyohist>self.tyohistoria_vaatimus:
             hist400=1
@@ -2544,12 +2544,12 @@ class UnemploymentLargeEnv_v2(gym.Env):
             d[states2+14]=np.log(unempwage/40_000+self.eps)
             d[states2+15]=np.log(unempwage_basis/40_000+self.eps)
         else:
-            d[states2]=(pension-20_000)/10_000 # vastainen eläke
-            d[states2+1]=(old_wage-40_000)/15_000
-            d[states2+4]=(paid_pension-20_000)/10_000 # alkanut eläke
-            d[states2+10]=(next_wage-40_000)/15_000
-            d[states2+14]=(unempwage-40_000)/15_000
-            d[states2+15]=(unempwage_basis-40_000)/15_000
+            d[states2]=(pension-40_000)/40_000 # vastainen eläke
+            d[states2+1]=(old_wage-40_000)/40_000
+            d[states2+4]=(paid_pension-40_000)/40_000 # alkanut eläke
+            d[states2+10]=(next_wage-40_000)/40_000
+            d[states2+14]=(unempwage-40_000)/40_000
+            d[states2+15]=(unempwage_basis-40_000)/40_000
 
         d[states2+2]=(age-(self.max_age+self.min_age)/2)/20
         d[states2+3]=(time_in_state-3)/10
@@ -2561,7 +2561,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
         #if self.include300:
         d[states2+5]=pink # irtisanottu vai ei 
         d[states2+6]=toe-14/12 # työssäoloehto
-        d[states2+7]=(tyohist-3)/10 # tyohistoria: 300/400 pv
+        d[states2+7]=(tyohist-3)/20 # tyohistoria: 300/400 pv
         if tyohist>self.tyohistoria_vaatimus:
             hist400=1
         else:
@@ -2569,7 +2569,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
         d[states2+8]=hist400
         d[states2+9]=retaged
-        d[states2+11]=used_unemp_benefit
+        d[states2+11]=used_unemp_benefit-1
         d[states2+12]=wage_reduction
         d[states2+13]=(unemp_after_ra-1)/2
         if self.include_preferencenoise:
@@ -2618,20 +2618,20 @@ class UnemploymentLargeEnv_v2(gym.Env):
             unempwage=(np.exp(vec[pos+14])-self.eps)*40_000
             unempwage_basis=(np.exp(vec[pos+15])-self.eps)*40_000
         else:
-            pension=vec[pos]*10_000+20_000
-            wage=vec[pos+1]*15_000+40_000 
-            next_wage=vec[pos+10]*15_000+40_000 
-            paid_pension=vec[pos+4]*10_000+20_000
-            unempwage=vec[pos+14]*15_000+40_000 
-            unempwage_basis=vec[pos+15]*15_000+40_000 
+            pension=vec[pos]*40_000+40_000
+            wage=vec[pos+1]*40_000+40_000 
+            next_wage=vec[pos+10]*40_000+40_000 
+            paid_pension=vec[pos+4]*40_000+40_000
+            unempwage=vec[pos+14]*40_000+40_000 
+            unempwage_basis=vec[pos+15]*40_000+40_000 
 
         age=vec[pos+2]*20+(self.max_age+self.min_age)/2
         time_in_state=vec[pos+3]*10+3
         #if self.include300:
         pink=vec[pos+5] # irtisanottu vai ei 
         toe=vec[pos+6]+14/12 # työssäoloehto, kesto
-        tyohist=vec[pos+7]*10+3 # työhistoria
-        used_unemp_benefit=vec[pos+11] # käytetty työttömyyspäivärahapäivien määrä
+        tyohist=vec[pos+7]*20+3 # työhistoria
+        used_unemp_benefit=vec[pos+11]+1 # käytetty työttömyyspäivärahapäivien määrä
         wage_reduction=vec[pos+12] # käytetty työttömyyspäivärahapäivien määrä
         unemp_after_ra=vec[pos+13]*2+1
         
@@ -2784,12 +2784,12 @@ class UnemploymentLargeEnv_v2(gym.Env):
             paid_pension_max=np.log(200_00/20_000+self.eps) # alkanut eläke
             paid_pension_min=np.log(0/20_000+self.eps) # alkanut eläke
         else:
-            pension_max=(200_000-20_000)/10_000 # vastainen eläke
-            pension_min=(0-20_000)/10_000 # vastainen eläke
-            wage_max=(500_000-40_000)/15_000
-            wage_min=(0-40_000)/15_000
-            paid_pension_min=(0-20_000)/10_000 # alkanut eläke
-            paid_pension_max=(200_000-20_000)/10_000 # alkanut eläke
+            pension_max=(200_000-40_000)/40_000 # vastainen eläke
+            pension_min=(0-40_000)/40_000 # vastainen eläke
+            wage_max=(300_000-40_000)/40_000
+            wage_min=(0-40_000)/40_000
+            paid_pension_min=(0-40_000)/40_000 # alkanut eläke
+            paid_pension_max=(200_000-40_000)/40_000 # alkanut eläke
 
         age_max=(self.max_age-(self.max_age+self.min_age)/2)/20
         age_min=(self.min_age-(self.max_age+self.min_age)/2)/20
@@ -2799,8 +2799,8 @@ class UnemploymentLargeEnv_v2(gym.Env):
         pink_max=1 # irtisanottu vai ei 
         toe_min=0-self.max_toe*0.5 # työssäoloehto
         toe_max=self.max_toe-self.max_toe*0.5 # työssäoloehto
-        thist_min=-3/10 # tyohistoria: 300/400 pv
-        thist_max=(self.max_age-self.min_age-3)/10 # tyohistoria: 300/400 pv
+        thist_min=-3/20 # tyohistoria: 300/400 pv
+        thist_max=(self.max_age-self.min_age-3)/20 # tyohistoria: 300/400 pv
         out_max=100
         out_min=0
 
@@ -2808,8 +2808,8 @@ class UnemploymentLargeEnv_v2(gym.Env):
         group_max=1
         state_min=0
         state_max=1
-        ben_min=0
-        ben_max=3
+        ben_min=-1
+        ben_max=2
         wr_min=0
         wr_max=1
         pref_min=-5
