@@ -352,6 +352,8 @@ class UnemploymentLargeEnv_v2(gym.Env):
         self.init_infostate()
         
         self.explain()
+        
+        #self.unit_test_code_decode()
 
     def get_n_states(self):
         '''
@@ -2439,7 +2441,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
         #if self.include300:
         d[states2+5]=pink # irtisanottu vai ei 
         d[states2+6]=toe-14/12 # työssäoloehto
-        d[states2+7]=(tyohist-3)/10 # tyohistoria: 300/400 pv
+        d[states2+7]=(tyohist-3)/20 # tyohistoria: 300/400 pv
         d[states2+8]=hist400
         if age>=self.min_retirementage:
             retaged=1
@@ -2661,6 +2663,91 @@ class UnemploymentLargeEnv_v2(gym.Env):
                    tyohist,used_unemp_benefit,wage_reduction,unemp_after_ra,\
                    unempwage,unempwage_basis,prefnoise,children_under7,children_under18
 
+    def unit_test_code_decode(self):
+        for k in range(10):
+            emp=random.randint(0,3)
+            g=np.random.randint(0,6)
+            pension=random.uniform(0,80_000)
+            old_wage=random.uniform(0,80_000)
+            age=np.random.randint(0,60)
+            time_in_state=random.uniform(0,30)
+            paid_pension=random.uniform(0,80_000)
+            pink=np.random.randint(2)
+            toe=np.random.uniform(0,3)
+            tyohist=np.random.uniform(0,20)
+            next_wage=random.uniform(0,80_000)
+            used_unemp_benefit=np.random.uniform(0,20)
+            wage_reduction=random.uniform(0,1.0)
+            unemp_after_ra=random.uniform(0,10.0)
+            unempwage=random.uniform(0,80_000)
+            unempwage_basis=random.uniform(0,80_000)
+            prefnoise=random.uniform(-1,1)
+            children_under7=np.random.randint(0,10)
+            children_under18=np.random.randint(0,10)
+        
+            vec=self.state_encode(emp,g,pension,old_wage,age,time_in_state,paid_pension,pink,
+                                toe,tyohist,next_wage,used_unemp_benefit,wage_reduction,
+                                unemp_after_ra,unempwage,unempwage_basis,
+                                prefnoise=prefnoise,children_under7=children_under7,children_under18=children_under18)
+            emp2,g2,pension2,wage2,age2,time_in_state2,paid_pension2,pink2,toe2,\
+            tyohist2,used_unemp_benefit2,wage_reduction2,unemp_after_ra2,\
+            unempwage2,unempwage_basis2,prefnoise2,children_under7_2,children_under18_2,next_wage2\
+                =self.state_decode(vec,return_nextwage=True)
+                
+            self.check_state(emp,g,pension,old_wage,age,time_in_state,paid_pension,pink,
+                                toe,tyohist,next_wage,used_unemp_benefit,wage_reduction,
+                                unemp_after_ra,unempwage,unempwage_basis,
+                                prefnoise,children_under7,children_under18,
+                                emp2,g2,pension2,wage2,age2,time_in_state2,paid_pension2,pink2,toe2,\
+                                tyohist2,used_unemp_benefit2,wage_reduction2,unemp_after_ra2,\
+                                unempwage2,unempwage_basis2,prefnoise2,children_under7_2,children_under18_2,next_wage2)
+        
+    
+    def check_state(self,emp,g,pension,old_wage,age,time_in_state,paid_pension,pink,
+                                toe,tyohist,next_wage,used_unemp_benefit,wage_reduction,
+                                unemp_after_ra,unempwage,unempwage_basis,
+                                prefnoise,children_under7,children_under18,
+                                emp2,g2,pension2,old_wage2,age2,time_in_state2,paid_pension2,pink2,toe2,\
+                                tyohist2,used_unemp_benefit2,wage_reduction2,unemp_after_ra2,\
+                                unempwage2,unempwage_basis2,prefnoise2,children_under7_2,children_under18_2,next_wage2):
+        if not emp==emp2:  
+            print('emp: {} vs {}'.format(emp,emp2))
+        if not g==g2:  
+            print('g: {} vs {}'.format(g,g2))
+        if not pension==pension2:  
+            print('pension: {} vs {}'.format(pension,pension2))
+        if not old_wage==old_wage2:  
+            print('old_wage: {} vs {}'.format(old_wage,old_wage2))
+        if not age==age2:  
+            print('age: {} vs {}'.format(age,age2))
+        if not time_in_state==time_in_state2:  
+            print('time_in_state: {} vs {}'.format(time_in_state,time_in_state2))
+        if not paid_pension==paid_pension2:  
+            print('paid_pension: {} vs {}'.format(paid_pension,paid_pension2))
+        if not pink==pink2:  
+            print('pink: {} vs {}'.format(pink,pink2))
+        if not tyohist==tyohist2:  
+            print('tyohist: {} vs {}'.format(tyohist,tyohist2))
+        if not next_wage==next_wage2:  
+            print('next_wage: {} vs {}'.format(next_wage,next_wage2))
+        if not used_unemp_benefit==used_unemp_benefit2:  
+            print('used_unemp_benefit: {} vs {}'.format(used_unemp_benefit,used_unemp_benefit2))
+        if not wage_reduction==wage_reduction2:  
+            print('wage_reduction: {} vs {}'.format(wage_reduction,wage_reduction2))
+        if not unemp_after_ra==unemp_after_ra2:  
+            print('unemp_after_ra: {} vs {}'.format(unemp_after_ra,unemp_after_ra2))
+        if not unempwage==unempwage2:  
+            print('unempwage: {} vs {}'.format(unempwage,unempwage2))
+        if not unempwage_basis==unempwage_basis2:  
+            print('unempwage_basis: {} vs {}'.format(unempwage_basis,unempwage_basis2))
+        if self.include_preferencenoise:
+            if not prefnoise==prefnoise2:  
+                print('prefnoise: {} vs {}'.format(prefnoise,prefnoise2))
+        if not children_under7==children_under7_2:  
+            print('children_under7: {} vs {}'.format(children_under7,children_under7_2))
+        if not children_under18==children_under18_2:  
+            print('children_under18: {} vs {}'.format(children_under18,children_under18_2))
+    
     def reset(self,init=None):
         '''
         Open AI-interfacen mukainen reset-funktio, joka nollaa laskennan alkutilaan
