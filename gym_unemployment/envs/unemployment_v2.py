@@ -77,11 +77,11 @@ class UnemploymentLargeEnv_v2(gym.Env):
         12  Opiskelija
         13  Työmarkkinatuki
         14  Armeijassa
-        15  Osa-aikatyö + OVE
-        16  Täysiaikatyö + OVE
-        17  Työtön + OVE
-        18  Osatk + työ
-        19  Osatk + työtön
+        15  Osa-aikatyö + OVE   TBI
+        16  Täysiaikatyö + OVE  TBI
+        17  Työtön + OVE        TBI
+        18  Osatk + työ         TBI
+        19  Osatk + työtön      TBI
         20  Kuollut (jos kuolleisuus mukana)
 
     Actions:
@@ -251,8 +251,8 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
         # paljonko työstä poissaolo vaikuttaa palkkaan
         self.salary_const=0.05*self.timestep
-        self.salary_const_up=0.015*self.timestep # työssäolo palauttaa ansioita tämän verran vuodessa
-        self.salary_const_student=0.015*self.timestep # opiskelu nostaa leikkausta tämän verran vuodessa
+        self.salary_const_up=0.05*self.timestep # työssäolo palauttaa ansioita tämän verran vuodessa
+        self.salary_const_student=0.05*self.timestep # opiskelu nostaa leikkausta tämän verran vuodessa
 
         # karttumaprosentit
         self.acc=0.015*self.timestep
@@ -266,6 +266,8 @@ class UnemploymentLargeEnv_v2(gym.Env):
         self.max_toe=28/12
         self.accbasis_kht=719.0*12
         self.accbasis_tmtuki=1413.75*12
+        
+        self.log_utility_default_params()
 
         self.n_age=self.max_age-self.min_age+1
 
@@ -316,11 +318,13 @@ class UnemploymentLargeEnv_v2(gym.Env):
                 print('Mortality included, not stopped')
 
             self.n_empl=16 # state of employment, 0,1,2,3,4
-            self.state_encode=self.state_encode_mort
+            #self.state_encode=self.state_encode_mort
         else:
             print('No mortality included')
             self.n_empl=15 # state of employment, 0,1,2,3,4
-            self.state_encode=self.state_encode_nomort
+            #self.state_encode=self.state_encode_nomort
+            
+        self.setup_state_encoding()
 
         self.n_actions=4 # valittavien toimenpiteiden määrä
 
@@ -388,7 +392,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
         return npv,npv0
 
-    def comp_benefits(self,wage,old_wage,pension,employment_state,time_in_state,children_under7,children_under18,ika,
+    def comp_benefits(self,wage,old_wage,pension,employment_state,time_in_state,children_under3,children_under7,children_under18,ika,
                       irtisanottu=0,tyohistoria=0,retq=True):
         '''
         Kutsuu fin_benefits-modulia, jonka avulla lasketaan etuudet ja huomioidaan verotus
@@ -503,12 +507,12 @@ class UnemploymentLargeEnv_v2(gym.Env):
             if self.include_children:
                 p['lapsia']=children_under18
                 p['paivahoidossa']=0
-                p['alle_3v']=children_under7
+                p['alle_3v']=children_under3
                 p['alle_kouluikaisia']=children_under7
                 p['lapsia_kotihoidontuella']=children_under7
             else:
                 p['lapsia']=1
-                p['paivahoidossa']=1
+                p['paivahoidossa']=0
                 p['alle_3v']=1
                 p['lapsia_kotihoidontuella']=p['lapsia']
                 p['alle_kouluikaisia']=1
@@ -849,7 +853,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
         else:
             return self.elinaikakerroin*pension*self.elakeindeksi
         
-    def move_to_parttime(self,pension,old_wage,age,tyoura,time_in_state,wage_reduction,children_under7,children_under18):
+    def move_to_parttime(self,pension,old_wage,age,tyoura,time_in_state,wage_reduction,children_under3,children_under7,children_under18):
         '''
         Siirtymä osa-aikaiseen työskentelyyn
         '''
@@ -861,14 +865,14 @@ class UnemploymentLargeEnv_v2(gym.Env):
         time_in_state=0
         old_wage=0
         pension=self.pension_accrual(age,parttimewage,pension,state=employment_status)
-        netto,benq=self.comp_benefits(parttimewage,old_wage,0,employment_status,time_in_state,children_under7,children_under18,age,retq=True)
+        netto,benq=self.comp_benefits(parttimewage,old_wage,0,employment_status,time_in_state,children_under3,children_under7,children_under18,age,retq=True)
         pinkslip=0
         time_in_state=self.timestep
         wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)        
 
         return employment_status,pension,wage,time_in_state,netto,tyoura,pinkslip,wage_reduction,benq
 
-    def move_to_OVE_parttime(self,pension,old_wage,age,tyoura,time_in_state,wage_reduction,children_under7,children_under18):
+    def move_to_OVE_parttime(self,pension,old_wage,age,tyoura,time_in_state,wage_reduction,children_under3,children_under7,children_under18):
         '''
         Siirtymä osa-aikaiseen työskentelyyn
         '''
@@ -881,14 +885,14 @@ class UnemploymentLargeEnv_v2(gym.Env):
         old_wage=0
         paid_pension = self.scale_pension(0.5*pension,age,scale=scale_acc)
         pension=self.pension_accrual(age,parttimewage,0.5*pension,state=employment_status)
-        netto,benq=self.comp_benefits(parttimewage,old_wage,0,employment_status,time_in_state,children_under7,children_under18,age,retq=True)
+        netto,benq=self.comp_benefits(parttimewage,old_wage,0,employment_status,time_in_state,children_under3,children_under7,children_under18,age,retq=True)
         pinkslip=0
         time_in_state=self.timestep
         wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)        
 
         return employment_status,pension,paid_pension,wage,time_in_state,netto,tyoura,pinkslip,wage_reduction,benq
 
-    def move_to_OVE_fulltime(self,pension,old_wage,age,tyoura,time_in_state,wage_reduction,children_under7,children_under18):
+    def move_to_OVE_fulltime(self,pension,old_wage,age,tyoura,time_in_state,wage_reduction,children_under3,children_under7,children_under18):
         '''
         Siirtymä osa-aikaiseen työskentelyyn
         '''
@@ -900,14 +904,14 @@ class UnemploymentLargeEnv_v2(gym.Env):
         old_wage=0
         paid_pension = self.scale_pension(0.5*pension,age,scale=scale_acc)
         pension=self.pension_accrual(age,wage,0.5*pension,state=employment_status)
-        netto,benq=self.comp_benefits(wage,old_wage,0,employment_status,time_in_state,children_under7,children_under18,age,retq=True)
+        netto,benq=self.comp_benefits(wage,old_wage,0,employment_status,time_in_state,children_under3,children_under7,children_under18,age,retq=True)
         pinkslip=0
         time_in_state=self.timestep
         wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)        
 
         return employment_status,pension,paid_pension,wage,time_in_state,netto,tyoura,pinkslip,wage_reduction,benq
 
-    def move_to_OVE_unemp(self,pension,old_wage,age,tyoura,time_in_state,wage_reduction,children_under7,children_under18):
+    def move_to_OVE_unemp(self,pension,old_wage,age,tyoura,time_in_state,wage_reduction,children_under3,children_under7,children_under18):
         '''
         Siirtymä osa-aikaiseen työskentelyyn
         '''
@@ -919,14 +923,14 @@ class UnemploymentLargeEnv_v2(gym.Env):
         old_wage=0
         paid_pension = self.scale_pension(0.5*pension,age,scale=scale_acc)
         pension=self.pension_accrual(age,0,0.5*pension,state=employment_status)
-        netto,benq=self.comp_benefits(0,old_wage,0,employment_status,time_in_state,children_under7,children_under18,age,retq=True)
+        netto,benq=self.comp_benefits(0,old_wage,0,employment_status,time_in_state,children_under3,children_under7,children_under18,age,retq=True)
         pinkslip=0
         time_in_state=self.timestep
         wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)        
 
         return employment_status,pension,paid_pension,wage,time_in_state,netto,tyoura,pinkslip,wage_reduction,benq
 
-    def move_to_work(self,pension,old_wage,age,time_in_state,tyoura,pinkslip,wage_reduction,children_under7,children_under18):
+    def move_to_work(self,pension,old_wage,age,time_in_state,tyoura,pinkslip,wage_reduction,children_under3,children_under7,children_under18):
         '''
         Siirtymä täysiaikaiseen työskentelyyn
         '''
@@ -939,13 +943,13 @@ class UnemploymentLargeEnv_v2(gym.Env):
         tyoura+=self.timestep
         #pinkslip=0
         pension=self.pension_accrual(age,wage,pension,state=employment_status) # poistettu *0.5
-        netto,benq=self.comp_benefits(wage,old_wage,0,employment_status,time_in_state,children_under7,children_under18,age)
+        netto,benq=self.comp_benefits(wage,old_wage,0,employment_status,time_in_state,children_under3,children_under7,children_under18,age)
         time_in_state=self.timestep
         wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)        
 
         return employment_status,pension,wage,time_in_state,netto,tyoura,pinkslip,wage_reduction,benq
 
-    def move_to_retwork(self,pension,old_wage,age,time_in_state,paid_pension,wage_reduction,children_under7,children_under18):
+    def move_to_retwork(self,pension,old_wage,age,time_in_state,paid_pension,wage_reduction,children_under3,children_under7,children_under18):
         '''
         Siirtymä vanhuuseläkkeellä työskentelyyn
         '''
@@ -956,7 +960,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
         paid_pension=paid_pension*self.elakeindeksi
         pension=self.pension_accrual(age,ptwage,pension,state=employment_status)
         time_in_state=0
-        netto,benq=self.comp_benefits(ptwage,0,paid_pension,employment_status,time_in_state,children_under7,children_under18,age)
+        netto,benq=self.comp_benefits(ptwage,0,paid_pension,employment_status,time_in_state,children_under3,children_under7,children_under18,age)
         time_in_state+=self.timestep
         wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)        
         
@@ -964,7 +968,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
         return employment_status,pension,wage,time_in_state,netto,wage_reduction,benq
 
-    def move_to_student(self,pension,old_wage,age,time_in_state,tyoura,pinkslip,wage_reduction,children_under7,children_under18):
+    def move_to_student(self,pension,old_wage,age,time_in_state,tyoura,pinkslip,wage_reduction,children_under3,children_under7,children_under18):
         '''
         Siirtymä opiskelijaksi
         Tässä ei muuttujien päivityksiä, koska se tehdään jo muualla!
@@ -972,7 +976,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
         employment_status = 12
         intage=int(np.floor(age))
         time_in_state=0
-        netto,benq=self.comp_benefits(0,0,0,employment_status,time_in_state,children_under7,children_under18,age)
+        netto,benq=self.comp_benefits(0,0,0,employment_status,time_in_state,children_under3,children_under7,children_under18,age)
         time_in_state+=self.timestep
         wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)        
         pinkslip=0
@@ -980,7 +984,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
         return employment_status,pension,wage,time_in_state,netto,pinkslip,wage_reduction,benq
 
-    def move_to_retpartwork(self,pension,old_wage,age,time_in_state,paid_pension,wage_reduction,children_under7,children_under18):
+    def move_to_retpartwork(self,pension,old_wage,age,time_in_state,paid_pension,wage_reduction,children_under3,children_under7,children_under18):
         '''
         Siirtymä osa-aikaiseen vanhuuseläkkeellä työskentelyyn
         '''
@@ -991,7 +995,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
         paid_pension=paid_pension*self.elakeindeksi
         pension=self.pension_accrual(age,ptwage,pension,state=employment_status)
         time_in_state=0
-        netto,benq=self.comp_benefits(ptwage,0,paid_pension,employment_status,time_in_state,children_under7,children_under18,age)
+        netto,benq=self.comp_benefits(ptwage,0,paid_pension,employment_status,time_in_state,children_under3,children_under7,children_under18,age)
         time_in_state+=self.timestep
         wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)        
         # tyoura+= ??
@@ -999,16 +1003,42 @@ class UnemploymentLargeEnv_v2(gym.Env):
         return employment_status,pension,wage,time_in_state,netto,wage_reduction,benq
 
     def move_to_retirement(self,pension,old_wage,age,paid_pension,employment_status,
-            wage_reduction,unemp_after_ra,children_under7,children_under18,all_acc=True,scale_acc=True):
+            wage_reduction,unemp_after_ra,children_under3,children_under7,children_under18,all_acc=True,scale_acc=True):
         '''
         Siirtymä vanhuuseläkkeelle
         '''
-        if age>=self.min_retirementage:
+        if age>=self.max_retirementage:
+            if employment_status in set([2,8,9]): # ve, ve+työ, ve+osatyö
+                if age>=self.max_retirementage:
+                    # lykkäyskorotusta
+                    paid_pension = self.elakeindeksi*paid_pension+self.scale_pension(pension,age,scale=True,unemp_after_ra=unemp_after_ra)
+                    pension=0
+                else:
+                    paid_pension = self.elakeindeksi*paid_pension
+            elif employment_status==3: # tk
+                # do nothing
+                employment_status=3
+            elif employment_status in set({15,16,17}): # OVE+oa tai OVE+työ tai OVE+työtön
+                paid_pension = self.scale_pension(pension,age,scale=scale_acc,unemp_after_ra=unemp_after_ra)+self.elakeindeksi*paid_pension
+                paid_pension += self.ben.laske_kansanelake(age,paid_pension/12,1)*12 # ben-modulissa palkat kk-tasolla
+                pension=0
+            else: # ei vielä eläkkeellä
+                # lykkäyskorotus
+                paid_pension = self.scale_pension(pension,age,scale=scale_acc,unemp_after_ra=unemp_after_ra)
+                paid_pension += self.ben.laske_kansanelake(age,paid_pension/12,1)*12 # ben-modulissa palkat kk-tasolla
+                pension=0
+                
+            time_in_state=self.timestep
+            employment_status = 2 
+            wage=old_wage
+            netto,benq=self.comp_benefits(0,0,paid_pension,employment_status,0,children_under3,children_under7,children_under18,age)
+            wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)        
+        elif age>=self.min_retirementage:
             if all_acc:
                 if employment_status in set([2,8,9]): # ve, ve+työ, ve+osatyö
                     if age>=self.max_retirementage:
-                        # ei lykkäyskorotusta
-                        paid_pension = self.elinaikakerroin*self.elakeindeksi*pension+self.elakeindeksi*paid_pension
+                        # lykkäyskorotusta
+                        paid_pension = self.elinaikakerroin*self.elakeindeksi*pension+self.scale_pension(paid_pension,age,scale=scale_acc,unemp_after_ra=unemp_after_ra)
                         pension=0
                     else:
                         paid_pension = self.elakeindeksi*paid_pension
@@ -1028,19 +1058,19 @@ class UnemploymentLargeEnv_v2(gym.Env):
             time_in_state=self.timestep
             employment_status = 2 
             wage=old_wage
-            netto,benq=self.comp_benefits(0,0,paid_pension,employment_status,0,children_under7,children_under18,age)
+            netto,benq=self.comp_benefits(0,0,paid_pension,employment_status,0,children_under3,children_under7,children_under18,age)
             wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)        
         else: # työvoiman ulkopuolella
             time_in_state=0
             employment_status = 2 
             wage=old_wage
-            netto,benq=self.comp_benefits(0,0,0,employment_status,0,children_under7,children_under18,age)
+            netto,benq=self.comp_benefits(0,0,0,employment_status,0,children_under3,children_under7,children_under18,age)
             time_in_state+=self.timestep
             wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)        
 
         return employment_status,paid_pension,pension,wage,time_in_state,netto,wage_reduction,benq
 
-    def move_to_retdisab(self,pension,old_wage,age,paid_pension,employment_status,wage_reduction,children_under7,children_under18):   
+    def move_to_retdisab(self,pension,old_wage,age,paid_pension,employment_status,wage_reduction,children_under3,children_under7,children_under18):   
         '''
         Siirtymä vanhuuseläkkeelle, jossa ei voi tehdä työtä
         '''
@@ -1051,7 +1081,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
         employment_status = 3
         wage=old_wage
-        netto,benq=self.comp_benefits(0,0,paid_pension,employment_status,0,children_under7,children_under18,age)
+        netto,benq=self.comp_benefits(0,0,paid_pension,employment_status,0,children_under3,children_under7,children_under18,age)
         time_in_state=self.timestep
         wage_reduction=0.9
 
@@ -1075,7 +1105,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
                 #    or (ika>=self.minage_500 and tyohistoria>=self.tyohistoria_vaatimus500 and p['tyottomyyden_kesto']<=self.ansiopvraha_kesto500)) \
 
     def move_to_unemp(self,pension,old_wage,age,paid_pension,toe,irtisanottu,tyoura,wage_reduction,
-                    used_unemp_benefit,unemp_after_ra,unempwage,children_under7,children_under18):
+                    used_unemp_benefit,unemp_after_ra,unempwage,children_under3,children_under7,children_under18):
         '''
         Siirtymä työttömyysturvalle
         '''
@@ -1085,7 +1115,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
             unempwage_basis=0
             employment_status,paid_pension,pension,wage,time_in_state,netto,wage_reduction,benq=\
                 self.move_to_retirement(pension,old_wage,age,paid_pension,employment_status,
-                    wage_reduction,unemp_after_ra,children_under7,children_under18,all_acc=True)
+                    wage_reduction,unemp_after_ra,children_under3,children_under7,children_under18,all_acc=True)
                 
             return employment_status,paid_pension,pension,wage,time_in_state,netto,\
                    wage_reduction,used_unemp_benefit,pinkslip,benq,unemp_after_ra,unempwage_basis
@@ -1117,7 +1147,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
             # hmm, omavastuupäivät puuttuvat!
             # omavastuupäiviä on 5/(21.5*12*self.timestep), kerroin tällöin
             # 1-5/(21.5*12*self.timestep)
-            netto,benq=self.comp_benefits(0,unempwage_basis,0,employment_status,used_unemp_benefit,children_under7,children_under18,age,
+            netto,benq=self.comp_benefits(0,unempwage_basis,0,employment_status,used_unemp_benefit,children_under3,children_under7,children_under18,age,
                                      irtisanottu=irtisanottu,tyohistoria=tyoura)
             time_in_state=self.timestep
             #unemp_after_ra ei muutu
@@ -1131,7 +1161,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
                wage_reduction,used_unemp_benefit,pinkslip,benq,unemp_after_ra,unempwage_basis
                
 
-    def move_to_outsider(self,pension,old_wage,age,irtisanottu,wage_reduction,children_under7,children_under18):
+    def move_to_outsider(self,pension,old_wage,age,irtisanottu,wage_reduction,children_under3,children_under7,children_under18):
         '''
         Siirtymä työvoiman ulkopuolelle
         '''
@@ -1143,7 +1173,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
         wage=old_wage
         pension=pension*self.palkkakerroin
 
-        netto,benq=self.comp_benefits(0,0,0,employment_status,time_in_state,children_under7,children_under18,age,irtisanottu=0)
+        netto,benq=self.comp_benefits(0,0,0,employment_status,time_in_state,children_under3,children_under7,children_under18,age,irtisanottu=0)
         paid_pension=0
         time_in_state+=self.timestep
         wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)        
@@ -1151,7 +1181,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
         return employment_status,paid_pension,pension,wage,time_in_state,netto,wage_reduction,pinkslip,benq
 
-    def move_to_disab(self,pension,old_wage,age,wage_reduction,children_under7,children_under18):
+    def move_to_disab(self,pension,old_wage,age,wage_reduction,children_under3,children_under7,children_under18):
         '''
         Siirtymä työkyvyttömyyseläkkeelle
         '''
@@ -1162,13 +1192,13 @@ class UnemploymentLargeEnv_v2(gym.Env):
         #old_wage=0
         time_in_state=0
         wage=old_wage
-        netto,benq=self.comp_benefits(0,0,paid_pension,employment_status,0,children_under7,children_under18,age)
+        netto,benq=self.comp_benefits(0,0,paid_pension,employment_status,0,children_under3,children_under7,children_under18,age)
         time_in_state+=self.timestep
         wage_reduction=0.60 # vastaa määritelmää
 
         return employment_status,pension,paid_pension,wage,time_in_state,netto,wage_reduction,benq
 
-    def move_to_deceiced(self,pension,old_wage,age,children_under7,children_under18):
+    def move_to_deceiced(self,pension,old_wage,age,children_under3,children_under7,children_under18):
         '''
         Siirtymä tilaan kuollut
         '''
@@ -1180,7 +1210,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
         return employment_status,pension,wage,time_in_state,netto
 
-    def move_to_kht(self,pension,old_wage,age,wage_reduction,children_under7,children_under18):
+    def move_to_kht(self,pension,old_wage,age,wage_reduction,children_under3,children_under7,children_under18):
         '''
         Siirtymä kotihoidontuelle
         '''
@@ -1189,13 +1219,13 @@ class UnemploymentLargeEnv_v2(gym.Env):
         pension=self.pension_accrual(age,old_wage,pension,state=7)
         
         time_in_state=0
-        netto,benq=self.comp_benefits(0,old_wage,0,employment_status,time_in_state,children_under7,children_under18,age)
+        netto,benq=self.comp_benefits(0,old_wage,0,employment_status,time_in_state,children_under3,children_under7,children_under18,age)
         time_in_state+=self.timestep
         wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)        
 
         return employment_status,pension,wage,time_in_state,netto,wage_reduction,benq
 
-    def move_to_fatherleave(self,pension,old_wage,age,wage_reduction,children_under7,children_under18):
+    def move_to_fatherleave(self,pension,old_wage,age,wage_reduction,children_under3,children_under7,children_under18):
         '''
         Siirtymä isyysvapaalle
         '''
@@ -1204,14 +1234,14 @@ class UnemploymentLargeEnv_v2(gym.Env):
         time_in_state=0
         wage=old_wage
         pension=self.pension_accrual(age,old_wage,pension,state=6)
-        netto,benq=self.comp_benefits(0,old_wage,0,employment_status,0,children_under7,children_under18,age)
+        netto,benq=self.comp_benefits(0,old_wage,0,employment_status,0,children_under3,children_under7,children_under18,age)
         time_in_state+=self.timestep        
         pinkslip=0
         wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)        
         
         return employment_status,pension,wage,time_in_state,netto,pinkslip,wage_reduction,benq
 
-    def move_to_motherleave(self,pension,old_wage,age,wage_reduction,children_under7,children_under18):
+    def move_to_motherleave(self,pension,old_wage,age,wage_reduction,children_under3,children_under7,children_under18):
         '''
         Siirtymä äitiysvapaalle
         '''
@@ -1220,7 +1250,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
         time_in_state=0
         wage=old_wage
         pension=self.pension_accrual(age,old_wage,pension,state=5)
-        netto,benq=self.comp_benefits(0,old_wage,0,employment_status,0,children_under7,children_under18,age)
+        netto,benq=self.comp_benefits(0,old_wage,0,employment_status,0,children_under3,children_under7,children_under18,age)
         time_in_state+=self.timestep
         pinkslip=0
         wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)        
@@ -1229,7 +1259,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
     def stay_unemployed(self,employment_status,paid_pension,pension,time_in_state,toe,wage_reduction,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
-                        unempwage_basis,action,age,sattuma,intage,g,children_under7,children_under18):
+                        unempwage_basis,action,age,sattuma,intage,g,children_under3,children_under7,children_under18):
         '''
         Pysy tilassa työtön (0)
         '''
@@ -1237,13 +1267,13 @@ class UnemploymentLargeEnv_v2(gym.Env):
             
         if age>=65:
             employment_status,paid_pension,pension,wage,time_in_state,netto,wage_reduction,benq\
-                =self.move_to_retirement(pension,0,age,paid_pension,employment_status,wage_reduction,unemp_after_ra,children_under7,children_under18,all_acc=True)
+                =self.move_to_retirement(pension,0,age,paid_pension,employment_status,wage_reduction,unemp_after_ra,children_under3,children_under7,children_under18,all_acc=True)
         elif action == 0 or (action == 2 and age < self.min_retirementage):
             employment_status = 0 # unchanged
             wage=self.get_wage(intage,wage_reduction)
             wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)
 
-            netto,benq=self.comp_benefits(0,unempwage_basis,0,employment_status,used_unemp_benefit,children_under7,children_under18,age,tyohistoria=tyoura)
+            netto,benq=self.comp_benefits(0,unempwage_basis,0,employment_status,used_unemp_benefit,children_under3,children_under7,children_under18,age,tyohistoria=tyoura)
             if pinkslip or time_in_state>=self.karenssi_kesto: # muuten ei oikeutta ansiopäivärahaan karenssi vuoksi
                 used_unemp_benefit+=self.timestep
             kesto=12*21.5*used_unemp_benefit
@@ -1266,18 +1296,18 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
         elif action == 1: # 
             employment_status,pension,wage,time_in_state,netto,tyoura,pinkslip,wage_reduction,benq=\
-                self.move_to_work(pension,old_wage,age,time_in_state,tyoura,pinkslip,wage_reduction,children_under7,children_under18)
+                self.move_to_work(pension,old_wage,age,time_in_state,tyoura,pinkslip,wage_reduction,children_under3,children_under7,children_under18)
         elif action==2:
             if age >= self.min_retirementage: # ve
                 employment_status,paid_pension,pension,wage,time_in_state,netto,wage_reduction,benq=\
                     self.move_to_retirement(pension,old_wage,age,paid_pension,employment_status,
-                        wage_reduction,unemp_after_ra,children_under7,children_under18,scale_acc=False)
+                        wage_reduction,unemp_after_ra,children_under3,children_under7,children_under18,scale_acc=False)
         elif action == 3: # osatyö 50%
             employment_status,pension,wage,time_in_state,netto,tyoura,pinkslip,wage_reduction,benq=\
-                self.move_to_parttime(pension,old_wage,age,tyoura,time_in_state,wage_reduction,children_under7,children_under18)
+                self.move_to_parttime(pension,old_wage,age,tyoura,time_in_state,wage_reduction,children_under3,children_under7,children_under18)
         elif action==11: # tk
             employment_status,pension,paid_pension,wage,time_in_state,netto,wage_reduction,benq=\
-                self.move_to_disab(pension,old_wage,age,wage_reduction,children_under7,children_under18)
+                self.move_to_disab(pension,old_wage,age,wage_reduction,children_under3,children_under7,children_under18)
             pinkslip=0
         else:
             print('error 17')  
@@ -1288,7 +1318,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
     def stay_tyomarkkinatuki(self,employment_status,paid_pension,pension,time_in_state,toe,wage_reduction,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,
-                        unempwage,unempwage_basis,action,age,sattuma,intage,g,children_under7,children_under18):
+                        unempwage,unempwage_basis,action,age,sattuma,intage,g,children_under3,children_under7,children_under18):
         '''
         Pysy tilassa työmarkkinatuki (13)
         '''
@@ -1296,13 +1326,13 @@ class UnemploymentLargeEnv_v2(gym.Env):
         if age>=65:
             employment_status,paid_pension,pension,wage,time_in_state,netto,wage_reduction,benq=\
                 self.move_to_retirement(pension,0,age,paid_pension,employment_status,wage_reduction,
-                        unemp_after_ra,children_under7,children_under18,all_acc=True)
+                        unemp_after_ra,children_under3,children_under7,children_under18,all_acc=True)
         elif action == 0 or (action == 2 and age < self.min_retirementage):
             employment_status = 13 # unchanged
             wage=old_wage
             pension=self.pension_accrual(age,wage,pension,state=13)
 
-            netto,benq=self.comp_benefits(0,old_wage,0,employment_status,used_unemp_benefit,children_under7,children_under18,age,tyohistoria=tyoura)
+            netto,benq=self.comp_benefits(0,old_wage,0,employment_status,used_unemp_benefit,children_under3,children_under7,children_under18,age,tyohistoria=tyoura)
             used_unemp_benefit+=self.timestep
             wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)
             if age >= self.min_retirementage:
@@ -1310,18 +1340,18 @@ class UnemploymentLargeEnv_v2(gym.Env):
         
         elif action == 1: # 
             employment_status,pension,wage,time_in_state,netto,tyoura,pinkslip,wage_reduction,benq=\
-                self.move_to_work(pension,old_wage,age,time_in_state,tyoura,pinkslip,wage_reduction,children_under7,children_under18)
+                self.move_to_work(pension,old_wage,age,time_in_state,tyoura,pinkslip,wage_reduction,children_under3,children_under7,children_under18)
         elif action==2:
             if age >= self.min_retirementage: # ve
                 employment_status,paid_pension,pension,wage,time_in_state,netto,wage_reduction,benq=\
                     self.move_to_retirement(pension,old_wage,age,paid_pension,employment_status,
-                        wage_reduction,unemp_after_ra,children_under7,children_under18,scale_acc=False)
+                        wage_reduction,unemp_after_ra,children_under3,children_under7,children_under18,scale_acc=False)
         elif action == 3: # osatyö 50%
             employment_status,pension,wage,time_in_state,netto,tyoura,pinkslip,wage_reduction,benq=\
-                self.move_to_parttime(pension,old_wage,age,tyoura,time_in_state,wage_reduction,children_under7,children_under18)
+                self.move_to_parttime(pension,old_wage,age,tyoura,time_in_state,wage_reduction,children_under3,children_under7,children_under18)
         elif action==11: # tk
             employment_status,pension,paid_pension,wage,time_in_state,netto,wage_reduction,benq=\
-                self.move_to_disab(pension,old_wage,age,wage_reduction,children_under7,children_under18)
+                self.move_to_disab(pension,old_wage,age,wage_reduction,children_under3,children_under7,children_under18)
         else:
             print('error 17')        
                 
@@ -1330,7 +1360,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
                 
     def stay_pipeline(self,employment_status,paid_pension,pension,time_in_state,toe,wage_reduction,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
-                        unempwage_basis,action,age,sattuma,intage,g,children_under7,children_under18):
+                        unempwage_basis,action,age,sattuma,intage,g,children_under3,children_under7,children_under18):
         '''
         Pysy tilassa työttömyysputki (4)
         '''
@@ -1338,14 +1368,14 @@ class UnemploymentLargeEnv_v2(gym.Env):
         if age>=65:
             employment_status,paid_pension,pension,wage,time_in_state,netto,wage_reduction,benq=\
                 self.move_to_retirement(pension,0,age,paid_pension,employment_status,
-                    wage_reduction,unemp_after_ra,children_under7,children_under18,all_acc=True)
+                    wage_reduction,unemp_after_ra,children_under3,children_under7,children_under18,all_acc=True)
         elif action == 0 or (action == 2 and age < self.min_retirementage):
             employment_status  = 4 # unchanged
             wage=self.get_wage(intage,wage_reduction)
             pension=self.pension_accrual(age,unempwage_basis,pension,state=4)
             wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)
                 
-            netto,benq=self.comp_benefits(0,unempwage_basis,0,employment_status,used_unemp_benefit,children_under7,children_under18,age,tyohistoria=tyoura)
+            netto,benq=self.comp_benefits(0,unempwage_basis,0,employment_status,used_unemp_benefit,children_under3,children_under7,children_under18,age,tyohistoria=tyoura)
             if pinkslip or time_in_state>=self.karenssi_kesto: # muuten ei oikeutta ansiopäivärahaan karenssi vuoksi
                 used_unemp_benefit+=self.timestep
             if age >= self.min_retirementage:
@@ -1353,19 +1383,19 @@ class UnemploymentLargeEnv_v2(gym.Env):
                 
         elif action == 1: # 
             employment_status,pension,wage,time_in_state,netto,tyoura,pinkslip,wage_reduction,benq=\
-                self.move_to_work(pension,old_wage,age,time_in_state,tyoura,pinkslip,wage_reduction,children_under7,children_under18)
+                self.move_to_work(pension,old_wage,age,time_in_state,tyoura,pinkslip,wage_reduction,children_under3,children_under7,children_under18)
         elif action==2:
             if age >= self.min_retirementage: # ve
                 employment_status,paid_pension,pension,wage,time_in_state,netto,wage_reduction,benq=\
                     self.move_to_retirement(pension,old_wage,age,paid_pension,employment_status,
-                        wage_reduction,unemp_after_ra,children_under7,children_under18,scale_acc=False)
+                        wage_reduction,unemp_after_ra,children_under3,children_under7,children_under18,scale_acc=False)
             pinkslip=0
         elif action == 3: # 
             employment_status,pension,wage,time_in_state,netto,tyoura,pinkslip,wage_reduction,benq=\
-                self.move_to_parttime(pension,old_wage,age,tyoura,time_in_state,wage_reduction,children_under7,children_under18)
+                self.move_to_parttime(pension,old_wage,age,tyoura,time_in_state,wage_reduction,children_under3,children_under7,children_under18)
         elif action==11: # tk
             employment_status,pension,paid_pension,wage,time_in_state,netto,wage_reduction,benq=\
-                self.move_to_disab(pension,old_wage,age,wage_reduction,children_under7,children_under18)
+                self.move_to_disab(pension,old_wage,age,wage_reduction,children_under3,children_under7,children_under18)
         else:
             print('error 1: ',action)
             
@@ -1374,7 +1404,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
                
     def stay_employed(self,employment_status,paid_pension,pension,time_in_state,toe,wage_reduction,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
-                        unempwage_basis,action,age,sattuma,intage,g,children_under7,children_under18):
+                        unempwage_basis,action,age,sattuma,intage,g,children_under3,children_under7,children_under18):
         '''
         Pysy tilassa töissä (1)
         '''
@@ -1395,23 +1425,23 @@ class UnemploymentLargeEnv_v2(gym.Env):
             wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)
             tyoura+=self.timestep
             pension=self.pension_accrual(age,wage,pension,state=1)
-            netto,benq=self.comp_benefits(wage,0,0,employment_status,time_in_state,children_under7,children_under18,age)
+            netto,benq=self.comp_benefits(wage,0,0,employment_status,time_in_state,children_under3,children_under7,children_under18,age)
         elif action == 1: # työttömäksi
             employment_status,paid_pension,pension,wage,time_in_state,netto,\
                 wage_reduction,used_unemp_benefit,pinkslip,benq,unemp_after_ra,unempwage_basis=\
                 self.move_to_unemp(pension,old_wage,age,paid_pension,toe,pinkslip,tyoura,
-                    wage_reduction,used_unemp_benefit,unemp_after_ra,unempwage,children_under7,children_under18)
+                    wage_reduction,used_unemp_benefit,unemp_after_ra,unempwage,children_under3,children_under7,children_under18)
         elif action==2:
             if age >= self.min_retirementage: # ve
                 employment_status,paid_pension,pension,wage,time_in_state,netto,wage_reduction,benq=\
                     self.move_to_retirement(pension,old_wage,age,paid_pension,employment_status,wage_reduction,
-                        unemp_after_ra,children_under7,children_under18) 
+                        unemp_after_ra,children_under3,children_under7,children_under18) 
         elif action == 3: # osatyö 50%
             employment_status,pension,wage,time_in_state,netto,tyoura,pinkslip,wage_reduction,benq=\
-                self.move_to_parttime(pension,old_wage,age,tyoura,0,wage_reduction,children_under7,children_under18)
+                self.move_to_parttime(pension,old_wage,age,tyoura,0,wage_reduction,children_under3,children_under7,children_under18)
         elif action==11: # tk
             employment_status,pension,paid_pension,wage,time_in_state,netto,wage_reduction,benq=\
-                self.move_to_disab(pension,old_wage,age,wage_reduction,children_under7,children_under18)
+                self.move_to_disab(pension,old_wage,age,wage_reduction,children_under3,children_under7,children_under18)
         else:
             print('error 12')    
             
@@ -1420,7 +1450,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
            
     def stay_disabled(self,employment_status,paid_pension,pension,time_in_state,toe,wage_reduction,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
-                        unempwage_basis,action,age,sattuma,intage,g,children_under7,children_under18):
+                        unempwage_basis,action,age,sattuma,intage,g,children_under3,children_under7,children_under18):
             
         '''
         Pysy tilassa työkyvytön (4)
@@ -1433,14 +1463,14 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
         paid_pension=paid_pension*self.elakeindeksi
         wage=old_wage
-        netto,benq=self.comp_benefits(0,0,paid_pension,employment_status,0,children_under7,children_under18,age)
+        netto,benq=self.comp_benefits(0,0,paid_pension,employment_status,0,children_under3,children_under7,children_under18,age)
 
         return employment_status,paid_pension,pension,wage,time_in_state,netto,wage_reduction,\
                benq,pinkslip,unemp_after_ra,time_in_state,tyoura,used_unemp_benefit,unempwage_basis           
 
     def stay_retired(self,employment_status,paid_pension,pension,time_in_state,toe,wage_reduction,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
-                        unempwage_basis,action,age,sattuma,intage,g,children_under7,children_under18):
+                        unempwage_basis,action,age,sattuma,intage,g,children_under3,children_under7,children_under18):
         '''
         Pysy tilassa vanhuuseläke (2)
         '''
@@ -1448,7 +1478,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
             time_in_state+=self.timestep
 
             if age>=self.max_retirementage:
-                paid_pension += self.elinaikakerroin*pension
+                paid_pension = self.elakeindeksi*paid_pension+self.scale_pension(pension,age,scale=True,unemp_after_ra=unemp_after_ra)
                 pension=0
 
             if action == 0 or action == 3 or ((action == 1 or action == 2) and age>=self.max_retirementage):
@@ -1457,17 +1487,17 @@ class UnemploymentLargeEnv_v2(gym.Env):
                 paid_pension=paid_pension*self.elakeindeksi
                 pension=pension*self.palkkakerroin
                 wage=self.get_wage(intage,wage_reduction)
-                netto,benq=self.comp_benefits(0,0,paid_pension,employment_status,0,children_under7,children_under18,age)
+                netto,benq=self.comp_benefits(0,0,paid_pension,employment_status,0,children_under3,children_under7,children_under18,age)
                 wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)
             elif action == 1 and age<self.max_retirementage:
                 employment_status,pension,wage,time_in_state,netto,wage_reduction,benq=\
-                    self.move_to_retwork(pension,old_wage,age,time_in_state,paid_pension,wage_reduction,children_under7,children_under18)
+                    self.move_to_retwork(pension,old_wage,age,time_in_state,paid_pension,wage_reduction,children_under3,children_under7,children_under18)
             elif action == 2 and age<self.max_retirementage:
                 employment_status,pension,wage,time_in_state,netto,wage_reduction,benq=\
-                    self.move_to_retpartwork(pension,old_wage,age,time_in_state,paid_pension,wage_reduction,children_under7,children_under18)
+                    self.move_to_retpartwork(pension,old_wage,age,time_in_state,paid_pension,wage_reduction,children_under3,children_under7,children_under18)
             elif action == 11:
                 employment_status,paid_pension,pension,wage,time_in_state,netto,wage_reduction,benq=\
-                    self.move_to_retdisab(pension,old_wage,age,time_in_state,paid_pension,wage_reduction,children_under7,children_under18)
+                    self.move_to_retdisab(pension,old_wage,age,time_in_state,paid_pension,wage_reduction,children_under3,children_under7,children_under18)
             else:
                 print('error 221, action {} age {}'.format(action,age))
         else:
@@ -1478,22 +1508,22 @@ class UnemploymentLargeEnv_v2(gym.Env):
                 wage=old_wage
                 #toe=max(0,toe-self.timestep)
                 pension=pension*self.palkkakerroin
-                netto,benq=self.comp_benefits(0,0,0,employment_status,time_in_state,children_under7,children_under18,age)
+                netto,benq=self.comp_benefits(0,0,0,employment_status,time_in_state,children_under3,children_under7,children_under18,age)
                 wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)
             elif action == 1: # työttömäksi
                 employment_status,paid_pension,pension,wage,time_in_state,netto,\
                     wage_reduction,used_unemp_benefit,pinkslip,benq,unemp_after_ra,unempwage_basis=\
                     self.move_to_unemp(pension,old_wage,age,paid_pension,toe,0,tyoura,
-                        wage_reduction,used_unemp_benefit,unemp_after_ra,unempwage,children_under7,children_under18)
+                        wage_reduction,used_unemp_benefit,unemp_after_ra,unempwage,children_under3,children_under7,children_under18)
             elif action == 2: # töihin
                 employment_status,pension,wage,time_in_state,netto,tyoura,pinkslip,wage_reduction,benq=\
-                    self.move_to_work(pension,old_wage,age,time_in_state,tyoura,pinkslip,wage_reduction,children_under7,children_under18)
+                    self.move_to_work(pension,old_wage,age,time_in_state,tyoura,pinkslip,wage_reduction,children_under3,children_under7,children_under18)
             elif action == 3: # osatyö 50%
                 employment_status,pension,wage,time_in_state,netto,tyoura,pinkslip,wage_reduction,benq=\
-                    self.move_to_parttime(pension,old_wage,age,tyoura,time_in_state,wage_reduction,children_under7,children_under18)
+                    self.move_to_parttime(pension,old_wage,age,tyoura,time_in_state,wage_reduction,children_under3,children_under7,children_under18)
             elif action == 11: # tk
                 employment_status,pension,paid_pension,wage,time_in_state,netto,wage_reduction,benq=\
-                    self.move_to_disab(pension,old_wage,age,wage_reduction,children_under7,children_under18)
+                    self.move_to_disab(pension,old_wage,age,wage_reduction,children_under3,children_under7,children_under18)
             else:
                 print('error 12')
                 
@@ -1502,7 +1532,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
     def stay_motherleave(self,employment_status,paid_pension,pension,time_in_state,toe,wage_reduction,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
-                        unempwage_basis,action,age,sattuma,intage,g,children_under7,children_under18):
+                        unempwage_basis,action,age,sattuma,intage,g,children_under3,children_under7,children_under18):
         '''
         Pysy tilassa äitiysvapaa (5)
         '''
@@ -1512,25 +1542,25 @@ class UnemploymentLargeEnv_v2(gym.Env):
                 employment_status,paid_pension,pension,wage,time_in_state,netto,\
                     wage_reduction,used_unemp_benefit,pinkslip,benq,unemp_after_ra,unempwage_basis=\
                     self.move_to_unemp(pension,old_wage,age,paid_pension,toe,pinkslip,tyoura,
-                        wage_reduction,used_unemp_benefit,unemp_after_ra,unempwage,children_under7,children_under18)
+                        wage_reduction,used_unemp_benefit,unemp_after_ra,unempwage,children_under3,children_under7,children_under18)
             elif action == 1: # 
                 employment_status,pension,wage,time_in_state,netto,tyoura,pinkslip,wage_reduction,benq=\
-                    self.move_to_work(pension,old_wage,age,time_in_state,tyoura,pinkslip,wage_reduction,children_under7,children_under18)
+                    self.move_to_work(pension,old_wage,age,time_in_state,tyoura,pinkslip,wage_reduction,children_under3,children_under7,children_under18)
             elif action == 2: # 
                 employment_status,pension,wage,time_in_state,netto,wage_reduction,benq=\
-                    self.move_to_kht(pension,old_wage,age,wage_reduction,children_under7,children_under18)
+                    self.move_to_kht(pension,old_wage,age,wage_reduction,children_under3,children_under7,children_under18)
             elif action == 3: # osa-aikatyöhön
                 employment_status,pension,wage,time_in_state,netto,tyoura,pinkslip,wage_reduction,benq=\
-                    self.move_to_parttime(pension,old_wage,age,tyoura,time_in_state,wage_reduction,children_under7,children_under18)
+                    self.move_to_parttime(pension,old_wage,age,tyoura,time_in_state,wage_reduction,children_under3,children_under7,children_under18)
             elif action==11: # tk
                 employment_status,pension,paid_pension,wage,time_in_state,netto,wage_reduction,benq=\
-                    self.move_to_disab(pension,old_wage,age,wage_reduction,children_under7,children_under18)
+                    self.move_to_disab(pension,old_wage,age,wage_reduction,children_under3,children_under7,children_under18)
             else:
                 print('Error 21')
         else:
             pension=self.pension_accrual(age,old_wage,pension,state=5)
             wage=old_wage # self.get_wage(intage,wage_reduction)
-            netto,benq=self.comp_benefits(0,old_wage,0,employment_status,0,children_under7,children_under18,age)
+            netto,benq=self.comp_benefits(0,old_wage,0,employment_status,0,children_under3,children_under7,children_under18,age)
             time_in_state+=self.timestep
             wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)
                 
@@ -1539,7 +1569,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
     def stay_fatherleave(self,employment_status,paid_pension,pension,time_in_state,toe,wage_reduction,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
-                        unempwage_basis,action,age,sattuma,intage,g,children_under7,children_under18):
+                        unempwage_basis,action,age,sattuma,intage,g,children_under3,children_under7,children_under18):
         '''
         Pysy tilassa isyysvapaa (6)
         '''
@@ -1549,26 +1579,26 @@ class UnemploymentLargeEnv_v2(gym.Env):
                 employment_status,paid_pension,pension,wage,time_in_state,netto,\
                     wage_reduction,used_unemp_benefit,pinkslip,benq,unemp_after_ra,unempwage_basis=\
                     self.move_to_unemp(pension,old_wage,age,paid_pension,toe,pinkslip,tyoura,
-                        wage_reduction,used_unemp_benefit,unemp_after_ra,unempwage,children_under7,children_under18)
+                        wage_reduction,used_unemp_benefit,unemp_after_ra,unempwage,children_under3,children_under7,children_under18)
             elif action == 1: # 
                 # ei vaikutusta palkkaan
                 employment_status,pension,wage,time_in_state,netto,tyoura,pinkslip,wage_reduction,benq=\
-                    self.move_to_work(pension,old_wage,age,0,tyoura,pinkslip,wage_reduction,children_under7,children_under18)
+                    self.move_to_work(pension,old_wage,age,0,tyoura,pinkslip,wage_reduction,children_under3,children_under7,children_under18)
             elif action == 2: # 
                 employment_status,pension,wage,time_in_state,netto,wage_reduction,benq=\
-                    self.move_to_kht(pension,old_wage,age,wage_reduction,children_under7,children_under18)
+                    self.move_to_kht(pension,old_wage,age,wage_reduction,children_under3,children_under7,children_under18)
             elif action == 3: # osa-aikatöihin
                 employment_status,pension,wage,time_in_state,netto,tyoura,pinkslip,wage_reduction,benq=\
-                    self.move_to_parttime(pension,old_wage,age,tyoura,0,wage_reduction,children_under7,children_under18)
+                    self.move_to_parttime(pension,old_wage,age,tyoura,0,wage_reduction,children_under3,children_under7,children_under18)
             elif action==11: # tk
                 employment_status,pension,paid_pension,wage,time_in_state,netto,wage_reduction,benq=\
-                    self.move_to_disab(pension,old_wage,age,wage_reduction,children_under7,children_under18)
+                    self.move_to_disab(pension,old_wage,age,wage_reduction,children_under3,children_under7,children_under18)
             else:
                 print('Error 23')
         else:
             pension=self.pension_accrual(age,old_wage,pension,state=6)
             wage=old_wage
-            netto,benq=self.comp_benefits(0,old_wage,0,employment_status,0,children_under7,children_under18,age)
+            netto,benq=self.comp_benefits(0,old_wage,0,employment_status,0,children_under3,children_under7,children_under18,age)
             time_in_state+=self.timestep
             wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)
 
@@ -1577,7 +1607,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
     def stay_khh(self,employment_status,paid_pension,pension,time_in_state,toe,wage_reduction,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
-                        unempwage_basis,action,age,sattuma,intage,g,children_under7,children_under18):
+                        unempwage_basis,action,age,sattuma,intage,g,children_under3,children_under7,children_under18):
         '''
         Pysy tilassa kotihoidontuki (0)
         '''
@@ -1586,34 +1616,34 @@ class UnemploymentLargeEnv_v2(gym.Env):
         if age >= self.min_retirementage: # ve
             employment_status,paid_pension,pension,wage,time_in_state,netto,wage_reduction,benq=\
                 self.move_to_retirement(pension,old_wage,age,paid_pension,employment_status,
-                    wage_reduction,unemp_after_ra,children_under7,children_under18,all_acc=True)
-        elif action == 0 and (time_in_state<=self.kht_kesto or self.perustulo): # jos perustulo, ei aikarajoitetta
+                    wage_reduction,unemp_after_ra,children_under3,children_under7,children_under18,all_acc=True)
+        elif action == 0 and ((time_in_state<=self.kht_kesto and children_under3>0) or self.perustulo): # jos perustulo, ei aikarajoitetta
         #elif action == 0 and (time_in_state<=self.kht_kesto): # jos perustulo, ei aikarajoitetta
             employment_status  = 7 # stay
             wage=old_wage
             pension=self.pension_accrual(age,wage,pension,state=7)
-            netto,benq=self.comp_benefits(0,old_wage,0,employment_status,time_in_state,children_under7,children_under18,age)
+            netto,benq=self.comp_benefits(0,old_wage,0,employment_status,time_in_state,children_under3,children_under7,children_under18,age)
             wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)
         elif action == 2: # 
             pinkslip=0
             employment_status,paid_pension,pension,wage,time_in_state,netto,\
                 wage_reduction,used_unemp_benefit,pinkslip,benq,unemp_after_ra,unempwage_basis=\
                 self.move_to_unemp(pension,old_wage,age,paid_pension,toe,pinkslip,tyoura,
-                    wage_reduction,used_unemp_benefit,unemp_after_ra,unempwage,children_under7,children_under18)
+                    wage_reduction,used_unemp_benefit,unemp_after_ra,unempwage,children_under3,children_under7,children_under18)
         elif action == 1: # 
             employment_status,pension,wage,time_in_state,netto,tyoura,pinkslip,wage_reduction,benq=\
-                self.move_to_work(pension,old_wage,age,time_in_state,tyoura,pinkslip,wage_reduction,children_under7,children_under18)
+                self.move_to_work(pension,old_wage,age,time_in_state,tyoura,pinkslip,wage_reduction,children_under3,children_under7,children_under18)
         elif action == 3: # 
             employment_status,pension,wage,time_in_state,netto,tyoura,pinkslip,wage_reduction,benq=\
-                self.move_to_parttime(pension,old_wage,age,tyoura,time_in_state,wage_reduction,children_under7,children_under18)
+                self.move_to_parttime(pension,old_wage,age,tyoura,time_in_state,wage_reduction,children_under3,children_under7,children_under18)
         elif action==11: # tk
             employment_status,pension,paid_pension,wage,time_in_state,netto,wage_reduction,benq=\
-                self.move_to_disab(pension,old_wage,age,wage_reduction,children_under7,children_under18)
-        elif time_in_state>self.kht_kesto: # 
+                self.move_to_disab(pension,old_wage,age,wage_reduction,children_under3,children_under7,children_under18)
+        elif time_in_state>self.kht_kesto or children_under3<1: # 
             employment_status,paid_pension,pension,wage,time_in_state,netto,\
                 wage_reduction,used_unemp_benefit,pinkslip,benq,unemp_after_ra,unempwage_basis=\
                 self.move_to_unemp(pension,old_wage,age,paid_pension,toe,pinkslip,tyoura,
-                    wage_reduction,used_unemp_benefit,unemp_after_ra,unempwage,children_under7,children_under18)
+                    wage_reduction,used_unemp_benefit,unemp_after_ra,unempwage,children_under3,children_under7,children_under18)
         else:
             print('Error 25')
             
@@ -1622,7 +1652,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
     def stay_student(self,employment_status,paid_pension,pension,time_in_state,toe,wage_reduction,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
-                        unempwage_basis,action,age,sattuma,intage,g,children_under7,children_under18):
+                        unempwage_basis,action,age,sattuma,intage,g,children_under3,children_under7,children_under18):
         '''
         Pysy tilassa työtön (12)
         '''
@@ -1634,23 +1664,23 @@ class UnemploymentLargeEnv_v2(gym.Env):
             time_in_state+=self.timestep
             wage=old_wage
             pension=self.pension_accrual(age,0,pension,state=13)
-            netto,benq=self.comp_benefits(0,0,0,employment_status,time_in_state,children_under7,children_under18,age,tyohistoria=tyoura)
+            netto,benq=self.comp_benefits(0,0,0,employment_status,time_in_state,children_under3,children_under7,children_under18,age,tyohistoria=tyoura)
             # opiskelu parantaa tuloja
             wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)
         elif action == 0: # 
             employment_status,pension,wage,time_in_state,netto,tyoura,pinkslip,wage_reduction,benq=\
-                self.move_to_work(pension,old_wage,age,0,tyoura,pinkslip,wage_reduction,children_under7,children_under18)
+                self.move_to_work(pension,old_wage,age,0,tyoura,pinkslip,wage_reduction,children_under3,children_under7,children_under18)
         elif action == 1 or action == 3:
             employment_status,paid_pension,pension,wage,time_in_state,netto,\
                 wage_reduction,used_unemp_benefit,pinkslip,benq,unemp_after_ra,unempwage_basis=\
                 self.move_to_unemp(pension,old_wage,age,paid_pension,toe,pinkslip,tyoura,
-                    wage_reduction,used_unemp_benefit,unemp_after_ra,unempwage,children_under7,children_under18)
+                    wage_reduction,used_unemp_benefit,unemp_after_ra,unempwage,children_under3,children_under7,children_under18)
         elif action == 2:
             employment_status,pension,wage,time_in_state,netto,tyoura,pinkslip,wage_reduction,benq=\
-                self.move_to_parttime(pension,old_wage,age,tyoura,time_in_state,wage_reduction,children_under7,children_under18)
+                self.move_to_parttime(pension,old_wage,age,tyoura,time_in_state,wage_reduction,children_under3,children_under7,children_under18)
         elif action == 11: # tk
             employment_status,pension,paid_pension,wage,time_in_state,netto,wage_reduction,benq=\
-                self.move_to_disab(pension,old_wage,age,wage_reduction,children_under7,children_under18)
+                self.move_to_disab(pension,old_wage,age,wage_reduction,children_under3,children_under7,children_under18)
         else:
             print('error 29: ',action)
             
@@ -1659,7 +1689,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
     def stay_oa_parttime(self,employment_status,paid_pension,pension,time_in_state,toe,wage_reduction,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
-                        unempwage_basis,action,age,sattuma,intage,g,children_under7,children_under18):
+                        unempwage_basis,action,age,sattuma,intage,g,children_under3,children_under7,children_under18):
         '''
         Pysy tilassa ve+(osa-aikatyö) (0)
         '''
@@ -1681,19 +1711,19 @@ class UnemploymentLargeEnv_v2(gym.Env):
             pension=self.pension_accrual(age,parttimewage,pension,state=9)
 
             paid_pension=paid_pension*self.elakeindeksi
-            netto,benq=self.comp_benefits(parttimewage,0,paid_pension,employment_status,time_in_state,children_under7,children_under18,age)
+            netto,benq=self.comp_benefits(parttimewage,0,paid_pension,employment_status,time_in_state,children_under3,children_under7,children_under18,age)
             wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)
         elif action==1: # jatkaa täysin töissä, ei voi saada työttömyyspäivärahaa
             employment_status,pension,wage,time_in_state,netto,wage_reduction,benq=\
-                self.move_to_retwork(pension,old_wage,age,0,paid_pension,wage_reduction,children_under7,children_under18)
+                self.move_to_retwork(pension,old_wage,age,0,paid_pension,wage_reduction,children_under3,children_under7,children_under18)
         elif action==2: # eläkkeelle, eläkeaikana karttunutta eläkettä ei vielä maksuun
             employment_status,paid_pension,pension,wage,time_in_state,netto,wage_reduction,benq=\
                 self.move_to_retirement(pension,old_wage,age,paid_pension,employment_status,
-                    wage_reduction,0,children_under7,children_under18,all_acc=False)
+                    wage_reduction,0,children_under3,children_under7,children_under18,all_acc=False)
         elif action == 11:
             # no more working, move to "disab" with no change in paid_pension
             employment_status,paid_pension,pension,wage,time_in_state,netto,wage_reduction,benq=\
-                self.move_to_retdisab(pension,old_wage,age,time_in_state,paid_pension,wage_reduction,children_under7,children_under18)
+                self.move_to_retdisab(pension,old_wage,age,time_in_state,paid_pension,wage_reduction,children_under3,children_under7,children_under18)
         else:
             print('error 14, action {} age {}'.format(action,age))
 
@@ -1702,7 +1732,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
     def stay_oa_emp(self,employment_status,paid_pension,pension,time_in_state,toe,wage_reduction,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
-                        unempwage_basis,action,age,sattuma,intage,g,children_under7,children_under18):
+                        unempwage_basis,action,age,sattuma,intage,g,children_under3,children_under7,children_under18):
         '''
         Pysy tilassa ve+työ (0)
         '''
@@ -1722,19 +1752,19 @@ class UnemploymentLargeEnv_v2(gym.Env):
             pension=self.pension_accrual(age,wage,pension,state=8)
             
             paid_pension=paid_pension*self.elakeindeksi
-            netto,benq=self.comp_benefits(wage,0,paid_pension,employment_status,time_in_state,children_under7,children_under18,age)
+            netto,benq=self.comp_benefits(wage,0,paid_pension,employment_status,time_in_state,children_under3,children_under7,children_under18,age)
             wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)
         elif action == 1: # jatkaa osa-aikatöissä, ei voi saada työttömyyspäivärahaa
             employment_status,pension,wage,time_in_state,netto,wage_reduction,benq=\
-                self.move_to_retpartwork(pension,old_wage,age,0,paid_pension,wage_reduction,children_under7,children_under18)
+                self.move_to_retpartwork(pension,old_wage,age,0,paid_pension,wage_reduction,children_under3,children_under7,children_under18)
         elif action==2: # eläkkeelle, eläkeaikana karttunutta eläkettä ei vielä maksuun
             employment_status,paid_pension,pension,wage,time_in_state,netto,wage_reduction,benq=\
                 self.move_to_retirement(pension,old_wage,age,paid_pension,employment_status,
-                    wage_reduction,0,children_under7,children_under18,all_acc=False)
+                    wage_reduction,0,children_under3,children_under7,children_under18,all_acc=False)
         elif action == 11:
             # no more working, move to "disab" with no change in paid_pension
             employment_status,paid_pension,pension,wage,time_in_state,netto,wage_reduction,benq=\
-                self.move_to_retdisab(pension,old_wage,age,time_in_state,paid_pension,wage_reduction,children_under7,children_under18)
+                self.move_to_retdisab(pension,old_wage,age,time_in_state,paid_pension,wage_reduction,children_under3,children_under7,children_under18)
         else:
             print('error 14, action {} age {}'.format(action,age))
             
@@ -1743,7 +1773,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
     def stay_parttime(self,employment_status,paid_pension,pension,time_in_state,toe,wage_reduction,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
-                        unempwage_basis,action,age,sattuma,intage,g,children_under7,children_under18):
+                        unempwage_basis,action,age,sattuma,intage,g,children_under3,children_under7,children_under18):
         '''
         Pysy tilassa osa-aikatyö (0)
         '''
@@ -1771,24 +1801,24 @@ class UnemploymentLargeEnv_v2(gym.Env):
             tyoura+=self.timestep
             
             pension=self.pension_accrual(age,parttimewage,pension,state=10)
-            netto,benq=self.comp_benefits(parttimewage,0,0,employment_status,time_in_state,children_under7,children_under18,age)
+            netto,benq=self.comp_benefits(parttimewage,0,0,employment_status,time_in_state,children_under3,children_under7,children_under18,age)
             wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)
         elif action == 1: # työttömäksi
             employment_status,paid_pension,pension,wage,time_in_state,netto,\
                 wage_reduction,used_unemp_benefit,pinkslip,benq,unemp_after_ra,unempwage_basis=\
                 self.move_to_unemp(pension,old_wage,age,paid_pension,toe,pinkslip,tyoura,
-                    wage_reduction,used_unemp_benefit,unemp_after_ra,unempwage,children_under7,children_under18)
+                    wage_reduction,used_unemp_benefit,unemp_after_ra,unempwage,children_under3,children_under7,children_under18)
         elif action==2:
             if age >= self.min_retirementage: # ve
                 employment_status,paid_pension,pension,wage,time_in_state,netto,wage_reduction,benq=\
                     self.move_to_retirement(pension,old_wage,age,paid_pension,employment_status,
-                        wage_reduction,unemp_after_ra,children_under7,children_under18,all_acc=True)
+                        wage_reduction,unemp_after_ra,children_under3,children_under7,children_under18,all_acc=True)
         elif action==3:
             employment_status,pension,wage,time_in_state,netto,tyoura,pinkslip,wage_reduction,benq=\
-                self.move_to_work(pension,old_wage,age,0,tyoura,pinkslip,wage_reduction,children_under7,children_under18)
+                self.move_to_work(pension,old_wage,age,0,tyoura,pinkslip,wage_reduction,children_under3,children_under7,children_under18)
         elif action==11: # tk
             employment_status,pension,paid_pension,wage,time_in_state,netto,wage_reduction,benq=\
-                self.move_to_disab(pension,old_wage,age,wage_reduction,children_under7,children_under18)
+                self.move_to_disab(pension,old_wage,age,wage_reduction,children_under3,children_under7,children_under18)
         else:
             print('error 12')
         return employment_status,paid_pension,pension,wage,time_in_state,netto,wage_reduction,\
@@ -1797,7 +1827,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
     def stay_army(self,employment_status,paid_pension,pension,time_in_state,toe,wage_reduction,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
-                        unempwage_basis,action,age,sattuma,intage,g,children_under7,children_under18):
+                        unempwage_basis,action,age,sattuma,intage,g,children_under3,children_under7,children_under18):
         '''
         Pysy tilassa armeija/siviilipalvelus (14)
         '''
@@ -1808,23 +1838,23 @@ class UnemploymentLargeEnv_v2(gym.Env):
             employment_status = 14 # unchanged
             time_in_state+=self.timestep
             wage=old_wage
-            netto,benq=self.comp_benefits(0,0,0,employment_status,time_in_state,children_under7,children_under18,age,tyohistoria=tyoura)
+            netto,benq=self.comp_benefits(0,0,0,employment_status,time_in_state,children_under3,children_under7,children_under18,age,tyohistoria=tyoura)
             # opiskelu parantaa tuloja
             wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)
         elif action == 0: # 
             employment_status,pension,wage,time_in_state,netto,tyoura,pinkslip,wage_reduction,benq=\
-                self.move_to_work(pension,old_wage,age,0,tyoura,pinkslip,wage_reduction,children_under7,children_under18)
+                self.move_to_work(pension,old_wage,age,0,tyoura,pinkslip,wage_reduction,children_under3,children_under7,children_under18)
         elif action == 1 or action == 3:
             employment_status,paid_pension,pension,wage,time_in_state,netto,\
                 wage_reduction,used_unemp_benefit,pinkslip,benq,unemp_after_ra,unempwage_basis=\
                 self.move_to_unemp(pension,old_wage,age,paid_pension,toe,pinkslip,tyoura,
-                    wage_reduction,used_unemp_benefit,unemp_after_ra,unempwage,children_under7,children_under18)
+                    wage_reduction,used_unemp_benefit,unemp_after_ra,unempwage,children_under3,children_under7,children_under18)
         elif action == 2:
             employment_status,pension,wage,time_in_state,netto,tyoura,pinkslip,wage_reduction,benq=\
-                self.move_to_parttime(pension,old_wage,age,tyoura,time_in_state,wage_reduction,children_under7,children_under18)
+                self.move_to_parttime(pension,old_wage,age,tyoura,time_in_state,wage_reduction,children_under3,children_under7,children_under18)
         elif action == 11: # tk
             employment_status,pension,paid_pension,wage,time_in_state,netto,wage_reduction,benq=\
-                self.move_to_disab(pension,old_wage,age,wage_reduction,children_under7,children_under18)
+                self.move_to_disab(pension,old_wage,age,wage_reduction,children_under3,children_under7,children_under18)
         else:
             print('error 39: ',action) 
                 
@@ -1833,7 +1863,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
     def stay_outsider(self,employment_status,paid_pension,pension,time_in_state,toe,wage_reduction,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
-                        unempwage_basis,action,age,sattuma,intage,g,children_under7,children_under18):
+                        unempwage_basis,action,age,sattuma,intage,g,children_under3,children_under7,children_under18):
         '''
         Pysy tilassa työvoiman ulkopuolella (11)
         '''
@@ -1841,29 +1871,29 @@ class UnemploymentLargeEnv_v2(gym.Env):
         if age>=self.min_retirementage:
             employment_status,paid_pension,pension,wage,time_in_state,netto,wage_reduction,benq=\
                 self.move_to_retirement(pension,old_wage,age,paid_pension,employment_status,
-                wage_reduction,unemp_after_ra,children_under7,children_under18,all_acc=True)
+                wage_reduction,unemp_after_ra,children_under3,children_under7,children_under18,all_acc=True)
         elif sattuma[5]>=self.outsider_outrate[intage,g]:
             time_in_state+=self.timestep
             employment_status = 11 # unchanged
             wage=old_wage
             pension=self.pension_accrual(age,wage,pension,state=11)
-            netto,benq=self.comp_benefits(0,old_wage,0,employment_status,time_in_state,children_under7,children_under18,age,tyohistoria=tyoura)
+            netto,benq=self.comp_benefits(0,old_wage,0,employment_status,time_in_state,children_under3,children_under7,children_under18,age,tyohistoria=tyoura)
             wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)
         elif action == 1: # 
             employment_status,pension,wage,time_in_state,netto,tyoura,pinkslip,wage_reduction,benq=\
-                self.move_to_work(pension,old_wage,age,time_in_state,tyoura,pinkslip,wage_reduction,children_under7,children_under18)
+                self.move_to_work(pension,old_wage,age,time_in_state,tyoura,pinkslip,wage_reduction,children_under3,children_under7,children_under18)
         elif action == 2 or action == 0: # 
             pinkslip=0
             employment_status,paid_pension,pension,wage,time_in_state,netto,\
                 wage_reduction,used_unemp_benefit,pinkslip,benq,unemp_after_ra,unempwage_basis=\
                 self.move_to_unemp(pension,old_wage,age,paid_pension,toe,pinkslip,tyoura,wage_reduction,
-                    used_unemp_benefit,unemp_after_ra,unempwage,children_under7,children_under18)
+                    used_unemp_benefit,unemp_after_ra,unempwage,children_under3,children_under7,children_under18)
         elif action == 3: # 
             employment_status,pension,wage,time_in_state,netto,tyoura,pinkslip,wage_reduction,benq=\
-                self.move_to_parttime(pension,old_wage,age,tyoura,time_in_state,wage_reduction,children_under7,children_under18)
+                self.move_to_parttime(pension,old_wage,age,tyoura,time_in_state,wage_reduction,children_under3,children_under7,children_under18)
         elif action == 11: # tk
             employment_status,pension,paid_pension,wage,time_in_state,netto,wage_reduction,benq=\
-                self.move_to_disab(pension,old_wage,age,wage_reduction,children_under7,children_under18)
+                self.move_to_disab(pension,old_wage,age,wage_reduction,children_under3,children_under7,children_under18)
             pinkslip=0
         else:
             print('error 19: ',action)
@@ -1989,7 +2019,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
         employment_status,g,pension,old_wage,age,time_in_state,paid_pension,pinkslip,toe,\
             tyoura,used_unemp_benefit,wage_reduction,unemp_after_ra,\
-            unempwage,unempwage_basis,prefnoise,children_under7,children_under18\
+            unempwage,unempwage_basis,prefnoise,children_under3,children_under7,children_under18\
                 =self.state_decode(self.state)
             
         # simulointiin vaikuttavia ulkoisia tilamuuttujia, ei toteutettu
@@ -2025,25 +2055,25 @@ class UnemploymentLargeEnv_v2(gym.Env):
                     if self.infostat_can_have_children(age): # lasten väli vähintään vuosi
                         if g>2: # naiset
                             employment_status,pension,wage,time_in_state,netto,pinkslip,wage_reduction,benq=\
-                                self.move_to_motherleave(pension,old_wage,age,wage_reduction,children_under7,children_under18)
+                                self.move_to_motherleave(pension,old_wage,age,wage_reduction,children_under3,children_under7,children_under18)
                             pinkslip=0
                             moved=True
                         else: # miehet
                             # ikä valittu äidin iän mukaan. oikeastaan tämä ei mene ihan oikein miehille
                             if sattuma[4]<0.5:
                                 employment_status,pension,wage,time_in_state,netto,pinkslip,wage_reduction,benq=\
-                                    self.move_to_fatherleave(pension,old_wage,age,wage_reduction,children_under7,children_under18)
+                                    self.move_to_fatherleave(pension,old_wage,age,wage_reduction,children_under3,children_under7,children_under18)
                                 moved=True
                 elif sattuma[2]<s3/move_prob:
                     if employment_status not in set([2,3,8,9,11,12,14]): # and False:
                         employment_status,pension,wage,time_in_state,netto,pinkslip,wage_reduction,benq=\
-                            self.move_to_student(pension,old_wage,age,time_in_state,tyoura,pinkslip,wage_reduction,children_under7,children_under18)
+                            self.move_to_student(pension,old_wage,age,time_in_state,tyoura,pinkslip,wage_reduction,children_under3,children_under7,children_under18)
                         moved=True
                 #elif sattuma[2]<s4/move_prob: # and False:
                 else:
                     if employment_status not in set([2,3,8,9,11,12,14]):
                         employment_status,paid_pension,pension,wage,time_in_state,netto,wage_reduction,pinkslip,benq=\
-                            self.move_to_outsider(pension,old_wage,age,pinkslip,wage_reduction,children_under7,children_under18)
+                            self.move_to_outsider(pension,old_wage,age,pinkslip,wage_reduction,children_under3,children_under7,children_under18)
                         moved=True
 
             # voi aiheuttaa epästabiilisuutta
@@ -2074,7 +2104,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
             return np.array(self.state), reward, done, {}
         elif age>=self.max_retirementage:
             employment_status,paid_pension,pension,wage,time_in_state,netto,wage_reduction,benq\
-                =self.move_to_retirement(pension,0,age,paid_pension,employment_status,wage_reduction,unemp_after_ra,children_under7,children_under18,all_acc=True)
+                =self.move_to_retirement(pension,0,age,paid_pension,employment_status,wage_reduction,unemp_after_ra,children_under3,children_under7,children_under18,all_acc=True)
         else:
              if not moved:
                 # hoidetaan tilasiirtymät ja -pysymiset alirutiineilla, joita kutsutaan mäppäämällä tila funktioksi,
@@ -2087,13 +2117,13 @@ class UnemploymentLargeEnv_v2(gym.Env):
                 unemp_after_ra,time_in_state,tyoura,used_unemp_benefit,unempwage_basis\
                     = map_stays[employment_status](employment_status,paid_pension,pension,time_in_state,toe,wage_reduction,
                                                    tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,unempwage_basis,
-                                                   action,age,sattuma,intage,g,children_under7,children_under18)
+                                                   action,age,sattuma,intage,g,children_under3,children_under7,children_under18)
 
         done = age >= self.max_age
         done = bool(done)
         
         self.update_infostate(t,int(employment_status),wage)
-        toe,unempwage,children_under7,children_under18=self.comp_infostats(age+self.timestep)
+        toe,unempwage,children_under3,children_under7,children_under18=self.comp_infostats(age+self.timestep)
         work={1,10}
         if employment_status in work and self.tyossaoloehto(toe,tyoura,age):            
             used_unemp_benefit=0
@@ -2109,7 +2139,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
             paid_pension += self.elinaikakerroin*pension
             pension=0
             
-            netto,benq=self.comp_benefits(0,old_wage,paid_pension,employment_status,time_in_state,children_under7,children_under18,age)
+            netto,benq=self.comp_benefits(0,old_wage,paid_pension,employment_status,time_in_state,children_under3,children_under7,children_under18,age)
             if employment_status in set([2,3,8,9]):
                 reward = self.npv[g]*self.log_utility(netto,employment_status,age,pinkslip=0)
                 
@@ -2135,12 +2165,12 @@ class UnemploymentLargeEnv_v2(gym.Env):
             self.state = self.state_encode(employment_status,g,pension,wage,age+self.timestep,time_in_state,
                                     paid_pension,pinkslip,toe,tyoura,next_wage,used_unemp_benefit,
                                     wage_reduction,unemp_after_ra,unempwage,unempwage_basis,
-                                    prefnoise=prefnoise,children_under7=children_under7,children_under18=children_under18)
+                                    prefnoise=prefnoise,children_under3=children_under3,children_under7=children_under7,children_under18=children_under18)
         else:
             self.state = self.state_encode(employment_status,g,pension,wage,age+self.timestep,time_in_state,
                                     paid_pension,pinkslip,toe,tyoura,next_wage,used_unemp_benefit,
                                     wage_reduction,unemp_after_ra,unempwage,unempwage_basis,
-                                    children_under7=children_under7,children_under18=children_under18)
+                                    children_under3=children_under3,children_under7=children_under7,children_under18=children_under18)
 
         if self.plotdebug:
             self.render(done=done,reward=reward, netto=netto)
@@ -2162,29 +2192,160 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
         return benq        
 
-    # WITH RANDOMNESS
+#     WITH RANDOMNESS
+#     def log_utility(self,income,employment_state,age,g=0,pinkslip=0,prefnoise=0):
+#         '''
+#         Log-utiliteettifunktio muokattuna lähteestä Määttänen, 2013 & Hakola & Määttänen, 2005
+# 
+#         Tulot _income_ ovat vuositasolla, jotta askelpituuden muutos ei vaikuta vapaa-aika-vakioihin
+#         '''
+# 
+#         kappa tells how much person values free-time
+#         if g<3: # miehet
+#             kappa_kokoaika=0.525 # 0.635 # 0.665
+#             mu_scale=0.215 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+#             mu_age=59.25 # P.O. 60??
+#             kappa_osaaika=0.48*kappa_kokoaika
+#             kappa_hoitovapaa=0.015
+#             kappa_ve=0.075 # ehkä 0.10?
+#         else: # naiset
+#             kappa_kokoaika=0.455 # 0.605 # 0.58
+#             mu_scale=0.210 # 0.25 # 0.25 # 0.17 # how much penalty is associated with work increase with age after mu_age
+#             mu_age=59.25 # 61 # P.O. 60??
+#             kappa_osaaika=0.38*kappa_kokoaika # 0.42*kappa_kokoaika
+#             kappa_hoitovapaa=0.05
+#             kappa_ve=0.10 # ehkä 0.10?
+#                 
+#         if self.include_preferencenoise:
+#             kappa_kokoaika += prefnoise
+#         
+#         if age<25:
+#         alle 25-vuotiaalla eri säännöt, vanhempien tulot huomioidaan jne
+#            kappa_pinkslip = 0.25
+#         else:
+#         if pinkslip>0: # irtisanottu
+#             kappa_pinkslip = 0 # irtisanotuille ei vaikutuksia
+#         else:
+#             kappa_pinkslip = 0.09 # irtisanoutumisesta seuraava alennus
+#         
+#         if age>mu_age:
+#             kappa_kokoaika *= (1+mu_scale*max(0,age-mu_age))
+#             kappa_osaaika *= (1+mu_scale*max(0,age-mu_age))
+# 
+#         if employment_state in set([1,8]):
+#             kappa= -kappa_kokoaika
+#         elif employment_state in set([9,10]):
+#             kappa= -kappa_osaaika
+#         elif employment_state in set([0,4,13]):
+#             kappa= -kappa_pinkslip
+#         elif employment_state == 2:
+#             kappa=kappa_ve
+#         elif employment_state == 7:
+#             kappa=kappa_hoitovapaa
+#         elif employment_state == 11:
+#             kappa=0 #kappa_outsider
+#         elif employment_state == 12:
+#             kappa=0 #kappa_opiskelija
+#         else: # states 3, 5, 6, 7, 14, 15
+#             kappa=0
+#         
+#         hyöty/score
+#         print(type(np),income,type(income))
+#         u=np.log(income)+kappa
+# 
+#         if u is np.inf:
+#             print('inf: state ',employment_state)
+# 
+#         if income<1:
+#             print('inf: state ',employment_state)
+# 
+#         return u/10 # tulot ovat vuositasolla, mutta skaalataan hyöty
+
+    def log_utility_default_params(self):
+        self.men_kappa_fulltime=0.555 # 0.635 # 0.665
+        self.men_mu_scale=0.215 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+        self.men_mu_age=59.25 # P.O. 60??
+        self.men_kappa_osaaika=0.48
+        self.men_kappa_hoitovapaa=0.015
+        self.men_kappa_ve=0.075 # ehkä 0.10?
+        self.women_kappa_fulltime=0.475 # 0.605 # 0.58
+        self.women_mu_scale=0.210 # 0.25 # 0.25 # 0.17 # how much penalty is associated with work increase with age after mu_age
+        self.women_mu_age=59.25 # 61 # P.O. 60??
+        self.women_kappa_osaaika=0.38
+        self.women_kappa_hoitovapaa=0.05
+        self.women_kappa_ve=0.10 # ehkä 0.10?
+        self.kappa_pinkslip=0.10
+
+    def set_utility_params(self,**kwargs):
+        if 'kwargs' in kwargs:
+            kwarg=kwargs['kwargs']
+        else:
+            kwarg={}
+
+        for key, value in kwarg.items():
+            if key=='men_kappa_fulltime':
+                if value is not None:
+                    self.men_kappa_fulltime=value
+            elif key=='women_kappa_fulltime':
+                if value is not None:
+                    self.women_kappa_fulltime=value
+            elif key=='men_mu_scale':
+                if value is not None:
+                    self.men_mu_scale=value
+            elif key=='women_mu_scale':
+                if value is not None:
+                    self.women_mu_scale=value
+            elif key=='men_mu_age':
+                if value is not None:
+                    self.men_mu_age=value
+            elif key=='women_mu_age':
+                if value is not None:
+                    self.women_mu_age=value
+            elif key=='men_kappa_osaaika':
+                if value is not None:
+                    self.men_kappa_osaaika=value
+            elif key=='women_kappa_osaaika':
+                if value is not None:
+                    self.women_kappa_osaaika=value
+            elif key=='men_kappa_hoitovapaa':
+                if value is not None:
+                    self.men_kappa_hoitovapaa=value
+            elif key=='women_kappa_hoitovapaa':
+                if value is not None:
+                    self.women_kappa_hoitovapaa=value
+            elif key=='men_kappa_ve':
+                if value is not None:
+                    self.men_kappa_ve=value
+            elif key=='women_kappa_ve':
+                if value is not None:
+                    self.women_kappa_ve=value
+            elif key=='kappa_pinkslip':
+                if value is not None:
+                    self.kappa_pinkslip=value
+                    
     def log_utility(self,income,employment_state,age,g=0,pinkslip=0,prefnoise=0):
         '''
         Log-utiliteettifunktio muokattuna lähteestä Määttänen, 2013 & Hakola & Määttänen, 2005
 
         Tulot _income_ ovat vuositasolla, jotta askelpituuden muutos ei vaikuta vapaa-aika-vakioihin
+        Tämä versio on parametrisoitu optimoijaa varten
         '''
 
         # kappa tells how much person values free-time
         if g<3: # miehet
-            kappa_kokoaika=0.607 # 0.635 # 0.665
-            mu_scale=0.203 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-            mu_age=59.25 # P.O. 60??
-            kappa_osaaika=0.65*kappa_kokoaika
-            kappa_hoitovapaa=0.04
-            kappa_ve=0.00 # ehkä 0.10?
+            kappa_kokoaika=self.men_kappa_fulltime
+            mu_scale=self.men_mu_scale
+            mu_age=self.men_mu_age
+            kappa_osaaika=self.men_kappa_osaaika*kappa_kokoaika
+            kappa_hoitovapaa=self.women_kappa_hoitovapaa
+            kappa_ve=self.men_kappa_ve
         else: # naiset
-            kappa_kokoaika=0.534 # 0.605 # 0.58
-            mu_scale=0.151 # 0.25 # 0.25 # 0.17 # how much penalty is associated with work increase with age after mu_age
-            mu_age=59.25 # 61 # P.O. 60??
-            kappa_osaaika=0.44*kappa_kokoaika # 0.42*kappa_kokoaika
-            kappa_hoitovapaa=0.08
-            kappa_ve=0.17 # ehkä 0.10?
+            kappa_kokoaika=self.women_kappa_fulltime
+            mu_scale=self.women_mu_scale
+            mu_age=self.women_mu_age
+            kappa_osaaika=self.women_kappa_osaaika*kappa_kokoaika # 0.42*kappa_kokoaika
+            kappa_hoitovapaa=self.women_kappa_hoitovapaa
+            kappa_ve=self.women_kappa_ve
                 
         if self.include_preferencenoise:
             kappa_kokoaika += prefnoise
@@ -2196,7 +2357,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
         if pinkslip>0: # irtisanottu
             kappa_pinkslip = 0 # irtisanotuille ei vaikutuksia
         else:
-            kappa_pinkslip = 0.26 # irtisanoutumisesta seuraava alennus
+            kappa_pinkslip = self.kappa_pinkslip # irtisanoutumisesta seuraava alennus
         
         if age>mu_age:
             kappa_kokoaika *= (1+mu_scale*max(0,age-mu_age))
@@ -2230,6 +2391,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
             print('inf: state ',employment_state)
 
         return u/10 # tulot ovat vuositasolla, mutta skaalataan hyöty
+
 
     # From Määttänen, 2013
     def wage_process(self,w,age,ave=3300*12):
@@ -2344,130 +2506,10 @@ class UnemploymentLargeEnv_v2(gym.Env):
                     self.salary[age]=self.wage_process_TK(self.salary[age-1],age,a0,a1)
 
 
-    def state_encode_mort(self,emp,g,pension,old_wage,age,time_in_state,paid_pension,pink,
-                          toe,tyohist,next_wage,used_unemp_benefit,wage_reduction,
-                          unemp_after_ra,unempwage,unempwage_basis,
-                          prefnoise=0,children_under7=0,children_under18=0):
-        '''
-        Tilan koodaus neuroverkkoa varten. Arvot skaalataan ja tilat one-hot-enkoodataan
-
-        Käytetään, jos kuolleisuus mukana
-        '''
-        if self.include_children:
-            if self.include_preferencenoise:
-                d=np.zeros(self.n_empl+self.n_groups+19)
-            else:
-                d=np.zeros(self.n_empl+self.n_groups+18)
-        else:
-            if self.include_preferencenoise:
-                d=np.zeros(self.n_empl+self.n_groups+17)
-            else:
-                d=np.zeros(self.n_empl+self.n_groups+16)
-        
-        states=self.n_empl
-        if emp==1:
-            d[0:states]=np.array([0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0])
-        elif emp==0:
-            d[0:states]=np.array([1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0])
-        elif emp==2:
-            d[0:states]=np.array([0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0])
-        elif emp==3:
-            d[0:states]=np.array([0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0])
-        elif emp==4:
-            d[0:states]=np.array([0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0])
-        elif emp==5:
-            d[0:states]=np.array([0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0])
-        elif emp==6:
-            d[0:states]=np.array([0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0])
-        elif emp==7:
-            d[0:states]=np.array([0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0])
-        elif emp==8:
-            d[0:states]=np.array([0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0])
-        elif emp==9:
-            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0])
-        elif emp==10:
-            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0])
-        elif emp==11:
-            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0])
-        elif emp==12:
-            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0])
-        elif emp==13:
-            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0])
-        elif emp==14:
-            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0])
-        elif emp==15:
-            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1])
-        else:
-            print('state_encode error '+str(emp))
-
-        states2=states+self.n_groups
-        if g==1:
-            d[states:states2]=np.array([0,1,0,0,0,0])
-        elif g==0:
-            d[states:states2]=np.array([1,0,0,0,0,0])
-        elif g==2:
-            d[states:states2]=np.array([0,0,1,0,0,0])
-        elif g==3:
-            d[states:states2]=np.array([0,0,0,1,0,0])
-        elif g==4:
-            d[states:states2]=np.array([0,0,0,0,1,0])
-        elif g==5:
-            d[states:states2]=np.array([0,0,0,0,0,1])
-        else:
-            print('state_encode g-error '+str(g))
-
-        if self.log_transform:
-            d[states2]=np.log(pension/20_000+self.eps) # vastainen eläke
-            d[states2+1]=np.log(old_wage/40_000+self.eps)
-            d[states2+4]=np.log(paid_pension/20_000+self.eps) # alkanut eläke
-            d[states2+10]=np.log(next_wage/40_000+self.eps)
-            d[states2+14]=np.log(unempwage/40_000+self.eps)
-            d[states2+15]=np.log(unempwage_basis/40_000+self.eps)
-        else:
-            d[states2]=(pension-40_000)/40_000 # vastainen eläke
-            d[states2+1]=(old_wage-40_000)/40_000
-            d[states2+4]=(paid_pension-40_000)/40_000 # alkanut eläke
-            d[states2+10]=(next_wage-40_000)/40_000        
-            d[states2+14]=(unempwage-40_000)/40_000        
-            d[states2+15]=(unempwage_basis-40_000)/40_000
-
-        if tyohist>self.tyohistoria_vaatimus:
-            hist400=1
-        else:
-            hist400=0
-
-        d[states2+2]=(age-(self.max_age+self.min_age)/2)/20
-        d[states2+3]=(time_in_state-3)/10
-        #if self.include300:
-        d[states2+5]=pink # irtisanottu vai ei 
-        d[states2+6]=toe-14/12 # työssäoloehto
-        d[states2+7]=(tyohist-3)/20 # tyohistoria: 300/400 pv
-        d[states2+8]=hist400
-        if age>=self.min_retirementage:
-            retaged=1
-        else:
-            retaged=0
-        d[states2+9]=retaged
-        d[states2+11]=used_unemp_benefit
-        d[states2+12]=wage_reduction
-        d[states2+13]=(unemp_after_ra-1)/2
-        if self.include_preferencenoise:
-            d[states2+15]=prefnoise
-            if self.include_children:
-                d[states2+17]=(children_under7-5)/10
-                d[states2+18]=(children_under18-5)/10
-        else:
-            if self.include_children:
-                d[states2+16]=(children_under7-5)/10
-                d[states2+17]=(children_under18-5)/10
-        
-        return d
-
-
-    def state_encode_nomort(self,emp,g,pension,old_wage,age,time_in_state,paid_pension,pink,
-                            toe,tyohist,next_wage,used_unemp_benefit,wage_reduction,
-                            unemp_after_ra,unempwage,unempwage_basis,
-                            prefnoise=0,children_under7=0,children_under18=0):
+    def state_encode(self,emp,g,pension,old_wage,age,time_in_state,paid_pension,pink,
+                        toe,tyohist,next_wage,used_unemp_benefit,wage_reduction,
+                        unemp_after_ra,unempwage,unempwage_basis,
+                        prefnoise=0,children_under3=0,children_under7=0,children_under18=0):
         '''
         Tilan koodaus neuroverkkoa varten. Arvot skaalataan ja tilat one-hot-enkoodataan
 
@@ -2475,9 +2517,9 @@ class UnemploymentLargeEnv_v2(gym.Env):
         '''
         if self.include_children:
             if self.include_preferencenoise:
-                d=np.zeros(self.n_empl+self.n_groups+19)
+                d=np.zeros(self.n_empl+self.n_groups+20)
             else:
-                d=np.zeros(self.n_empl+self.n_groups+18)
+                d=np.zeros(self.n_empl+self.n_groups+19)
         else:
             if self.include_preferencenoise:
                 d=np.zeros(self.n_empl+self.n_groups+17)
@@ -2487,56 +2529,59 @@ class UnemploymentLargeEnv_v2(gym.Env):
         states=self.n_empl
         # d2=np.zeros(n_empl,1)
         # d2[emp]=1
-        if emp==1:
-            d[0:states]=np.array([0,1,0,0,0,0,0,0,0,0,0,0,0,0,0])
-        elif emp==0:
-            d[0:states]=np.array([1,0,0,0,0,0,0,0,0,0,0,0,0,0,0])
-        elif emp==2:
-            d[0:states]=np.array([0,0,1,0,0,0,0,0,0,0,0,0,0,0,0])
-        elif emp==3:
-            d[0:states]=np.array([0,0,0,1,0,0,0,0,0,0,0,0,0,0,0])
-        elif emp==4:
-            d[0:states]=np.array([0,0,0,0,1,0,0,0,0,0,0,0,0,0,0])
-        elif emp==5:
-            d[0:states]=np.array([0,0,0,0,0,1,0,0,0,0,0,0,0,0,0])
-        elif emp==6:
-            d[0:states]=np.array([0,0,0,0,0,0,1,0,0,0,0,0,0,0,0])
-        elif emp==7:
-            d[0:states]=np.array([0,0,0,0,0,0,0,1,0,0,0,0,0,0,0])
-        elif emp==8:
-            d[0:states]=np.array([0,0,0,0,0,0,0,0,1,0,0,0,0,0,0])
-        elif emp==9:
-            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,1,0,0,0,0,0])
-        elif emp==10:
-            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,1,0,0,0,0])
-        elif emp==11:
-            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,1,0,0,0])
-        elif emp==12:
-            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,0,1,0,0])
-        elif emp==13:
-            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,1,0])
-        elif emp==14:
-            d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,1])
-        elif emp==15:
+        d[0:states]=self.state_encoding[emp,:]
+#         if emp==1:
+#             d[0:states]=np.array([0,1,0,0,0,0,0,0,0,0,0,0,0,0,0])
+#         elif emp==0:
+#             d[0:states]=np.array([1,0,0,0,0,0,0,0,0,0,0,0,0,0,0])
+#         elif emp==2:
+#             d[0:states]=np.array([0,0,1,0,0,0,0,0,0,0,0,0,0,0,0])
+#         elif emp==3:
+#             d[0:states]=np.array([0,0,0,1,0,0,0,0,0,0,0,0,0,0,0])
+#         elif emp==4:
+#             d[0:states]=np.array([0,0,0,0,1,0,0,0,0,0,0,0,0,0,0])
+#         elif emp==5:
+#             d[0:states]=np.array([0,0,0,0,0,1,0,0,0,0,0,0,0,0,0])
+#         elif emp==6:
+#             d[0:states]=np.array([0,0,0,0,0,0,1,0,0,0,0,0,0,0,0])
+#         elif emp==7:
+#             d[0:states]=np.array([0,0,0,0,0,0,0,1,0,0,0,0,0,0,0])
+#         elif emp==8:
+#             d[0:states]=np.array([0,0,0,0,0,0,0,0,1,0,0,0,0,0,0])
+#         elif emp==9:
+#             d[0:states]=np.array([0,0,0,0,0,0,0,0,0,1,0,0,0,0,0])
+#         elif emp==10:
+#             d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,1,0,0,0,0])
+#         elif emp==11:
+#             d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,1,0,0,0])
+#         elif emp==12:
+#             d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,0,1,0,0])
+#         elif emp==13:
+#             d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,1,0])
+#         elif emp==14:
+#             d[0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,1])
+        if emp==15:
             print('no state 15 in state_encode_nomort')
-        else:
+        elif emp>15:
             print('state_encode error '+str(emp))
 
         states2=states+self.n_groups
-        if g==1:
-            d[states:states2]=np.array([0,1,0,0,0,0])
-        elif g==0:
-            d[states:states2]=np.array([1,0,0,0,0,0])
-        elif g==2:
-            d[states:states2]=np.array([0,0,1,0,0,0])
-        elif g==3:
-            d[states:states2]=np.array([0,0,0,1,0,0])
-        elif g==4:
-            d[states:states2]=np.array([0,0,0,0,1,0])
-        elif g==5:
-            d[states:states2]=np.array([0,0,0,0,0,1])
-        else:
-            print('state_encode g-error '+str(g))
+        d[states:states2]=self.group_encoding[g,:]
+
+#         if g==1:
+#             c=np.array([0,1,0,0,0,0])
+#         elif g==0:
+#             d[states:states2]=np.array([1,0,0,0,0,0])
+#         elif g==2:
+#             d[states:states2]=np.array([0,0,1,0,0,0])
+#         elif g==3:
+#             d[states:states2]=np.array([0,0,0,1,0,0])
+#         elif g==4:
+#             d[states:states2]=np.array([0,0,0,0,1,0])
+#         elif g==5:
+#             d[states:states2]=np.array([0,0,0,0,0,1])
+#         else:
+#             print('state_encode g-error '+str(g))
 
         if self.log_transform:
             d[states2]=np.log(pension/20_000+self.eps) # vastainen eläke
@@ -2577,12 +2622,14 @@ class UnemploymentLargeEnv_v2(gym.Env):
         if self.include_preferencenoise:
             d[states2+16]=prefnoise
             if self.include_children:
-                d[states2+17]=(children_under7-5)/10
-                d[states2+18]=(children_under18-5)/10
+                d[states2+17]=(children_under3-5)/10
+                d[states2+18]=(children_under7-5)/10
+                d[states2+19]=(children_under18-5)/10
         else:
             if self.include_children:
-                d[states2+16]=(children_under7-5)/10
-                d[states2+17]=(children_under18-5)/10
+                d[states2+16]=(children_under3-5)/10
+                d[states2+17]=(children_under7-5)/10
+                d[states2+18]=(children_under18-5)/10
         
         return d
 
@@ -2640,28 +2687,32 @@ class UnemploymentLargeEnv_v2(gym.Env):
         if self.include_preferencenoise:
             prefnoise=vec[pos+16]
             if self.include_children:
-                children_under7=int(vec[pos+17])
-                children_under18=int(vec[pos+18])
+                children_under3=int(vec[pos+17]*10+5)
+                children_under7=int(vec[pos+18]*10+5)
+                children_under18=int(vec[pos+19]*10+5)
             else:
+                children_under3=0
                 children_under7=0
                 children_under18=0
         else:
             prefnoise=0
             if self.include_children:
-                children_under7=int(vec[pos+16]*10+5)
-                children_under18=int(vec[pos+17]*10+5)
+                children_under3=int(vec[pos+16]*10+5)
+                children_under7=int(vec[pos+17]*10+5)
+                children_under18=int(vec[pos+18]*10+5)
             else:
+                children_under3=0
                 children_under7=0
                 children_under18=0
 
         if return_nextwage:
             return int(emp),int(g),pension,wage,age,time_in_state,paid_pension,int(pink),toe,\
                    tyohist,used_unemp_benefit,wage_reduction,unemp_after_ra,\
-                   unempwage,unempwage_basis,prefnoise,children_under7,children_under18,next_wage
+                   unempwage,unempwage_basis,prefnoise,children_under3,children_under7,children_under18,next_wage
         else:
             return int(emp),int(g),pension,wage,age,time_in_state,paid_pension,int(pink),toe,\
                    tyohist,used_unemp_benefit,wage_reduction,unemp_after_ra,\
-                   unempwage,unempwage_basis,prefnoise,children_under7,children_under18
+                   unempwage,unempwage_basis,prefnoise,children_under3,children_under7,children_under18
 
     def unit_test_code_decode(self):
         for k in range(10):
@@ -2682,34 +2733,40 @@ class UnemploymentLargeEnv_v2(gym.Env):
             unempwage=random.uniform(0,80_000)
             unempwage_basis=random.uniform(0,80_000)
             prefnoise=random.uniform(-1,1)
+            children_under3=np.random.randint(0,10)
             children_under7=np.random.randint(0,10)
             children_under18=np.random.randint(0,10)
         
             vec=self.state_encode(emp,g,pension,old_wage,age,time_in_state,paid_pension,pink,
                                 toe,tyohist,next_wage,used_unemp_benefit,wage_reduction,
                                 unemp_after_ra,unempwage,unempwage_basis,
-                                prefnoise=prefnoise,children_under7=children_under7,children_under18=children_under18)
+                                prefnoise=prefnoise,children_under3=children_under3,
+                                children_under7=children_under7,children_under18=children_under18)
+                                
             emp2,g2,pension2,wage2,age2,time_in_state2,paid_pension2,pink2,toe2,\
             tyohist2,used_unemp_benefit2,wage_reduction2,unemp_after_ra2,\
-            unempwage2,unempwage_basis2,prefnoise2,children_under7_2,children_under18_2,next_wage2\
+            unempwage2,unempwage_basis2,prefnoise2, \
+            children_under3_2,children_under7_2,children_under18_2,next_wage2\
                 =self.state_decode(vec,return_nextwage=True)
                 
             self.check_state(emp,g,pension,old_wage,age,time_in_state,paid_pension,pink,
                                 toe,tyohist,next_wage,used_unemp_benefit,wage_reduction,
                                 unemp_after_ra,unempwage,unempwage_basis,
-                                prefnoise,children_under7,children_under18,
+                                prefnoise,children_under3,children_under7,children_under18,
                                 emp2,g2,pension2,wage2,age2,time_in_state2,paid_pension2,pink2,toe2,\
                                 tyohist2,used_unemp_benefit2,wage_reduction2,unemp_after_ra2,\
-                                unempwage2,unempwage_basis2,prefnoise2,children_under7_2,children_under18_2,next_wage2)
+                                unempwage2,unempwage_basis2,prefnoise2,
+                                children_under3_2,children_under7_2,children_under18_2,next_wage2)
         
     
     def check_state(self,emp,g,pension,old_wage,age,time_in_state,paid_pension,pink,
                                 toe,tyohist,next_wage,used_unemp_benefit,wage_reduction,
                                 unemp_after_ra,unempwage,unempwage_basis,
-                                prefnoise,children_under7,children_under18,
+                                prefnoise,children_under3,children_under7,children_under18,
                                 emp2,g2,pension2,old_wage2,age2,time_in_state2,paid_pension2,pink2,toe2,\
                                 tyohist2,used_unemp_benefit2,wage_reduction2,unemp_after_ra2,\
-                                unempwage2,unempwage_basis2,prefnoise2,children_under7_2,children_under18_2,next_wage2):
+                                unempwage2,unempwage_basis2,prefnoise2,
+                                children_under3_2,children_under7_2,children_under18_2,next_wage2):
         if not emp==emp2:  
             print('emp: {} vs {}'.format(emp,emp2))
         if not g==g2:  
@@ -2743,6 +2800,8 @@ class UnemploymentLargeEnv_v2(gym.Env):
         if self.include_preferencenoise:
             if not prefnoise==prefnoise2:  
                 print('prefnoise: {} vs {}'.format(prefnoise,prefnoise2))
+        if not children_under3==children_under3_2:  
+            print('children_under3: {} vs {}'.format(children_under3,children_under3_2))
         if not children_under7==children_under7_2:  
             print('children_under7: {} vs {}'.format(children_under7,children_under7_2))
         if not children_under18==children_under18_2:  
@@ -2769,9 +2828,14 @@ class UnemploymentLargeEnv_v2(gym.Env):
                 #print('exploration')
                 initial_salary=np.random.uniform(low=1_000,high=100_000)
                 pension=random.uniform(0,80_000)
+                if random.random()<0.5:
+                    age=int(np.random.uniform(low=self.min_age,high=self.max_age-1))
+                else:
+                    age=int(np.random.uniform(low=62,high=self.max_age-1))
+                initial_salary=np.random.uniform(low=1_000,high=100_000)
                 toe=random.choices(np.array([0,0.25,0.5,0.75,1.0,1.5,2.0,2.5],dtype=int),
                     weights=[0.3,0.1,0.1,0.1,0.1,0.1,0.1,0.1])[0]
-                toe=random.choices(np.array([0,0.25,0.5,0.75,1.0,1.5,2.0,2.5],dtype=int),
+                tyohist=random.choices(np.array([0,0.25,0.5,0.75,1.0,1.5,2.0,2.5],dtype=int),
                     weights=[0.3,0.1,0.1,0.1,0.1,0.1,0.1,0.1])[0]
         
         self.compute_salary_TK(group=group,initial_salary=initial_salary)
@@ -2782,9 +2846,9 @@ class UnemploymentLargeEnv_v2(gym.Env):
         unemp_after_ra=0
         unempwage=0
         unempwage_basis=old_wage
+        children_under3=0
         children_under7=0
         children_under18=0
-        
         
         self.init_infostate()
         
@@ -2820,17 +2884,16 @@ class UnemploymentLargeEnv_v2(gym.Env):
             self.state = self.state_encode(employment_state,group,pension,old_wage,self.min_age,
                                             time_in_state,0,pink,toe,tyohist,next_wage,
                                             used_unemp_benefit,wage_reduction,unemp_after_ra,
-                                            unempwage,unempwage_basis,
-                                            prefnoise=prefnoise,children_under7=children_under7,children_under18=children_under18)
+                                            unempwage,unempwage_basis,prefnoise=prefnoise,
+                                            children_under3=children_under3,children_under7=children_under7,children_under18=children_under18)
         else:
             self.state = self.state_encode(employment_state,group,pension,old_wage,self.min_age,
                                             time_in_state,0,pink,toe,tyohist,next_wage,
                                             used_unemp_benefit,wage_reduction,unemp_after_ra,
                                             unempwage,unempwage_basis,
-                                            children_under7=children_under7,children_under18=children_under18)
-        #print('shape=',self.state.shape)
+                                            children_under3=children_under3,children_under7=children_under7,children_under18=children_under18)
         self.steps_beyond_done = None
-
+        
         return np.array(self.state)
 
     def render(self, mode='human', close=False, done=False, reward=None, netto=None):
@@ -2999,10 +3062,12 @@ class UnemploymentLargeEnv_v2(gym.Env):
               high.append(child_max)
               low.append(child_min)
               high.append(child_max)
+              low.append(child_min)
+              high.append(child_max)
                   
         self.low=np.array(low)
         self.high=np.array(high)
-                    
+        
     def explain(self):
         '''
         Tulosta laskennan parametrit
@@ -3123,14 +3188,17 @@ class UnemploymentLargeEnv_v2(gym.Env):
             
         children_under18=0
         children_under7=0
+        children_under3=0
         for k in range(self.infostate['children_n']):
             c_age=age-self.infostate['children_date'][k]
             if c_age<18:
                 children_under18=children_under18+1
                 if c_age<7:
                     children_under7=children_under7+1
+                    if c_age<3:
+                        children_under3=children_under3+1
 
-        return toes,wage,children_under7,children_under18
+        return toes,wage,children_under3,children_under7,children_under18
 
     def infostat_can_have_children(self,age):
         children_under1=0
@@ -3147,3 +3215,29 @@ class UnemploymentLargeEnv_v2(gym.Env):
             
     def infostat_check_80percent(self,t):
         pass
+        
+    def setup_state_encoding(self):
+        self.state_encoding=np.zeros((self.n_empl,self.n_empl))
+        for s in range(self.n_empl):
+            self.state_encoding[s,s]=1
+        self.group_encoding=np.zeros((self.n_groups,self.n_groups))
+        for s in range(self.n_groups):
+            self.group_encoding[s,s]=1
+
+#             self.state_encoding[1,0:states]=np.array([0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0])
+#             self.state_encoding[0,0:states]=np.array([1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0])
+#             self.state_encoding[2,0:states]=np.array([0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0])
+#             self.state_encoding[3,0:states]=np.array([0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0])
+#             self.state_encoding[4,0:states]=np.array([0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0])
+#             self.state_encoding[5,0:states]=np.array([0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0])
+#             self.state_encoding[6,0:states]=np.array([0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0])
+#             self.state_encoding[7,0:states]=np.array([0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0])
+#             self.state_encoding[8,0:states]=np.array([0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0])
+#             self.state_encoding[9,0:states]=np.array([0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0])
+#             self.state_encoding[10,0:states]=np.array([0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0])
+#             self.state_encoding[11,0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0])
+#             self.state_encoding[12,0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0])
+#             self.state_encoding[13,0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0])
+#             self.state_encoding[14,0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0])
+#             self.state_encoding[15,0:states]=np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1])
+    

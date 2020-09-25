@@ -95,7 +95,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         self.plotdebug=False
         self.wage_without_tis=True
         self.include_mort=False
-        self.reset_exploration_go=True
+        self.reset_exploration_go=False
         self.reset_exploration_ratio=0.4
         self.train=False
         self.zero_npv=False
@@ -695,7 +695,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
             print('-------------------------------------------------------------------------------------------------------')
 
     def state_encode(self,emp,pension,old_wage,age,time_in_state,nextwage):
-        d=np.zeros(self.n_empl+7)
+        d=np.zeros(self.n_empl+8)
         states=self.n_empl
         if emp==1:
             d[0:states]=np.array([0,1,0])
@@ -720,6 +720,8 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
             d[states+6]=1
         else:
             d[states+6]=0
+            
+        d[states+7]=(self.min_retirementage-age)/43
         
         return d
 
@@ -753,7 +755,8 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
             -0.5,
             -2,
             0,
-            0])
+            0,
+            -1])
         self.high = np.array([
             1,
             1,
@@ -763,6 +766,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
             (self.max_age-(69+25)/2)/10,
             10,
             10,
+            1,
             1,
             1])
                     
