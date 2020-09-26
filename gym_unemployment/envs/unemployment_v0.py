@@ -95,7 +95,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         self.plotdebug=False
         self.wage_without_tis=True
         self.include_mort=False
-        self.reset_exploration_go=False
+        self.reset_exploration_go=True
         self.reset_exploration_ratio=0.4
         self.train=False
         self.zero_npv=False
