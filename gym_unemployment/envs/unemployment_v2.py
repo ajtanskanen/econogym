@@ -1115,13 +1115,14 @@ class UnemploymentLargeEnv_v2(gym.Env):
         else:
             return True
             
-    def update_unempwage_basis(self,unempwage_basis,unempwage):
+    def update_unempwage_basis(self,unempwage_basis,unempwage,use80percent):
         '''
         Tähän 80% sääntö (jos edellisestä uudelleenmäärittelystä alle vuosi, 80% suojaosa)
         '''
-        #return max(unempwage_basis*0.8,unempwage)
-        
-        return unempwage
+        if use80percent:
+            return max(unempwage_basis*0.8,unempwage)
+        else:
+            return unempwage
 
     def move_to_unemp(self,pension,old_wage,age,paid_pension,toe,irtisanottu,tyoura,wage_reduction,
                     used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,
@@ -1153,7 +1154,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
                 if self.paivarahapaivia_jaljella(kesto,tyoura,age):
                     employment_status  = 0 # siirto ansiosidonnaiselle
                     if alkanut_ansiosidonnainen<1:
-                        unempwage_basis=self.update_unempwage_basis(unempwage_basis,unempwage)
+                        unempwage_basis=self.update_unempwage_basis(unempwage_basis,unempwage,True)
                         self.infostate_set_enimmaisaika(age)
                         if irtisanottu: # muuten ei oikeutta ansiopäivärahaan karenssi vuoksi
                             used_unemp_benefit+=self.timestep
@@ -1168,7 +1169,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
                     if self.include_putki and age>=self.min_tyottputki_ika and tyoura>=self.tyohistoria_tyottputki: 
                         employment_status = 4 # siirto lisäpäiville
                         if alkanut_ansiosidonnainen<1:
-                            unempwage_basis=self.update_unempwage_basis(unempwage_basis,unempwage)
+                            unempwage_basis=self.update_unempwage_basis(unempwage_basis,unempwage,False)
                             self.infostate_set_enimmaisaika(age)
                             if irtisanottu: # muuten ei oikeutta ansiopäivärahaan karenssi vuoksi
                                 used_unemp_benefit+=self.timestep
@@ -2190,9 +2191,9 @@ class UnemploymentLargeEnv_v2(gym.Env):
         work={1,10}
         if employment_status in work and self.tyossaoloehto(toe,tyoura,age):
             used_unemp_benefit=0
-            alkanut_ansiosidonnainen=0
-            #toe=toe2
-            #unempwage=unempwage2
+            if alkanut_ansiosidonnainen>0:
+                if not self.infostat_check_aareset(age):
+                    alkanut_ansiosidonnainen=0
             
         pvr_jalvella=self.comp_unempdays_left(used_unemp_benefit,tyoura,age,toe,employment_status,alkanut_ansiosidonnainen)
         
@@ -2255,16 +2256,16 @@ class UnemploymentLargeEnv_v2(gym.Env):
         return benq        
 
     def log_utility_default_params(self):
-        self.men_kappa_fulltime=0.655 # 0.635 # 0.665
+        self.men_kappa_fulltime=0.615 # 0.635 # 0.665
         self.men_mu_scale=0.215 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
         self.men_mu_age=59.25 # P.O. 60??
-        self.men_kappa_osaaika=0.48
+        self.men_kappa_osaaika=0.35
         self.men_kappa_hoitovapaa=0.015
         self.men_kappa_ve=0.075 # ehkä 0.10?
-        self.women_kappa_fulltime=0.605 # 0.605 # 0.58
+        self.women_kappa_fulltime=0.560 # 0.605 # 0.58
         self.women_mu_scale=0.210 # 0.25 # 0.25 # 0.17 # how much penalty is associated with work increase with age after mu_age
         self.women_mu_age=59.25 # 61 # P.O. 60??
-        self.women_kappa_osaaika=0.38
+        self.women_kappa_osaaika=0.25
         self.women_kappa_hoitovapaa=0.05
         self.women_kappa_ve=0.10 # ehkä 0.10?
         self.kappa_pinkslip=0.05
@@ -2329,6 +2330,9 @@ class UnemploymentLargeEnv_v2(gym.Env):
             kappa_kokoaika=self.men_kappa_fulltime
             mu_scale=self.men_mu_scale
             mu_age=self.men_mu_age
+            if self.include_preferencenoise:
+                kappa_kokoaika += prefnoise
+        
             kappa_osaaika=self.men_kappa_osaaika*kappa_kokoaika
             kappa_hoitovapaa=self.men_kappa_hoitovapaa
             kappa_ve=self.men_kappa_ve
@@ -2336,13 +2340,13 @@ class UnemploymentLargeEnv_v2(gym.Env):
             kappa_kokoaika=self.women_kappa_fulltime
             mu_scale=self.women_mu_scale
             mu_age=self.women_mu_age
+            if self.include_preferencenoise:
+                kappa_kokoaika += prefnoise
+        
             kappa_osaaika=self.women_kappa_osaaika*kappa_kokoaika # 0.42*kappa_kokoaika
             kappa_hoitovapaa=self.women_kappa_hoitovapaa
             kappa_ve=self.women_kappa_ve
                 
-        if self.include_preferencenoise:
-            kappa_kokoaika += prefnoise
-        
         #if age<25:
         # alle 25-vuotiaalla eri säännöt, vanhempien tulot huomioidaan jne
         #    kappa_pinkslip = 0.25
@@ -3180,8 +3184,13 @@ class UnemploymentLargeEnv_v2(gym.Env):
         else:
             return True
             
-    def infostat_check_80percent(self,t):
-        pass
+    def infostat_check_aareset(self,age):
+        t=int((age-self.min_age)/self.timestep)
+        ed_t=self.infostate['enimmaisaika_alkaa']
+        if (t-ed_t)<1.0:
+            return True
+        else:
+            return False
         
     def setup_state_encoding(self):
         self.state_encoding=np.zeros((self.n_empl,self.n_empl))
