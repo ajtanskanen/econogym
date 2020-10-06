@@ -66,6 +66,9 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
 
     def __init__(self,**kwargs):
         super().__init__()
+        
+        self.version=0
+        
         self.elinaikakerroin=0.95
         
         self.timestep=1.0
@@ -85,7 +88,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         self.acc_unemp_over_52=0.75*self.acc_over_52
 
         self.max_age=70
-        self.min_age=25
+        self.min_age=20
         self.min_retirementage=65
         self.max_retirementage=70        
         
@@ -192,7 +195,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         self.setup_salaries()
         
         self.n_actions=3
-        
+
         self.explain()
         
     def get_n_states(self):
@@ -386,12 +389,12 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
     # from Hakola and Määttänen, 2005
     def log_utility(self,income,employment_state,age):
         # kappa tells how much person values free-time
-        kappa_kokoaika=0.60
-        kappa_retirement=0.20
-        mu_age=59
+        kappa_kokoaika=0.62
+        kappa_retirement=0.10
+        mu_age=60
         
         if age>mu_age:
-            mu=0.15
+            mu=0.18
             kappa_kokoaika *= (1+mu*max(0,age-mu_age))
         
         if employment_state == 1:
@@ -776,6 +779,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         '''
         print('Parameters of lifecycle:\ntimestep {}\ngamma {} ({} per anno)\nmin_age {}\nmax_age {}\nmin_retirementage {}'.format(self.timestep,self.gamma,self.gamma**(1.0/self.timestep),self.min_age,self.max_age,self.min_retirementage))
         print('max_retirementage {} mortality {}'.format(self.max_retirementage,self.include_mort))
+        print('ansiopvraha_kesto {}'.format(self.ansiopvraha_kesto))
         print('reset_exploration_go {} reset_exploration_ratio {} plotdebug {}\n'.format(self.reset_exploration_go,self.reset_exploration_ratio,self.plotdebug))
 
     def reset(self,init=None):
@@ -797,13 +801,14 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         if self.reset_exploration_go and self.train:
             if self.reset_exploration_ratio>np.random.uniform():
                 #print('exploration')
+                time_in_state=random.choices(np.array([0,1,2,3,4,5],dtype=int),weights=[0.25,0.25,0.20,0.10,0.10,0.10])[0] # 60% tm-tuella
                 employment_status=random.choices(np.array([0,1],dtype=int),weights=[0.5,0.5])[0]
                 if random.random()<0.5:
                     age=int(np.random.uniform(low=self.min_age,high=self.max_age-1))
                 else:
-                    age=int(np.random.uniform(low=62,high=self.max_age-1))
-                initial_salary=np.random.uniform(low=1_000,high=100_000)
-                pension=np.random.uniform(low=0,high=80_000)
+                    age=int(np.random.uniform(low=60,high=self.max_age-1))
+                initial_salary=np.random.uniform(low=1_000,high=110_000)
+                pension=np.random.uniform(low=0,high=90_000)
                 initial_age=age
                 #print('Explore: age {} initial {} pension {}'.format(age,initial_salary,pension))
 

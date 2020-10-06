@@ -34,3 +34,9 @@ register(
     id='test-v1',
     entry_point='gym_unemployment.envs:TestEnv',
 )
+
+register(
+    id='unemployment-long-v0',
+    entry_point='gym_unemployment.envs:UnemploymentLongEnv_v0',
+)
+
