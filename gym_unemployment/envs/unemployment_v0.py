@@ -154,7 +154,12 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
                     
         print('Train ',self.train)
         print('plotdebug',self.plotdebug)
-                
+        
+        #if self.train:
+        #    self.partial_npv=True
+        #    print('partial')
+        #else:
+        self.partial_npv=False
          
         # ei skaalata!
         #self.ansiopvraha_kesto400=self.ansiopvraha_kesto400/(12*21.5)
@@ -197,6 +202,8 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         self.n_actions=3
 
         self.explain()
+        
+        #self.unit_test_code_decode()
         
     def get_n_states(self):
         '''
@@ -395,7 +402,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         
         if age>mu_age:
             mu=0.18
-            kappa_kokoaika *= (1+mu*max(0,age-mu_age))
+            kappa_kokoaika *= (1+mu*max(0,min(4,age-mu_age)))
         
         if employment_state == 1:
             u=np.log(income)-kappa_kokoaika
@@ -403,6 +410,10 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
             u=np.log(income)+kappa_retirement
         else:
             u=np.log(income)
+            
+        #if income<1.0:
+        #    print(income,employment_state,age)
+        #    self.render()
             
         return u/10
    
@@ -551,7 +562,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         elif employment_status == 0:
             if action == 0 or (action==2 and age<self.min_retirementage):
                 if not dynprog:
-                    wage=self.get_wage(intage,time_in_state)
+                    wage=self.get_wage(intage,time_in_state) # tämä on väärin
                 employment_status = 0 # unchanged
                 pension=self.pension_accrual(age,old_wage,pension,state=0,time_in_state=time_in_state)
                 netto=self.comp_benefits(0,old_wage,0,employment_status,time_in_state,age)
@@ -655,12 +666,21 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
                     self.state = self.state_encode(employment_status,pension,wage,age+self.timestep,time_in_state,next_wage)
         else:
             if not done:
-                reward = self.log_utility(netto,int(employment_status),age)
+                if self.partial_npv:
+                    basenetto=self.comp_benefits(0,0,0,0,0,18)
+                    reward = self.npv*(self.log_utility(netto,int(employment_status),age)-self.log_utility(basenetto,0,18))
+                else:            
+                    reward = self.log_utility(netto,int(employment_status),age)
                 self.state = self.state_encode(employment_status,pension,wage,age+self.timestep,time_in_state,next_wage)
             elif self.steps_beyond_done is None:
                 self.steps_beyond_done = 0
                 if employment_status == 2:
-                    reward = self.npv*self.log_utility(netto,2,age)
+                    if self.partial_npv:
+                        basenetto=self.comp_benefits(0,0,0,0,0,18)
+                        reward = self.npv*(self.log_utility(netto,2,age)-self.log_utility(basenetto,0,18))
+                        #print(reward,self.npv,self.log_utility(netto,2,age),self.log_utility(basenetto,0,18))
+                    else:
+                        reward = self.npv*self.log_utility(netto,2,age)
                 else:
                     reward = 0.0
                 self.state = self.state_encode(employment_status,pension,wage,age+self.timestep,time_in_state,next_wage)
@@ -711,8 +731,8 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
             
         d[states]=(pension-40_000)/40_000 # vastainen/alkanut eläke
         d[states+1]=(old_wage-40_000)/40_000
-        d[states+2]=(age-(69+25)/2)/10
-        d[states+3]=(time_in_state-5)/10
+        d[states+2]=(age-(self.max_age+self.min_age)/2)/((self.max_age+self.min_age)/2)
+        d[states+3]=(time_in_state-20)/20
         d[states+4]=(nextwage-40_000)/40_000
         if age>=self.min_retirementage:
             d[states+5]=1
@@ -724,7 +744,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         else:
             d[states+6]=0
             
-        d[states+7]=(self.min_retirementage-age)/43
+        d[states+7]=(self.min_retirementage-age)/max(self.max_age-self.min_retirementage,self.min_retirementage-self.min_age)
         
         return d
 
@@ -740,11 +760,47 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
             
         pension=vec[self.n_empl]*40_000+40_000
         wage=vec[self.n_empl+1]*40_000+40_000
-        age=int(vec[self.n_empl+2]*10+(69+25)/2)
-        time_in_state=vec[self.n_empl+3]*10+5
+        age=int(vec[self.n_empl+2]*((self.max_age+self.min_age)/2)+(self.max_age+self.min_age)/2)
+        time_in_state=vec[self.n_empl+3]*20+20
         nextwage=vec[self.n_empl+4]*40_000+40_000
                 
         return int(emp),pension,wage,age,time_in_state,nextwage
+
+    def unit_test_code_decode(self):
+        for k in range(100):
+            emp=random.randint(0,2)
+            pension=random.uniform(0,80_000)
+            old_wage=random.uniform(0,80_000)
+            age=np.random.randint(self.min_age,self.max_age)
+            time_in_state=random.uniform(0,30)
+            nextwage=random.uniform(0,80_000)
+        
+            vec=self.state_encode(emp,pension,old_wage,age,time_in_state,nextwage)
+                                
+            emp2,pension2,old_wage2,age2,time_in_state2,nextwage2\
+                =self.state_decode(vec)
+                
+            self.check_state(emp,pension,old_wage,age,time_in_state,nextwage,
+                             emp2,pension2,old_wage2,age2,time_in_state2,nextwage2)
+                             
+        return 'Unit test done'
+        
+    
+    def check_state(self,emp,pension,old_wage,age,time_in_state,nextwage,
+                             emp2,pension2,old_wage2,age2,time_in_state2,nextwage2):
+        if not emp==emp2:  
+            print('emp: {} vs {}'.format(emp,emp2))
+        if not pension==pension2:  
+            print('pension: {} vs {}'.format(pension,pension2))
+        if not old_wage==old_wage2:  
+            print('old_wage: {} vs {}'.format(old_wage,old_wage2))
+        if not time_in_state==time_in_state2:  
+            print('time_in_state: {} vs {}'.format(time_in_state,time_in_state2))
+        if not age==age2:  
+            print('age: {} vs {}'.format(age,age2))
+        if not nextwage==nextwage2:  
+            print('nextwage: {} vs {}'.format(nextwage,nextwage2))
+                
 
     def state_limits(self):
         # Limits on states
@@ -752,26 +808,26 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
             0,
             0,
             0,
-            -1.5,
-            -2,
-            (self.min_age-(69+25)/2)/10,
-            -0.5,
-            -2,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
             0,
             0,
-            -1])
+            -1.0])
         self.high = np.array([
             1,
             1,
             1,
-            10,
-            10,
-            (self.max_age-(69+25)/2)/10,
-            10,
-            10,
+            10.0,
+            10.0,
+            1.0,
+            10.0,
+            10.0,
             1,
             1,
-            1])
+            1.0])
                     
     def explain(self):
         '''
@@ -806,7 +862,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
                 if random.random()<0.5:
                     age=int(np.random.uniform(low=self.min_age,high=self.max_age-1))
                 else:
-                    age=int(np.random.uniform(low=60,high=self.max_age-1))
+                    age=int(np.random.uniform(low=58,high=self.max_age-1))
                 initial_salary=np.random.uniform(low=1_000,high=110_000)
                 pension=np.random.uniform(low=0,high=90_000)
                 initial_age=age
