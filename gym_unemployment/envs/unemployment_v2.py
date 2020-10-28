@@ -2302,20 +2302,36 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
     def log_utility_default_params(self):
         if self.include_mort:
-            self.men_kappa_fulltime=0.620 # 0.635 # 0.665
-            self.men_mu_scale=0.11 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-            self.men_mu_age=60 # P.O. 60??
-            self.men_kappa_osaaika=0.46
-            self.men_kappa_hoitovapaa=0.015
-            self.men_kappa_ve=0.22 # ehkä 0.10?
-            self.women_kappa_fulltime=0.615 # 0.605 # 0.58
-            self.women_mu_scale=0.09 # 0.25 # 0.25 # 0.17 # how much penalty is associated with work increase with age after mu_age
-            self.women_mu_age=60 # 61 # P.O. 60??
-            self.women_kappa_osaaika=0.40
-            self.women_kappa_hoitovapaa=0.05
-            self.women_kappa_ve=0.27 # ehkä 0.10?
-            self.kappa_pinkslip=0.06
-            self.kappa_pinkslip_young=0.14
+            if self.perustulo:
+                self.men_kappa_fulltime=0.620 # 0.635 # 0.665
+                self.men_mu_scale=0.11 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+                self.men_mu_age=60 # P.O. 60??
+                self.men_kappa_osaaika=0.46
+                self.men_kappa_hoitovapaa=0.015
+                self.men_kappa_ve=0.22 # ehkä 0.10?
+                self.women_kappa_fulltime=0.615 # 0.605 # 0.58
+                self.women_mu_scale=0.09 # 0.25 # 0.25 # 0.17 # how much penalty is associated with work increase with age after mu_age
+                self.women_mu_age=60 # 61 # P.O. 60??
+                self.women_kappa_osaaika=0.40
+                self.women_kappa_hoitovapaa=0.05
+                self.women_kappa_ve=0.27 # ehkä 0.10?
+                self.kappa_pinkslip=0.06
+                self.kappa_pinkslip_young=0.06   
+            else:         
+                self.men_kappa_fulltime=0.640 # 0.635 # 0.665
+                self.men_mu_scale=0.07 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+                self.men_mu_age=59.75 # P.O. 60??
+                self.men_kappa_osaaika=0.44
+                self.men_kappa_hoitovapaa=0.025
+                self.men_kappa_ve=0.07 # ehkä 0.10?
+                self.women_kappa_fulltime=0.605 # 0.605 # 0.58
+                self.women_mu_scale=0.07 # 0.25 # 0.25 # 0.17 # how much penalty is associated with work increase with age after mu_age
+                self.women_mu_age=59.75 # 61 # P.O. 60??
+                self.women_kappa_osaaika=0.36
+                self.women_kappa_hoitovapaa=0.05
+                self.women_kappa_ve=0.10 # ehkä 0.10?
+                self.kappa_pinkslip=0.05
+                self.kappa_pinkslip_young=0.18            
         else:
             self.men_kappa_fulltime=0.620 # 0.635 # 0.665
             self.men_mu_scale=0.11 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
@@ -2331,6 +2347,54 @@ class UnemploymentLargeEnv_v2(gym.Env):
             self.women_kappa_ve=0.27 # ehkä 0.10?
             self.kappa_pinkslip=0.06
             self.kappa_pinkslip_young=0.14        
+
+    def log_utility_default_params_KAK(self):
+        if self.include_mort:
+            if self.perustulo:
+                self.men_kappa_fulltime=0.620 # 0.635 # 0.665
+                self.men_mu_scale=0.11 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+                self.men_mu_age=60 # P.O. 60??
+                self.men_kappa_osaaika=0.46
+                self.men_kappa_hoitovapaa=0.015
+                self.men_kappa_ve=0.22 # ehkä 0.10?
+                self.women_kappa_fulltime=0.615 # 0.605 # 0.58
+                self.women_mu_scale=0.09 # 0.25 # 0.25 # 0.17 # how much penalty is associated with work increase with age after mu_age
+                self.women_mu_age=60 # 61 # P.O. 60??
+                self.women_kappa_osaaika=0.40
+                self.women_kappa_hoitovapaa=0.05
+                self.women_kappa_ve=0.27 # ehkä 0.10?
+                self.kappa_pinkslip=0.06
+                self.kappa_pinkslip_young=0.06   
+            else:         
+                self.men_kappa_fulltime=0.620 # 0.635 # 0.665
+                self.men_mu_scale=0.11 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+                self.men_mu_age=60 # P.O. 60??
+                self.men_kappa_osaaika=0.46
+                self.men_kappa_hoitovapaa=0.015
+                self.men_kappa_ve=0.22 # ehkä 0.10?
+                self.women_kappa_fulltime=0.615 # 0.605 # 0.58
+                self.women_mu_scale=0.09 # 0.25 # 0.25 # 0.17 # how much penalty is associated with work increase with age after mu_age
+                self.women_mu_age=60 # 61 # P.O. 60??
+                self.women_kappa_osaaika=0.40
+                self.women_kappa_hoitovapaa=0.05
+                self.women_kappa_ve=0.27 # ehkä 0.10?
+                self.kappa_pinkslip=0.06
+                self.kappa_pinkslip_young=0.14            
+        else:
+            self.men_kappa_fulltime=0.620 # 0.635 # 0.665
+            self.men_mu_scale=0.11 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+            self.men_mu_age=60 # P.O. 60??
+            self.men_kappa_osaaika=0.46
+            self.men_kappa_hoitovapaa=0.015
+            self.men_kappa_ve=0.22 # ehkä 0.10?
+            self.women_kappa_fulltime=0.615 # 0.605 # 0.58
+            self.women_mu_scale=0.09 # 0.25 # 0.25 # 0.17 # how much penalty is associated with work increase with age after mu_age
+            self.women_mu_age=60 # 61 # P.O. 60??
+            self.women_kappa_osaaika=0.40
+            self.women_kappa_hoitovapaa=0.05
+            self.women_kappa_ve=0.27 # ehkä 0.10?
+            self.kappa_pinkslip=0.06
+            self.kappa_pinkslip_young=0.14       
 
     def set_utility_params(self,**kwargs):
         if 'kwargs' in kwargs:
@@ -2425,8 +2489,13 @@ class UnemploymentLargeEnv_v2(gym.Env):
             kappa= -kappa_kokoaika
         elif employment_state in set([8,10]):
             kappa= -kappa_osaaika
-        elif employment_state in set([0,4,13]):
+        elif employment_state in set([0,4]):
             kappa= -kappa_pinkslip
+        elif employment_state in set([13]):
+            if self.perustulo:
+                kappa= 0
+            else:
+                kappa= -kappa_pinkslip
         elif employment_state == 2:
             kappa=kappa_ve
         elif employment_state == 7:
