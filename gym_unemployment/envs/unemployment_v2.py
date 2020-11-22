@@ -128,8 +128,8 @@ class UnemploymentLargeEnv_v2(gym.Env):
         self.minage_500=58 # minimi-ikä 500 päivälle
         self.ansiopvraha_kesto400=400
         self.ansiopvraha_kesto300=300
-        self.min_salary=1000 # julkaistut laskelmat olettavat tämän
-        #self.min_salary=10000 # julkaistujen laskelmien jälkeen
+        #self.min_salary=1000 # julkaistut laskelmat olettavat tämän
+        self.min_salary=10000 # julkaistujen laskelmien jälkeen
 
         self.timestep=0.25
         self.max_age=71
@@ -420,7 +420,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
         if self.plotdebug:
             print('npv: {}'.format(npv))
 
-        return npv,npv0,cpsum_pension
+        return npv,npv0,npv_pension
 
     def comp_npv_simulation(self,g):
         '''
@@ -486,17 +486,18 @@ class UnemploymentLargeEnv_v2(gym.Env):
         
         if self.include_children:
             p['lapsia']=children_under18
-            p['paivahoidossa']=children_under7
-            p['alle_kouluikaisia']=children_under7
+            p['lapsia_paivahoidossa']=children_under7
+            p['lapsia_alle_kouluikaisia']=children_under7
+            p['lapsia_alle_3v']=children_under3
         else:
-            p['lapsia']=0
-            p['paivahoidossa']=0
-            p['alle_kouluikaisia']=0
+            p['lapsia']=children_under3
+            p['lapsia_paivahoidossa']=children_under3
+            p['lapsia_alle_kouluikaisia']=children_under3
+            p['lapsia_alle_3v']=children_under3
         p['aikuisia']=1
         p['veromalli']=0
         p['kuntaryhma']=3
         p['lapsia_kotihoidontuella']=0
-        p['alle3v']=0
         p['tyottomyyden_kesto']=1
         p['puoliso_tyottomyyden_kesto']=10
         p['isyysvapaalla']=0
@@ -571,17 +572,11 @@ class UnemploymentLargeEnv_v2(gym.Env):
         elif employment_state==7: # hoitovapaa
             p['kotihoidontuella']=1
             if self.include_children:
-                p['lapsia']=children_under18
-                p['paivahoidossa']=0
-                p['alle_3v']=children_under3
-                p['alle_kouluikaisia']=children_under7
+                p['lapsia_paivahoidossa']=0
                 p['lapsia_kotihoidontuella']=children_under7
             else:
-                p['lapsia']=1
-                p['paivahoidossa']=0
-                p['alle_3v']=1
-                p['lapsia_kotihoidontuella']=p['lapsia']
-                p['alle_kouluikaisia']=1
+                p['lapsia_paivahoidossa']=0
+                p['lapsia_kotihoidontuella']=children_under3
             p['kotihoidontuki_kesto']=time_in_state
             p['t']=0
             p['vakiintunutpalkka']=old_wage/12
@@ -700,8 +695,10 @@ class UnemploymentLargeEnv_v2(gym.Env):
         opiskelijoiden intensiteetit eri ryhmille
         '''
         inrate=np.zeros((101,self.n_groups))
-        miehet_in=np.array([0.15202 ,0.09165 ,0.08517 ,0.07565 ,0.05787 ,0.04162 ,0.03061 ,0.02336 ,0.01803 ,0.01439 ,0.03214 ,0.02674 ,0.02122 ,0.02005 ,0.01776 ,0.01610 ,0.01490 ,0.01433 ,0.01307 ,0.01175 ,0.01081 ,0.01069 ,0.00921 ,0.00832 ,0.00808 ,0.00783 ,0.00738 ,0.00727 ,0.00712 ,0.00621 ,0.00578 ,0.00540 ,0.00505 ,0.00411 ,0.00434 ,0.00392 ,0.00415 ,0.00362 ,0.00279 ,0.00232 ,0.00184 ,0.00196 ,0.00126 ,0.00239 ,0.00402 ,0.00587 ,0.00587 ,0.00754 ,0 ,0 ])
-        naiset_in=np.array([0.12538 ,0.09262 ,0.08467 ,0.06923 ,0.05144 ,0.03959 ,0.03101 ,0.02430 ,0.02103 ,0.01834 ,0.03984 ,0.03576 ,0.03300 ,0.03115 ,0.02934 ,0.02777 ,0.02454 ,0.02261 ,0.02127 ,0.01865 ,0.01711 ,0.01631 ,0.01496 ,0.01325 ,0.01251 ,0.01158 ,0.01148 ,0.01034 ,0.00935 ,0.00911 ,0.00848 ,0.00674 ,0.00636 ,0.00642 ,0.00605 ,0.00517 ,0.00501 ,0.00392 ,0.00330 ,0.00291 ,0.00202 ,0.00155 ,0.00118 ,0.00193 ,0.00376 ,0.00567 ,0.00779 ,0.00746 ,0 ,0 ])
+        #miehet_in=np.array([0.15202 ,0.09165 ,0.08517 ,0.07565 ,0.05787 ,0.04162 ,0.03061 ,0.02336 ,0.01803 ,0.01439 ,0.03214 ,0.02674 ,0.02122 ,0.02005 ,0.01776 ,0.01610 ,0.01490 ,0.01433 ,0.01307 ,0.01175 ,0.01081 ,0.01069 ,0.00921 ,0.00832 ,0.00808 ,0.00783 ,0.00738 ,0.00727 ,0.00712 ,0.00621 ,0.00578 ,0.00540 ,0.00505 ,0.00411 ,0.00434 ,0.00392 ,0.00415 ,0.00362 ,0.00279 ,0.00232 ,0.00184 ,0.00196 ,0.00126 ,0.00239 ,0.00402 ,0.00587 ,0.00587 ,0.00754 ,0 ,0 ])
+        miehet_in=np.array([0.15202,0.09165,0.08517,0.07565,0.05787,0.04162,0.03061,0.02336,0.01803,0.01439,0.03214,0.02674,0.02122,0.02005,0.01776,0.01610,0.01490,0.01433,0.01307,0.01175,0.01081,0.01069,0.00921,0.00832,0.00808,0.00783,0.00738,0.00727,0.00712,0.00621,0.00578,0.00540,0.00505,0.00411,0.00434,0.00392,0.00415,0.00362,0.00279,0.00232,0.00184,0.00196,0.00126,0.00239,0.00402,0.00587,0.00587,0.00754,0.06219,0.40441])
+        #naiset_in=np.array([0.12538 ,0.09262 ,0.08467 ,0.06923 ,0.05144 ,0.03959 ,0.03101 ,0.02430 ,0.02103 ,0.01834 ,0.03984 ,0.03576 ,0.03300 ,0.03115 ,0.02934 ,0.02777 ,0.02454 ,0.02261 ,0.02127 ,0.01865 ,0.01711 ,0.01631 ,0.01496 ,0.01325 ,0.01251 ,0.01158 ,0.01148 ,0.01034 ,0.00935 ,0.00911 ,0.00848 ,0.00674 ,0.00636 ,0.00642 ,0.00605 ,0.00517 ,0.00501 ,0.00392 ,0.00330 ,0.00291 ,0.00202 ,0.00155 ,0.00118 ,0.00193 ,0.00376 ,0.00567 ,0.00779 ,0.00746 ,0 ,0 ])
+        naiset_in=np.array([0.10137,0.09204,0.08397,0.06785,0.05060,0.04018,0.03222,0.02529,0.02228,0.01956,0.04233,0.03800,0.03538,0.03312,0.03097,0.02928,0.02561,0.02345,0.02194,0.01914,0.01742,0.01652,0.01508,0.01336,0.01253,0.01157,0.01146,0.01026,0.00930,0.00906,0.00840,0.00664,0.00627,0.00629,0.00594,0.00504,0.00486,0.00377,0.00318,0.00279,0.00193,0.00148,0.00111,0.00181,0.00362,0.00618,0.00918,0.00882,0.06410,0.15108])
         inrate[20:70,0] =miehet_in
         inrate[20:70,1] =miehet_in
         inrate[20:70,2] =miehet_in
@@ -710,7 +707,8 @@ class UnemploymentLargeEnv_v2(gym.Env):
         inrate[20:70,5] =naiset_in
         outrate=np.zeros((101,self.n_groups))
         miehet_ulos=np.array([0.20000,0.20000,0.27503,0.38096,0.43268,0.42941,0.41466,0.40854,0.38759,0.30057,0.66059,0.69549,0.55428,0.61274,0.58602,0.57329,0.53688,0.58737,0.59576,0.58190,0.50682,0.63749,0.59542,0.53201,0.53429,0.55827,0.51792,0.52038,0.63078,0.57287,0.57201,0.56673,0.69290,0.44986,0.60497,0.45890,0.64129,0.73762,0.68664,0.73908,0.47708,0.92437,0.27979,0.54998,0.60635,0.72281,0.45596,0.48120,0.41834,0.55567])
-        naiset_ulos=np.array([0.2,0.226044511,0.34859165,0.404346193,0.378947854,0.379027678,0.393658729,0.312799282,0.312126148,0.325150199,0.5946454,0.564144808,0.555376244,0.556615568,0.545757439,0.61520002,0.577306728,0.558805476,0.618014582,0.584596312,0.542579298,0.581755996,0.612559266,0.559683811,0.577041852,0.51024909,0.602288269,0.594473782,0.529303275,0.573062208,0.709297989,0.559692954,0.499632245,0.560546551,0.654820741,0.547514252,0.728319756,0.668454496,0.637200351,0.832907039,0.763936815,0.823014939,0.439925972,0.400593267,0.57729364,0.432838681,0.720728303,0.45569566,0.756655823,0.210470698])
+        #naiset_ulos=np.array([0.2,0.226044511,0.34859165,0.404346193,0.378947854,0.379027678,0.393658729,0.312799282,0.312126148,0.325150199,0.5946454,0.564144808,0.555376244,0.556615568,0.545757439,0.61520002,0.577306728,0.558805476,0.618014582,0.584596312,0.542579298,0.581755996,0.612559266,0.559683811,0.577041852,0.51024909,0.602288269,0.594473782,0.529303275,0.573062208,0.709297989,0.559692954,0.499632245,0.560546551,0.654820741,0.547514252,0.728319756,0.668454496,0.637200351,0.832907039,0.763936815,0.823014939,0.439925972,0.400593267,0.57729364,0.432838681,0.720728303,0.45569566,0.756655823,0.210470698])
+        naiset_ulos=np.array([0.2,0.263857107,0.34859165,0.404346193,0.378947854,0.379027678,0.393658729,0.312799282,0.312126148,0.325150199,0.5946454,0.564144808,0.555376244,0.556615568,0.545757439,0.61520002,0.577306728,0.558805476,0.618014582,0.584596312,0.542579298,0.581755996,0.612559266,0.559683811,0.577041852,0.51024909,0.602288269,0.594473782,0.529303275,0.573062208,0.709297989,0.559692954,0.499632245,0.560546551,0.654820741,0.547514252,0.728319756,0.668454496,0.637200351,0.832907039,0.763936815,0.823014939,0.439925972,0.400593267,0.57729364,0.432838681,0.720728303,0.45569566,0.756655823,0.210470698])
         outrate[20:70,0]=miehet_ulos
         outrate[20:70,1]=miehet_ulos
         outrate[20:70,2]=miehet_ulos
@@ -729,10 +727,11 @@ class UnemploymentLargeEnv_v2(gym.Env):
         
         #miehet_in=np.array([0.00598,0.00236,0.00195,0.00179,0.00222,0.00150,0.00363,0.00142,0.00138,0.00149,0.00561,0.00140,0.00291,0.00390,0.00130,0.00548,0.00120,0.00476,0.00118,0.00315,0.00111,0.00346,0.00117,0.00203,0.00105,0.00189,0.00154,0.00104,0.00488,0.00103,0.00273,0.00104,0.00375,0.00108,0.00314,0.00256,0.00188,0.00115,0.00115,0.00112,0.00112,0.00106,0.00112,0.00000,0.00000,0.00000,0.00257,0.00359,0,0 ])
         #miehet_in=np.array([0.00578,0.00226,0.00187,0.00170,0.00248,0.00143,0.00230,0.00134,0.00130,0.00213,0.00450,0.00132,0.00300,0.00353,0.00123,0.00481,0.00112,0.00364,0.00109,0.00295,0.00103,0.00335,0.00095,0.00213,0.00095,0.00094,0.00148,0.00093,0.00400,0.00093,0.00342,0.00097,0.00370,0.00099,0.00259,0.00221,0.00244,0.00106,0.00102,0.00101,0.00099,0.00098,0.00095,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0 ])
-        miehet_in=np.array([0.00578,0.00226,0.00187,0.00170,0.00153,0.00143,0.00137,0.00134,0.00130,0.00129,0.00210,0.00132,0.00348,0.00358,0.00123,0.00312,0.00112,0.00368,0.00109,0.00162,0.00103,0.00271,0.00095,0.00252,0.00095,0.00094,0.00093,0.00093,0.00400,0.00093,0.00342,0.00097,0.00370,0.00099,0.00259,0.00221,0.00244,0.00106,0.00102,0.00101,0.00099,0.00098,0.00095,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.0 ])
+        #miehet_in=np.array([0.00578,0.00226,0.00187,0.00170,0.00153,0.00143,0.00137,0.00134,0.00130,0.00129,0.00210,0.00132,0.00348,0.00358,0.00123,0.00312,0.00112,0.00368,0.00109,0.00162,0.00103,0.00271,0.00095,0.00252,0.00095,0.00094,0.00093,0.00093,0.00400,0.00093,0.00342,0.00097,0.00370,0.00099,0.00259,0.00221,0.00244,0.00106,0.00102,0.00101,0.00099,0.00098,0.00095,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.0 ])
+        miehet_in=np.array([0.00598,0.00236,0.00195,0.00179,0.00250,0.00229,0.00287,0.00142,0.00269,0.00138,0.00443,0.00140,0.00199,0.00137,0.00130,0.00183,0.00120,0.00339,0.00118,0.00112,0.00111,0.00166,0.00117,0.00180,0.00105,0.00234,0.00104,0.00104,0.00488,0.00103,0.00273,0.00104,0.00375,0.00108,0.00314,0.00256,0.00188,0.00115,0.00115,0.00112,0.00112,0.00106,0.00112,0.00000,0.00000,0.00000,0.00257,0.00359,0.00000,0.14474])
         #naiset_in=np.array([0.00246,0.00210,0.00212,0.00211,0.00205,0.00217,0.00233,0.00355,0.00246,0.00247,0.00248,0.00239,0.00238,0.00225,0.00209,0.00194,0.00179,0.01151,0.00823,0.00802,0.00990,0.00515,0.00418,0.00644,0.00334,0.00101,0.00098,0.00256,0.00093,0.00092,0.00089,0.00172,0.00089,0.00248,0.00107,0.00170,0.00105,0.00143,0.00140,0.00233,0.00108,0.00104,0.00112,0.00000,0.00000,0.00000,0.00000,0.00000,0,0 ])
         #naiset_in=np.array([0.00236,0.00203,0.00205,0.00206,0.00198,0.00210,0.00228,0.00227,0.00241,0.00241,0.00242,0.00234,0.00231,0.00217,0.00202,0.00187,0.00169,0.00817,0.00764,0.00667,0.00984,0.00532,0.00407,0.00593,0.00370,0.00092,0.00089,0.00326,0.00085,0.00084,0.00083,0.00142,0.00080,0.00295,0.00187,0.00086,0.00118,0.00089,0.00166,0.00100,0.00094,0.00092,0.00097,0.00000,0.00000,0.00000,0.00000,0.00000,0,0 ])
-        naiset_in=np.array([0.00236,0.00203,0.00205,0.00206,0.00198,0.00210,0.00228,0.00227,0.00241,0.00241,0.00242,0.00234,0.00231,0.00217,0.00202,0.00187,0.01046,0.00997,0.00293,0.00918,0.00231,0.00401,0.00850,0.00266,0.00394,0.00172,0.00089,0.00262,0.00113,0.00084,0.00083,0.00142,0.00080,0.00295,0.00187,0.00086,0.00118,0.00089,0.00166,0.00100,0.00094,0.00092,0.00097,0.00000,0.00000,0.00000,0.00000,0.00000,0.0,0.00])
+        naiset_in=np.array([0.00246,0.00210,0.00212,0.00211,0.01174,0.00217,0.00233,0.00234,0.00246,0.01245,0.00248,0.00239,0.00238,0.00463,0.01287,0.00194,0.00179,0.02175,0.00163,0.00659,0.00417,0.00419,0.00725,0.00250,0.00368,0.00101,0.00098,0.00111,0.00176,0.00092,0.00089,0.00172,0.00089,0.00248,0.00107,0.00170,0.00105,0.00143,0.00140,0.00233,0.00108,0.00104,0.00112,0.00000,0.00000,0.00000,0.00000,0.00000,0.01862,0.01884])
         inrate[20:max_spv,0] =miehet_in
         inrate[20:max_spv,1] =miehet_in
         inrate[20:max_spv,2] =miehet_in
@@ -742,10 +741,14 @@ class UnemploymentLargeEnv_v2(gym.Env):
         outrate=np.zeros((101,self.n_groups))
         #miehet_ulos=np.array([0.54528,0.21972,0.05225,0.08766,0.02000,0.07014,0.02000,0.07964,0.05357,0.02000,0.02000,0.12421,0.02000,0.02000,0.09464,0.02000,0.06655,0.02000,0.04816,0.02000,0.09763,0.02000,0.02000,0.02000,0.03777,0.02000,0.02000,0.10725,0.02000,0.05159,0.02000,0.04831,0.02000,0.08232,0.02000,0.02000,0.02000,0.02931,0.07298,0.05129,0.11783,0.07846,0.45489,0.58986,0.15937,0.43817,0.00000,0.00000,0.25798,0.00000])
         #miehet_ulos=np.array([0.55164,0.21920,0.06385,0.08468,0.02000,0.07242,0.02000,0.08007,0.05701,0.02000,0.02000,0.11639,0.02000,0.02000,0.10085,0.02000,0.06289,0.02000,0.03766,0.02000,0.10860,0.02000,0.02765,0.02000,0.03089,0.02520,0.02000,0.08840,0.02000,0.04616,0.02000,0.06061,0.02000,0.08866,0.02000,0.02000,0.02000,0.07034,0.04439,0.08118,0.06923,0.16061,0.51689,0.55980,0.23310,0.25554,0.01519,0.12491,0.06625,0.00000])
-        miehet_ulos=np.array([0.54333,0.18208,0.09452,0.06729,0.05128,0.03646,0.02952,0.04198,0.02505,0.02711,0.02000,0.07864,0.02000,0.02000,0.09971,0.02000,0.05071,0.02000,0.03236,0.02000,0.09185,0.02000,0.03203,0.02000,0.03167,0.03064,0.02161,0.08480,0.02000,0.04616,0.02000,0.06061,0.02000,0.08866,0.02000,0.02000,0.02000,0.07034,0.04439,0.08118,0.06923,0.16061,0.51689,0.55980,0.23310,0.25554,0.01519,0.12491,0.06625,0.00000]) 
+        #miehet_ulos=np.array([0.54333,0.18208,0.09452,0.06729,0.05128,0.03646,0.02952,0.04198,0.02505,0.02711,0.02000,0.07864,0.02000,0.02000,0.09971,0.02000,0.05071,0.02000,0.03236,0.02000,0.09185,0.02000,0.03203,0.02000,0.03167,0.03064,0.02161,0.08480,0.02000,0.04616,0.02000,0.06061,0.02000,0.08866,0.02000,0.02000,0.02000,0.07034,0.04439,0.08118,0.06923,0.16061,0.51689,0.55980,0.23310,0.25554,0.01519,0.12491,0.06625,0.00000]) 
+        #miehet_ulos=np.array([0.53850,0.20846,0.07825,0.03659,0.02000,0.02000,0.02000,0.02037,0.02000,0.03554,0.02000,0.10090,0.02000,0.02000,0.10882,0.02000,0.03623,0.02000,0.08660,0.02023,0.08139,0.02000,0.02000,0.02000,0.04640,0.02000,0.02347,0.10725,0.02000,0.05159,0.02000,0.04831,0.02000,0.08232,0.02000,0.02000,0.02000,0.02931,0.07298,0.05129,0.11783,0.07846,0.45489,0.58986,0.15937,0.43817,0.00000,0.00000,0.25798,0.00000])
+        miehet_ulos=np.array([0.58128,0.25811,0.02000,0.11310,0.10552,0.08553,0.02000,0.05752,0.02000,0.02000,0.02000,0.09796,0.02000,0.02000,0.02990,0.02000,0.05158,0.02000,0.03379,0.04785,0.08185,0.02000,0.04726,0.02000,0.03807,0.02000,0.02000,0.10725,0.02000,0.05159,0.02000,0.04831,0.02000,0.08232,0.02000,0.02000,0.02000,0.02931,0.07298,0.05129,0.11783,0.07846,0.45489,0.58986,0.15937,0.43817,0.00000,0.00000,0.25798,0.00000])
         #naiset_ulos=np.array([0.47839484,0.190435122,0.12086902,0.081182033,0.030748876,0.184119897,0.075833908,0.02,0.029741112,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.032506855,0.026333043,0.02,0.023692146,0.050057587,0.037561449,0.02,0.024524018,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.092785925,0.054435714,0.439187202,0.465046705,0.39008036,0.384356347,0.169971142,0.031645066,0,0])
         #naiset_ulos=np.array([0.485631713,0.198175734,0.114871531,0.090719936,0.034279871,0.183220816,0.054071766,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.032778805,0.03154085,0.02,0.021885099,0.03347865,0.070837788,0.02,0.032940802,0.02,0.02,0.02027967,0.02,0.043477638,0.02,0.02,0.080038155,0.071876772,0.477291934,0.454819524,0.428913696,0.287380262,0.140803001,0.054164949,0,0])
-        naiset_ulos=np.array([0.371419539,0.205661569,0.135265873,0.102702654,0.055240889,0.048992378,0.107111533,0.059592465,0.032056939,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.06991043,0.02,0.02,0.036157545,0.070163829,0.02,0.032241992,0.02,0.02,0.02027967,0.02,0.043477638,0.02,0.02,0.080038155,0.071876772,0.477291934,0.454819524,0.428913696,0.287380262,0.140803001,0.054164949,0,0])
+        #naiset_ulos=np.array([0.371419539,0.205661569,0.135265873,0.102702654,0.055240889,0.048992378,0.107111533,0.059592465,0.032056939,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.06991043,0.02,0.02,0.036157545,0.070163829,0.02,0.032241992,0.02,0.02,0.02027967,0.02,0.043477638,0.02,0.02,0.080038155,0.071876772,0.477291934,0.454819524,0.428913696,0.287380262,0.140803001,0.054164949,0,0])
+        #naiset_ulos=np.array([0.446193345,0.16116113,0.233423431,0.036908505,0.02,0.106383266,0.021296256,0.057840188,0.115391005,0.02,0.099564721,0.02,0.02,0.02,0.02,0.020568478,0.067764598,0.02,0.037624763,0.02,0.02,0.02,0.02,0.02,0.02,0.049079128,0.029183258,0.02,0.02,0.056752006,0.037561449,0.02,0.024524018,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.092785925,0.054435714,0.439187202,0.465046705,0.39008036,0.384356347,0.169971142,0.031645066,0,0])
+        naiset_ulos=np.array([0.409760795,0.33526957,0.113526173,0.086546304,0.02,0.136699836,0.053301124,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.110284837,0.02,0.02,0.02,0.02,0.02,0.02,0.027607472,0.020853233,0.030317496,0.046937247,0.037561449,0.02,0.024524018,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.092785925,0.054435714,0.439187202,0.465046705,0.39008036,0.384356347,0.169971142,0.031645066,0,0])        
         outrate[20:max_spv,0]=miehet_ulos
         outrate[20:max_spv,1]=miehet_ulos
         outrate[20:max_spv,2]=miehet_ulos
@@ -815,9 +818,11 @@ class UnemploymentLargeEnv_v2(gym.Env):
              # skaalattu alaspäin, jotta tk:laisten kokonaismäärä menee paremmin oikein
             dfactor=np.array([1.3,0.95,0.6,1.2,1.0,0.9])
             
-        dis_miehet=np.array([0.0068168,0.003341014,0,0.004279685,0.001118673,0.001802593,0.00217149,0,0,0.002157641,0,0.002545172,0,0.002960375,0.000767293,0,0.002265829,0.000286527,0,0.004899931,0,0.000677208,0.001155069,0.003796412,0.004896709,0.001921327,0.004668376,0.004630126,0.002478899,0.00642266,0.005795605,0.00558426,0.008096878,0.004548654,0.010179089,0.016100661,0.015144889,0.011688053,0.024563474,0.036719657,0.036573355,0.026898066,0.027508352,0.024176173,0.023621633,0.02058014,0.020290345,0.0202976,0.020304995,0.020282729,0.020282729])
-        dis_naiset=np.array([0.004962318,0.002850008,0.004703008,0,0.001625749,0.000940874,0.001050232,0,0,4.34852E-05,0.003516261,0,8.21901E-05,0.002276047,0.000443789,0.002472653,0,0.001866348,0.002269429,0.001480588,0.00139571,0.002185668,0.002003531,0.003662852,0.003271301,0.003629155,0.002690071,0.003977974,0.005051223,0.00303663,0.008097507,0.004912787,0.005008356,0.007536173,0.007618452,0.017496524,0.012431715,0.020801345,0.025163258,0.027521298,0.039852895,0.023791604,0.025422742,0.02230225,0.021684456,0.01894045,0.018676988,0.018654938,0.01865384,0.018650795,0.018650795])
-            
+        #dis_miehet=np.array([0.0068168,0.003341014,0,0.004279685,0.001118673,0.001802593,0.00217149,0,0,0.002157641,0,0.002545172,0,0.002960375,0.000767293,0,0.002265829,0.000286527,0,0.004899931,0,0.000677208,0.001155069,0.003796412,0.004896709,0.001921327,0.004668376,0.004630126,0.002478899,0.00642266,0.005795605,0.00558426,0.008096878,0.004548654,0.010179089,0.016100661,0.015144889,0.011688053,0.024563474,0.036719657,0.036573355,0.026898066,0.027508352,0.024176173,0.023621633,0.02058014,0.020290345,0.0202976,0.020304995,0.020282729,0.020282729])
+        dis_miehet=np.array([0.003844207,0.002157312,0,0.002915577,0.00081677,0.001404834,0.00177282,0,0,0.001891443,0,0.002265095,0,0.00268058,0.000697237,0,0.002079174,0.000263783,0,0.004538401,0,0.000631472,0.001079217,0.003555183,0.00458235,0.001800932,0.004376534,0.004341663,0.002335098,0.006036927,0.005459469,0.005254058,0.007632643,0.004282522,0.009607954,0.015170352,0.014231176,0.010977463,0.023104034,0.03462797,0.034507729,0.025464606,0.026129996,0.023528766,0.023334155,0.020393979,0.020180711,0.0201807,0.020180711,0.020180711,0.020180711])
+        #dis_naiset=np.array([0.004962318,0.002850008,0.004703008,0,0.001625749,0.000940874,0.001050232,0,0,4.34852E-05,0.003516261,0,8.21901E-05,0.002276047,0.000443789,0.002472653,0,0.001866348,0.002269429,0.001480588,0.00139571,0.002185668,0.002003531,0.003662852,0.003271301,0.003629155,0.002690071,0.003977974,0.005051223,0.00303663,0.008097507,0.004912787,0.005008356,0.007536173,0.007618452,0.017496524,0.012431715,0.020801345,0.025163258,0.027521298,0.039852895,0.023791604,0.025422742,0.02230225,0.021684456,0.01894045,0.018676988,0.018654938,0.01865384,0.018650795,0.018650795])
+        dis_naiset=np.array([0.003152456,0.001820899,0.003082487,0,0.001199533,0.00071851,0.000822116,0,0,3.56077E-05,0.002908854,0,6.90884E-05,0.001931247,0.000380501,0.002139637,0,0.001647453,0.002016588,0.001331603,0.001264028,0.002000195,0.001846965,0.003387732,0.003038917,0.003380599,0.00250926,0.003730162,0.004742885,0.002853525,0.007630704,0.004648271,0.00473735,0.007128777,0.007198634,0.01655657,0.011752225,0.019697643,0.023829746,0.026050823,0.037670072,0.022548783,0.024075564,0.021665082,0.021334812,0.018765714,0.018557929,0.018557929,0.018557929,0.018557929,0.018557929])
+
         for g in range(3):
             disab[20:71,g]=dfactor[g]*dis_miehet
             disab[70:(self.max_age+1),g]=24.45*dfactor[g]/1000
@@ -1780,6 +1785,15 @@ class UnemploymentLargeEnv_v2(gym.Env):
         '''
         time_in_state+=self.timestep
 
+        if action == 0 and (time_in_state>self.kht_kesto or children_under3<1): # 
+            s=np.random.uniform()
+            if s<1/3:
+                action=1
+            elif s<2/3:
+                action=2
+            else:
+                action=3
+
         if age >= self.min_retirementage: # ve
             employment_status,paid_pension,pension,wage,time_in_state,netto,wage_reduction,benq=\
                 self.move_to_retirement(pension,old_wage,age,paid_pension,employment_status,
@@ -1808,11 +1822,11 @@ class UnemploymentLargeEnv_v2(gym.Env):
         elif action==11: # tk
             employment_status,pension,paid_pension,wage,time_in_state,netto,wage_reduction,benq=\
                 self.move_to_disab(pension,old_wage,age,wage_reduction,children_under3,children_under7,children_under18,unemp_after_ra)
-        elif time_in_state>self.kht_kesto or children_under3<1: # 
-            employment_status,paid_pension,pension,wage,time_in_state,netto,\
-                wage_reduction,used_unemp_benefit,pinkslip,benq,unemp_after_ra,unempwage_basis,alkanut_ansiosidonnainen=\
-                self.move_to_unemp(pension,old_wage,age,paid_pension,toe,pinkslip,tyoura,
-                    wage_reduction,used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,children_under3,children_under7,children_under18,alkanut_ansiosidonnainen)
+        #elif time_in_state>self.kht_kesto or children_under3<1: # 
+        #    employment_status,paid_pension,pension,wage,time_in_state,netto,\
+        #        wage_reduction,used_unemp_benefit,pinkslip,benq,unemp_after_ra,unempwage_basis,alkanut_ansiosidonnainen=\
+        #        self.move_to_unemp(pension,old_wage,age,paid_pension,toe,pinkslip,tyoura,
+        #            wage_reduction,used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,children_under3,children_under7,children_under18,alkanut_ansiosidonnainen)
         else:
             print('Error 25')
             
@@ -1970,9 +1984,6 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
         if action == 0 or (action == 2 and age < self.min_retirementage):
             employment_status = 10 # unchanged
-            #if time_in_state>1:
-            #    prev_unempl=0 # nollataan työttömyyden vaikutus palkkaan vuoden jälkeen
-
             wage=self.get_wage(age,wage_reduction)
             parttimewage=0.5*wage
             tyoura+=self.timestep
@@ -2000,8 +2011,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
         else:
             print('error 12')
         return employment_status,paid_pension,pension,wage,time_in_state,netto,wage_reduction,\
-               benq,pinkslip,unemp_after_ra,time_in_state,tyoura,used_unemp_benefit,unempwage_basis,alkanut_ansiosidonnainen           
-
+               benq,pinkslip,unemp_after_ra,time_in_state,tyoura,used_unemp_benefit,unempwage_basis,alkanut_ansiosidonnainen
 
     def stay_army(self,employment_status,paid_pension,pension,time_in_state,toe,wage_reduction,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
@@ -2244,13 +2254,13 @@ class UnemploymentLargeEnv_v2(gym.Env):
                                     self.move_to_fatherleave(pension,old_wage,age,wage_reduction,children_under3,children_under7,children_under18)
                                 moved=True
                 elif sattuma[2]<s3/move_prob:
-                    if employment_status not in set([2,3,8,9,11,12,14]): # and False:
+                    if employment_status not in set([2,3,5,6,7,8,9,11,12,14]): # and False:
                         employment_status,pension,wage,time_in_state,netto,pinkslip,wage_reduction,benq=\
                             self.move_to_student(pension,old_wage,age,time_in_state,tyoura,pinkslip,wage_reduction,children_under3,children_under7,children_under18)
                         moved=True
                 #elif sattuma[2]<s4/move_prob: # and False:
                 else:
-                    if employment_status not in set([2,3,8,9,11,12,14]):
+                    if employment_status not in set([2,3,5,6,7,8,9,11,12,14]):
                         employment_status,paid_pension,pension,wage,time_in_state,netto,wage_reduction,pinkslip,benq=\
                             self.move_to_outsider(pension,old_wage,age,pinkslip,wage_reduction,children_under3,children_under7,children_under18)
                         moved=True
@@ -2338,11 +2348,11 @@ class UnemploymentLargeEnv_v2(gym.Env):
                     npv,npv0,npv_sim=self.comp_npv_simulation(g)
                     reward = npv*self.log_utility(netto,employment_status,age,pinkslip=0)
                 else:
-                    npv,npv0=self.npv[g],self.npv0[g]
+                    npv,npv0,npv_pension=self.npv[g],self.npv0[g],self.npv_pension[g]
                     reward = self.npv[g]*self.log_utility(netto,employment_status,age,pinkslip=0)
                 
                 # npv0 is undiscounted
-                benq=self.scale_q(npv,npv0,benq)                
+                benq=self.scale_q(npv,npv0,npv_pension,benq)                
             else:
                 # giving up the pension
                 reward = 0.0 #-self.npv[g]*self.log_utility(netto,employment_status,age)
@@ -2374,7 +2384,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
         return np.array(self.state), reward, done, benq
         
-    def scale_q(self,npv,npv0,benq):
+    def scale_q(self,npv,npv0,npv_pension,benq):
         '''
         Scaling the incomes etc by a discounted nominal present value
         '''
@@ -2383,8 +2393,8 @@ class UnemploymentLargeEnv_v2(gym.Env):
         benq['valtionvero']*=npv0
         benq['kunnallisvero']*=npv0
         benq['asumistuki']*=npv
-        benq['elake_maksussa']*=npv0
-        benq['kokoelake']*=npv0
+        benq['elake_maksussa']*=npv_pension
+        benq['kokoelake']*=npv_pension
         benq['perustulo']*=npv0
         benq['palkkatulot']*=npv0
         benq['kateen']*=npv0
@@ -2433,23 +2443,25 @@ class UnemploymentLargeEnv_v2(gym.Env):
                 self.kappa_pinkslip=0.03
                 self.kappa_pinkslip_young=0.05
         else:
-            self.salary_const=0.063*self.timestep
-            self.salary_const_up=0.04*self.timestep # työssäolo palauttaa ansioita tämän verran vuodessa
+            self.salary_const=0.07*self.timestep
+            self.salary_const_up=0.035*self.timestep # työssäolo palauttaa ansioita tämän verran vuodessa
             self.salary_const_student=0.05*self.timestep # opiskelu nostaa leikkausta tämän verran vuodessa
-            self.men_kappa_fulltime=0.632 # 0.635 # 0.665
-            self.men_mu_scale=0.055 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-            self.men_mu_age=60.5 # P.O. 60??
-            self.men_kappa_osaaika=0.384
-            self.men_kappa_hoitovapaa=0.015
-            self.men_kappa_ve=0.36 # ehkä 0.10?
-            self.women_kappa_fulltime=0.585 # 0.605 # 0.58
-            self.women_mu_scale=0.03 # 0.25 # 0.25 # 0.17 # how much penalty is associated with work increase with age after mu_age
-            self.women_mu_age=62 # 61 #5 P.O. 60??
-            self.women_kappa_osaaika=0.37
-            self.women_kappa_hoitovapaa=0.05
-            self.women_kappa_ve=0.36 # ehkä 0.10?
-            self.kappa_pinkslip=0.047
-            self.kappa_pinkslip_young=0.057
+            self.men_kappa_fulltime=0.640 # 0.635 # 0.665
+            self.men_mu_scale=0.0 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+            self.men_mu_age=62.0 # P.O. 60??
+            self.men_kappa_osaaika=0.415
+            self.men_kappa_osaaika_old=0.280
+            self.men_kappa_hoitovapaa=0.0
+            self.men_kappa_ve=0.37 # ehkä 0.10?
+            self.women_kappa_fulltime=0.590 # 0.605 # 0.58
+            self.women_mu_scale=0.0 # 0.25 # 0.25 # 0.17 # how much penalty is associated with work increase with age after mu_age
+            self.women_mu_age=63.00 # 61 #5 P.O. 60??
+            self.women_kappa_osaaika=0.372
+            self.women_kappa_osaaika_old=0.265
+            self.women_kappa_hoitovapaa=0.00
+            self.women_kappa_ve=0.50 # ehkä 0.10?
+            self.kappa_pinkslip=0.040
+            self.kappa_pinkslip_young=0.08
 
 #     def log_utility_default_params_KAK(self):
 #         if self.include_mort:
@@ -2562,7 +2574,11 @@ class UnemploymentLargeEnv_v2(gym.Env):
             if self.include_preferencenoise:
                 kappa_kokoaika += prefnoise
         
-            kappa_osaaika=self.men_kappa_osaaika*kappa_kokoaika
+            if age>40: # ikääntyneet preferoivat osa-aikatyötä
+                kappa_osaaika=self.men_kappa_osaaika_old*kappa_kokoaika
+            else:
+                kappa_osaaika=self.men_kappa_osaaika*kappa_kokoaika
+                
             kappa_hoitovapaa=self.men_kappa_hoitovapaa
             kappa_ve=self.men_kappa_ve
         else: # naiset
@@ -2572,14 +2588,18 @@ class UnemploymentLargeEnv_v2(gym.Env):
             if self.include_preferencenoise:
                 kappa_kokoaika += prefnoise
         
-            kappa_osaaika=self.women_kappa_osaaika*kappa_kokoaika # 0.42*kappa_kokoaika
+            if age>40: # ikääntyneet preferoivat osa-aikatyötä
+                kappa_osaaika=self.women_kappa_osaaika_old*kappa_kokoaika # 0.42*kappa_kokoaika
+            else:
+                #kappa_osaaika=self.men_kappa_osaaika*kappa_kokoaika
+                kappa_osaaika=self.women_kappa_osaaika*kappa_kokoaika # 0.42*kappa_kokoaika
             kappa_hoitovapaa=self.women_kappa_hoitovapaa
             kappa_ve=self.women_kappa_ve
                 
         if pinkslip>0: # irtisanottu
             kappa_pinkslip = 0 # irtisanotuille ei vaikutuksia
         else:
-            if age<25: # alle 25-vuotiaalla eri säännöt, vanhempien tulot huomioidaan jne
+            if age<40: # alle 25-vuotiaalla eri säännöt, vanhempien tulot huomioidaan jne
                 kappa_pinkslip = self.kappa_pinkslip_young
             else:
                 kappa_pinkslip = self.kappa_pinkslip # irtisanoutumisesta seuraava alennus
@@ -2613,7 +2633,8 @@ class UnemploymentLargeEnv_v2(gym.Env):
             kappa=0
         
         # hyöty/score
-        u=np.log(income)+kappa
+        tau_kulutusvero=0
+        u=np.log(income/(1+tau_kulutusvero))+kappa
 
         if u is np.inf:
             print('inf: state ',employment_state)
@@ -2671,6 +2692,16 @@ class UnemploymentLargeEnv_v2(gym.Env):
         else:
             return 0
 
+    def get_wage_step(self,age,reduction):
+        '''
+        palkka age-ikäiselle time_in_state-vähennyksellä työllistymispalkkaan, step-kohtaisesti, ei vuosikohtaisesti
+        '''
+        intage=int(np.floor(age))
+        if intage<self.max_age and intage>=self.min_age-1:
+            return np.maximum(self.min_salary,self.salary_step[intage]*max(0,(1-reduction)))
+        else:
+            return 0
+
     # wage process reparametrized
     def wage_process_TK(self,w,age,a0=3300*12,a1=3300*12,g=1):
         '''
@@ -2701,6 +2732,19 @@ class UnemploymentLargeEnv_v2(gym.Env):
         # iät 20-70
         palkat_ika_miehet=12.5*np.array([2339.01,2489.09,2571.40,2632.58,2718.03,2774.21,2884.89,2987.55,3072.40,3198.48,3283.81,3336.51,3437.30,3483.45,3576.67,3623.00,3731.27,3809.58,3853.66,3995.90,4006.16,4028.60,4104.72,4181.51,4134.13,4157.54,4217.15,4165.21,4141.23,4172.14,4121.26,4127.43,4134.00,4093.10,4065.53,4063.17,4085.31,4071.25,4026.50,4031.17,4047.32,4026.96,4028.39,4163.14,4266.42,4488.40,4201.40,4252.15,4443.96,3316.92,3536.03,3536.03])
         palkat_ika_naiset=12.5*np.array([2223.96,2257.10,2284.57,2365.57,2443.64,2548.35,2648.06,2712.89,2768.83,2831.99,2896.76,2946.37,2963.84,2993.79,3040.83,3090.43,3142.91,3159.91,3226.95,3272.29,3270.97,3297.32,3333.42,3362.99,3381.84,3342.78,3345.25,3360.21,3324.67,3322.28,3326.72,3326.06,3314.82,3303.73,3302.65,3246.03,3244.65,3248.04,3223.94,3211.96,3167.00,3156.29,3175.23,3228.67,3388.39,3457.17,3400.23,3293.52,2967.68,2702.05,2528.84,2528.84])
+        
+        def map_age(x):
+            return int(x-20)
+            
+        palkat_ika_miehet2=palkat_ika_miehet            
+        
+        # filtteri
+        m_age=int(self.min_retirementage-1)
+        palkat_miehet_ve=palkat_ika_miehet[map_age(m_age)]
+        palkat_ika_miehet[map_age(m_age):]=np.minimum(palkat_ika_miehet[map_age(m_age):],palkat_miehet_ve)
+        palkat_naiset_ve=palkat_ika_naiset[map_age(m_age)]
+        palkat_ika_naiset[map_age(m_age):]=np.minimum(palkat_ika_naiset[map_age(m_age):],palkat_naiset_ve)
+        
         #g_r=[0.77,1.0,1.23]
         g_r=[0.80,1.0,1.26]
         #group_ave=np.array([2000,3300,5000,0.85*2000,0.85*3300,0.85*5000])*12
@@ -2750,16 +2794,16 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
         Käytetään, jos kuolleisuus ei mukana
         '''
-        if self.include_children:
-            if self.include_preferencenoise:
-                d=np.zeros(self.n_empl+self.n_groups+22)
-            else:
-                d=np.zeros(self.n_empl+self.n_groups+21)
+        #if self.include_children:
+        if self.include_preferencenoise:
+            d=np.zeros(self.n_empl+self.n_groups+22)
         else:
-            if self.include_preferencenoise:
-                d=np.zeros(self.n_empl+self.n_groups+19)
-            else:
-                d=np.zeros(self.n_empl+self.n_groups+18)
+            d=np.zeros(self.n_empl+self.n_groups+21)
+        #else:
+        #    if self.include_preferencenoise:
+        #        d=np.zeros(self.n_empl+self.n_groups+19)
+        #    else:
+        #        d=np.zeros(self.n_empl+self.n_groups+18)
                     
         states=self.n_empl
         # d2=np.zeros(n_empl,1)
@@ -2805,15 +2849,15 @@ class UnemploymentLargeEnv_v2(gym.Env):
         d[states2+13]=(unemp_after_ra-1)/2
         d[states2+16]=retaged
         d[states2+17]=alkanut_ansiosidonnainen
-        if self.include_children:
-            d[states2+18]=(children_under3-5)/10
-            d[states2+19]=(children_under7-5)/10
-            d[states2+20]=(children_under18-5)/10
-            if self.include_preferencenoise:
-                d[states2+21]=prefnoise
-        else:
-            if self.include_preferencenoise:
-                d[states2+18]=prefnoise
+        #if self.include_children:
+        d[states2+18]=(children_under3-5)/10
+        d[states2+19]=(children_under7-5)/10
+        d[states2+20]=(children_under18-5)/10
+        if self.include_preferencenoise:
+            d[states2+21]=prefnoise
+        #else:
+        #    if self.include_preferencenoise:
+        #        d[states2+18]=prefnoise
         
         return d
 
@@ -2869,22 +2913,22 @@ class UnemploymentLargeEnv_v2(gym.Env):
         unemp_after_ra=vec[pos+13]*2+1
         unemp_left=vec[pos+9]+1
         alkanut_ansiosidonnainen=int(vec[pos+17])
-        if self.include_children:
-            children_under3=int(vec[pos+18]*10+5)
-            children_under7=int(vec[pos+19]*10+5)
-            children_under18=int(vec[pos+20]*10+5)
-            if self.include_preferencenoise:
-                prefnoise=vec[pos+21]
-            else:
-                prefnoise=0
+        #if self.include_children:
+        children_under3=int(vec[pos+18]*10+5)
+        children_under7=int(vec[pos+19]*10+5)
+        children_under18=int(vec[pos+20]*10+5)
+        if self.include_preferencenoise:
+            prefnoise=vec[pos+21]
         else:
-            children_under3=0
-            children_under7=0
-            children_under18=0
-            if self.include_preferencenoise:
-                prefnoise=vec[pos+18]
-            else:
-                prefnoise=0
+            prefnoise=0
+        #else:
+        #    children_under3=0
+        #    children_under7=0
+        #    children_under18=0
+        #    if self.include_preferencenoise:
+        #        prefnoise=vec[pos+18]
+        #    else:
+        #        prefnoise=0
 
         if return_nextwage:
             return int(emp),int(g),pension,wage,age,time_in_state,paid_pension,int(pink),toe,\
@@ -3070,7 +3114,8 @@ class UnemploymentLargeEnv_v2(gym.Env):
                     weights=[0.3,0.1,0.1,0.1,0.1,0.1,0.1,0.1])[0]
         
         self.compute_salary_TK(group=group,initial_salary=initial_salary)
-        old_wage=self.salary[self.min_age]
+        #old_wage=self.salary[self.min_age]
+        old_wage=self.get_wage(self.min_age,wage_reduction)
         next_wage=old_wage
         unemp_after_ra=0
         unempwage=0
@@ -3268,13 +3313,13 @@ class UnemploymentLargeEnv_v2(gym.Env):
               low.insert(0,state_min)
               high.insert(0,state_max)
               
-        if self.include_children:
-              low.append(child_min)
-              high.append(child_max)
-              low.append(child_min)
-              high.append(child_max)
-              low.append(child_min)
-              high.append(child_max)
+        #if self.include_children:
+        low.append(child_min)
+        high.append(child_max)
+        low.append(child_min)
+        high.append(child_max)
+        low.append(child_min)
+        high.append(child_max)
                   
         if self.include_preferencenoise:
             low.append(pref_min)
@@ -3372,7 +3417,8 @@ class UnemploymentLargeEnv_v2(gym.Env):
         #print(start_t,self.infostate['latest'],self.infostate['states'][start_t:self.infostate['latest']],
         #    self.infostate['wage'][start_t:self.infostate['latest']],self.infostate['enimmaisaika_alkaa'])
         
-        lstate=self.infostate['states'][self.infostate['latest']]
+        lstate=int(self.infostate['states'][self.infostate['latest']])
+        #print('lstate',lstate)
         
         if lstate not in ret_states:
             if lstate in family_states:
@@ -3422,18 +3468,30 @@ class UnemploymentLargeEnv_v2(gym.Env):
         #print('-->',start_t,self.infostate['latest'],self.infostate['states'][start_t:self.infostate['latest']],
         #    self.infostate['wage'][start_t:self.infostate['latest']],toes)
         
-            
-        children_under18=0
-        children_under7=0
-        children_under3=0
-        for k in range(self.infostate['children_n']):
-            c_age=age-self.infostate['children_date'][k]
-            if c_age<18:
-                children_under18=children_under18+1
-                if c_age<7:
-                    children_under7=children_under7+1
-                    if c_age<3:
-                        children_under3=children_under3+1
+        if self.include_children:
+            children_under18=0
+            children_under7=0
+            children_under3=0
+            for k in range(self.infostate['children_n']):
+                c_age=age-self.infostate['children_date'][k]
+                if c_age<18:
+                    children_under18=children_under18+1
+                    if c_age<7:
+                        children_under7=children_under7+1
+                        if c_age<3:
+                            children_under3=children_under3+1
+        else: # pidetään kirjaa vain yhdestä lapsesta
+            children_under18=0
+            children_under7=0
+            children_under3=0
+            for k in range(self.infostate['children_n']):
+                c_age=age-self.infostate['children_date'][k]
+                if c_age<3:
+                    children_under3=1
+                    break
+                    
+            children_under18=children_under3
+            children_under7=children_under3
 
         return toes,wage,children_under3,children_under7,children_under18
 

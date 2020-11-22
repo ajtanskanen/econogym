@@ -227,18 +227,18 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         p['toimeentulotuki_vahennys']=0
         p['ika']=ika
         p['lapsia']=0
-        p['paivahoidossa']=0
+        p['lapsia_paivahoidossa']=0
         p['aikuisia']=1
         p['veromalli']=0
         p['kuntaryhma']=3
         p['lapsia_kotihoidontuella']=0
-        p['alle3v']=0
+        p['lapsia_alle_3v']=0
         p['tyottomyyden_kesto']=1
         p['puoliso_tyottomyyden_kesto']=10
         p['isyysvapaalla']=0
         p['aitiysvapaalla']=0
         p['kotihoidontuella']=0
-        p['alle_kouluikaisia']=0
+        p['lapsia_alle_kouluikaisia']=0
         p['tyoelake']=0
         if employment_status==1: # työssä
             # voisi olla työtön siinä mielessä, että oikeutettu soviteltuun päivärahaan
