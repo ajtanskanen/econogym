@@ -2686,8 +2686,9 @@ class UnemploymentLargeEnv_v2(gym.Env):
             kappa_kokoaika=self.men_kappa_fulltime
             mu_scale=self.men_mu_scale
             mu_age=self.men_mu_age
-            if self.include_preferencenoise:
-                kappa_kokoaika += prefnoise
+            # lognormaali
+            #if self.include_preferencenoise:
+            #    kappa_kokoaika += prefnoise
         
             if age>40: # ikääntyneet preferoivat osa-aikatyötä
                 kappa_osaaika=self.men_kappa_osaaika_old*kappa_kokoaika
@@ -2702,8 +2703,9 @@ class UnemploymentLargeEnv_v2(gym.Env):
             kappa_kokoaika=self.women_kappa_fulltime
             mu_scale=self.women_mu_scale
             mu_age=self.women_mu_age
-            if self.include_preferencenoise:
-                kappa_kokoaika += prefnoise
+            # lognormaali
+            #if self.include_preferencenoise:
+            #    kappa_kokoaika += prefnoise
         
             if age>50: # ikääntyneet preferoivat osa-aikatyötä
                 kappa_osaaika=self.women_kappa_osaaika_old*kappa_kokoaika
@@ -2754,7 +2756,11 @@ class UnemploymentLargeEnv_v2(gym.Env):
         
         # hyöty/score
         tau_kulutusvero=0
-        u=np.log(income/(1+tau_kulutusvero))+kappa
+        if self.include_preferencenoise:
+            # normaali
+            u=np.log(prefnoise*income/(1+tau_kulutusvero))+kappa
+        else:
+            u=np.log(income/(1+tau_kulutusvero))+kappa
 
         if u is np.inf:
             print('inf: state ',employment_state)
@@ -3451,7 +3457,10 @@ class UnemploymentLargeEnv_v2(gym.Env):
             print('emp {} gender {} g {} old_wage {} next_wage {} age {}'.format(employment_state,gender,g,old_wage,next_wage,age))
 
         if self.include_preferencenoise:
-            prefnoise=np.random.normal(loc=-0.5*self.preferencenoise_std*self.preferencenoise_std,scale=self.preferencenoise_std,size=1)[0]
+            # lognormaali
+            #prefnoise=np.random.normal(loc=-0.5*self.preferencenoise_std*self.preferencenoise_std,scale=self.preferencenoise_std,size=1)[0]
+            # normaali
+            prefnoise=max(1e-6,np.random.normal(loc=1.0,scale=self.preferencenoise_std,size=1)[0])
         else:
             prefnoise=0
             
@@ -3737,6 +3746,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
         print('include_putki {}\ninclude_pinkslip {}'.format(self.include_putki,self.include_pinkslip))
         print('perustulo {}\n'.format(self.perustulo))
         print('sigma_reduction {}\nplotdebug {}\n'.format(self.use_sigma_reduction,self.plotdebug))
+        print('additional_tyel_premium {}\nscale_tyel_accrual {}\n'.format(self.additional_tyel_premium,self.scale_tyel_accrual))
 
     def unempright_left(self,emp,tis,bu,ika,tyohistoria):
         '''
