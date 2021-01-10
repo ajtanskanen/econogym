@@ -167,6 +167,8 @@ class UnemploymentLargeEnv_v2(gym.Env):
         self.additional_tyel_premium=0
         self.additional_kunnallisvero=0
         self.scale_tyel_accrual=True
+        self.scale_additional_tyel_accrual=0
+        self.scale_additional_unemp_benefit=0
         
         gamma=0.92
         
@@ -272,6 +274,9 @@ class UnemploymentLargeEnv_v2(gym.Env):
             elif key=='year':
                 if value is not None:
                     self.year=value
+            elif key=='scale_additional_tyel_accrual':
+                if value is not None:
+                    self.scale_additional_tyel_accrual=value
  
         # ei skaalata!
         #self.ansiopvraha_kesto400=self.ansiopvraha_kesto400/(12*21.5)
@@ -287,17 +292,17 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
         # karttumaprosentit
         if self.scale_tyel_accrual:
-            acc_scaling=1+self.additional_tyel_premium/0.244
+            acc_scaling=1+self.scale_additional_tyel_accrual
         else:
             acc_scaling=1
         
         self.acc=0.015*self.timestep*acc_scaling
         self.acc_over_52=0.019*self.timestep*acc_scaling
         #self.acc_over_52=self.acc
-        self.acc_family=1.15*self.acc*acc_scaling
-        self.acc_family_over_52=1.15*self.acc_over_52*acc_scaling
-        self.acc_unemp=0.75*self.acc*acc_scaling
-        self.acc_unemp_over_52=0.75*self.acc_over_52*acc_scaling
+        self.acc_family=1.15*self.acc
+        self.acc_family_over_52=1.15*self.acc_over_52
+        self.acc_unemp=0.75*self.acc
+        self.acc_unemp_over_52=0.75*self.acc_over_52
         #self.min_family_accwage=12*757
 
         # parametrejä
