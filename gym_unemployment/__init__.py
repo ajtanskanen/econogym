@@ -16,6 +16,11 @@ register(
 )
 
 register(
+    id='unemployment-v3',
+    entry_point='gym_unemployment.envs:UnemploymentLargeEnv_v3',
+)
+
+register(
     id='unemploymentEK-v0',
     entry_point='gym_unemployment.envs:UnemploymentEKEnv',
 )
