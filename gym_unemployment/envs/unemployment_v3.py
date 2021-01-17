@@ -1343,9 +1343,7 @@ class UnemploymentLargeEnv_v3(gym.Env):
             time_in_state+=self.timestep
             wage_reduction=0.60 # vastaa määritelmää
         else:
-            # lykkäyskorotus
-            print('moving to disab after minretage at ',age)
-            # lykkäyskorotus
+            # siirtymä vanhuuseläkkeelle, lykkäyskorotus, ei tulevaa aikaa
             paid_pension = paid_pension*self.elakeindeksi + self.scale_pension(pension,age,scale=True,unemp_after_ra=unemp_after_ra)
             if self.include_kansanelake:
                 paid_pension += self.ben.laske_kansanelake(age,paid_pension/12,1)*12 # ben-modulissa palkat kk-tasolla
@@ -2514,13 +2512,13 @@ class UnemploymentLargeEnv_v3(gym.Env):
             self.salary_const_student=0.05*self.timestep # opiskelu pienentää leikkausta tämän verran vuodessa
             self.wage_initial_reduction=0.015 # työttömäksi siirtymisestä tuleva alennus tuleviin palkkoihin
             
-            self.men_kappa_fulltime=0.674 # vapaa-ajan menetyksestä rangaistus miehille
+            self.men_kappa_fulltime=0.704 # vapaa-ajan menetyksestä rangaistus miehille
             self.men_mu_scale=0.20 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
             self.men_mu_age=self.min_retirementage # P.O. 60??
             self.men_kappa_osaaika=0.400 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
             self.men_kappa_osaaika_old=0.380 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan, alle 35v
             self.men_kappa_hoitovapaa=0.03 # hyöty hoitovapaalla olosta
-            self.men_kappa_ve=0.05 # ehkä 0.10?
+            self.men_kappa_ve=0.03 # ehkä 0.10?
             if self.perustulo:
                 self.men_kappa_pinkslip_young=0.10 
                 self.men_kappa_pinkslip=0.12
@@ -2528,13 +2526,13 @@ class UnemploymentLargeEnv_v3(gym.Env):
                 self.men_kappa_pinkslip_young=0.06
                 self.men_kappa_pinkslip=0.08
             
-            self.women_kappa_fulltime=0.605 # vapaa-ajan menetyksestä rangaistus naisille
+            self.women_kappa_fulltime=0.630 # vapaa-ajan menetyksestä rangaistus naisille
             self.women_mu_scale=0.20 # 0.25 # 0.25 # 0.17 # how much penalty is associated with work increase with age after mu_age
             self.women_mu_age=self.min_retirementage # 61 #5 P.O. 60??
             self.women_kappa_osaaika=0.360
             self.women_kappa_osaaika_old=0.400
             self.women_kappa_hoitovapaa=0.10
-            self.women_kappa_ve=0.05 # ehkä 0.10?
+            self.women_kappa_ve=0.03 # ehkä 0.10?
             if self.perustulo:
                 self.women_kappa_pinkslip_young=0.10
                 self.women_kappa_pinkslip=0.17

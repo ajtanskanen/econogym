@@ -169,6 +169,8 @@ class UnemploymentLargeEnv_v2(gym.Env):
         self.scale_tyel_accrual=True
         self.scale_additional_tyel_accrual=0
         self.scale_additional_unemp_benefit=0
+        self.include_halftoe=False
+        self.porrasta_toe=False
         
         gamma=0.92
         
@@ -277,7 +279,13 @@ class UnemploymentLargeEnv_v2(gym.Env):
             elif key=='scale_additional_tyel_accrual':
                 if value is not None:
                     self.scale_additional_tyel_accrual=value
- 
+            elif key=='include_halftoe':
+                if value is not None:
+                    self.include_halftoe=value
+            elif key=='porrasta_toe':
+                if value is not None:
+                    self.porrasta_toe=value
+                    
         # ei skaalata!
         #self.ansiopvraha_kesto400=self.ansiopvraha_kesto400/(12*21.5)
         #self.ansiopvraha_kesto300=self.ansiopvraha_kesto300/(12*21.5)              
@@ -308,6 +316,8 @@ class UnemploymentLargeEnv_v2(gym.Env):
         # parametrejä
         self.max_toe=28/12
         self.min_toewage=1211*12 # vuoden 2019 luku tilanteessa, jossa ei tessiä
+        self.setup_unempdays_left(porrastus=self.porrasta_toe)
+        
         self.accbasis_kht=719.0*12
         self.accbasis_tmtuki=0 # 1413.75*12
         self.disabbasis_tmtuki=1413.75*12
@@ -1246,8 +1256,16 @@ class UnemploymentLargeEnv_v2(gym.Env):
             return True
         else:
             return False
+            
+    def setup_unempdays_left(self,porrastus=False):
+        if porrastus:
+            self.comp_unempdays_left=self.comp_unempdays_left_porrastus
+            self.paivarahapaivia_jaljella=self.paivarahapaivia_jaljella_porrastus
+        else:
+            self.comp_unempdays_left=self.comp_unempdays_left_nykytila
+            self.paivarahapaivia_jaljella=self.paivarahapaivia_jaljella_nykytila
     
-    def comp_unempdays_left(self,kesto,tyoura,age,toe,emp,alkanut_ansiosidonnainen,toe58):
+    def comp_unempdays_left_nykytila(self,kesto,tyoura,age,toe,emp,alkanut_ansiosidonnainen,toe58):
         if emp in set([2,3,8,9]):
             return 0
     
@@ -1268,13 +1286,54 @@ class UnemploymentLargeEnv_v2(gym.Env):
             
         return max(0,min(ret,65-age))
 
-    def paivarahapaivia_jaljella(self,kesto,tyoura,age,toe58):
+    def paivarahapaivia_jaljella_nykytila(self,kesto,tyoura,age,toe58,toe):
         if age>=65:
             return False
             
         if ((tyoura>=self.tyohistoria_vaatimus500 and kesto>=self.ansiopvraha_kesto500 and age>=self.minage_500 and toe58>0) \
             or (tyoura>=self.tyohistoria_vaatimus and kesto>=self.ansiopvraha_kesto400 and (age<self.minage_500 or tyoura<self.tyohistoria_vaatimus500 or toe58<1)) \
             or (tyoura<self.tyohistoria_vaatimus and kesto>=self.ansiopvraha_kesto300)):    
+            return False
+        else:
+            return True
+            
+    def comp_unempdays_left_porrastus(self,kesto,tyoura,age,toe,emp,alkanut_ansiosidonnainen,toe58):
+        if emp in set([2,3,8,9]):
+            return 0
+    
+        scale=21.5*12
+        
+        if (not self.tyossaoloehto(toe,tyoura,age)) and alkanut_ansiosidonnainen<1:
+            return 0 
+
+        if self.tyossaoloehto(toe,tyoura,age):
+            kesto=0
+
+        if tyoura>=self.tyohistoria_vaatimus500 and age>=self.minage_500 and toe58>0:
+            ret=max(0,self.ansiopvraha_kesto500/scale-kesto)
+        else:
+            toekesto=max(0,min(toe,21/12)-0.5)*20/(21.5)+5/12
+            ret=max(0,toekesto-kesto)
+            
+        return max(0,min(ret,65-age))
+
+    def toe_porrastus_kesto(self,kesto,toe):
+        scale=21.5*12
+        if toe<0.5:
+            return False    
+        else:
+            toekesto=max(0,min(toe,21/12)-0.5)*20/(21.5)+5/12
+            if kesto/scale<toekesto:
+                return True
+            else:
+                return False
+        
+    def paivarahapaivia_jaljella_porrastus(self,kesto,tyoura,age,toe58,toe):
+        if age>=65:
+            return False
+            
+        if (tyoura>=self.tyohistoria_vaatimus500 and kesto>=self.ansiopvraha_kesto500 and age>=self.minage_500 and toe58>0) \
+            or ((not self.toe_porrastus_kesto(kesto,toe)) and (age<self.minage_500 or tyoura<self.tyohistoria_vaatimus500 or toe58<1)):
             return False
         else:
             return True
@@ -1322,7 +1381,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
                         unempwage_basis=self.update_unempwage_basis(unempwage_basis,unempwage,False)
                 else:
                     kesto=12*21.5*used_unemp_benefit
-                if self.paivarahapaivia_jaljella(kesto,tyoura,age,toe58):
+                if self.paivarahapaivia_jaljella(kesto,tyoura,age,toe58,toe):
                     employment_status  = 0 # siirto ansiosidonnaiselle
                     #if alkanut_ansiosidonnainen<1:
                     if irtisanottu: # or alkanut_ansiosidonnainen>0: # muuten ei oikeutta ansiopäivärahaan karenssi vuoksi
@@ -1514,7 +1573,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
 
             kesto=12*21.5*used_unemp_benefit
                 
-            if not self.paivarahapaivia_jaljella(kesto,tyoura,age,toe58):
+            if not self.paivarahapaivia_jaljella(kesto,tyoura,age,toe58,toe):
                 if self.include_putki and age>=self.min_tyottputki_ika and tyoura>=self.tyohistoria_tyottputki: 
                     employment_status = 4 # siirto lisäpäiville
                     pension=self.pension_accrual(age,unempwage_basis,pension,state=4)
@@ -3915,6 +3974,9 @@ class UnemploymentLargeEnv_v2(gym.Env):
                         if self.infostate['wage'][t2]>self.min_toewage:
                             toes+=self.timestep
                             wage+=self.infostate['wage'][t2]*self.timestep
+                        elif self.include_halftoe and self.infostate['wage'][t2]>=0.5*self.min_toewage:
+                            toes+=0.5*self.timestep
+                            wage+=2.0*self.infostate['wage'][t2]*self.timestep
                         nt=nt+1
                     elif self.infostate['states'][t2] in unemp_states:
                         nt=nt+1
@@ -3936,6 +3998,9 @@ class UnemploymentLargeEnv_v2(gym.Env):
                         if self.infostate['wage'][t2]>self.min_toewage:
                             toes+=self.timestep
                             wage+=self.infostate['wage'][t2]*self.timestep
+                        elif self.include_halftoe and self.infostate['wage'][t2]>=0.5*self.min_toewage:
+                            toes+=0.5*self.timestep
+                            wage+=2.0*self.infostate['wage'][t2]*self.timestep
                         nt=nt+1
                     elif self.infostate['states'][t2] in unemp_states:
                         nt=nt+1
