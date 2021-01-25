@@ -72,7 +72,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         self.elinaikakerroin=0.95
         
         self.timestep=1.0
-        gamma=0.92 # discounting
+        gamma_discount=0.92 # discounting
         #self.gamma=gamma**self.timestep # discounting
         reaalinen_palkkojenkasvu=1.016
         self.palkkakerroin=(0.8*1+0.2*1.0/reaalinen_palkkojenkasvu)**self.timestep
@@ -102,6 +102,13 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         self.reset_exploration_ratio=0.4
         self.train=False
         self.zero_npv=False
+        self.additional_income_tax=0
+        self.additional_income_tax_high=0
+        self.additional_tyel_premium=0
+        self.additional_kunnallisvero=0
+        self.scale_tyel_accrual=True
+        self.scale_additional_tyel_accrual=0
+        self.scale_additional_unemp_benefit=0
         
         if 'kwargs' in kwargs:
             kwarg=kwargs['kwargs']
@@ -114,7 +121,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
                     self.timestep==value
             elif key=='gamma':
                 if value is not None:
-                    gamma=value
+                    gamma_discount=value
             elif key=='train':
                 if value is not None:
                     self.train=value
@@ -151,7 +158,28 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
             elif key=='wage_without_tis':
                 if value is not None:
                     self.no_tis=value
-                    
+            elif key=='additional_income_tax':
+                if value is not None:
+                    self.additional_income_tax=value
+            elif key=='additional_income_tax_high':
+                if value is not None:
+                    self.additional_income_tax_high=value
+            elif key=='additional_tyel_premium':
+                if value is not None:
+                    self.additional_tyel_premium=value
+            elif key=='additional_kunnallisvero':
+                if value is not None:
+                    self.additional_kunnallisvero=value
+            elif key=='scale_tyel_accrual':
+                if value is not None:
+                    self.scale_tyel_accrual=value
+            elif key=='year':
+                if value is not None:
+                    self.year=value
+            elif key=='scale_additional_tyel_accrual':
+                if value is not None:
+                    self.scale_additional_tyel_accrual=value
+
         print('Train ',self.train)
         print('plotdebug',self.plotdebug)
         
@@ -165,7 +193,8 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         #self.ansiopvraha_kesto400=self.ansiopvraha_kesto400/(12*21.5)
 
         self.salary_const=0.05*self.timestep
-        self.gamma=gamma**self.timestep
+        print(gamma_discount,self.timestep)
+        self.gamma=gamma_discount**self.timestep
         
         self.acc=0.015*self.timestep
         self.acc_unemp=0.75*self.acc
@@ -494,8 +523,8 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
 
     def setup_salaries(self):
         self.min_salary=1000
-        self.palkat_ika_miehet=12.5*np.array([2339.01,2489.09,2571.40,2632.58,2718.03,2774.21,2884.89,2987.55,3072.40,3198.48,3283.81,3336.51,3437.30,3483.45,3576.67,3623.00,3731.27,3809.58,3853.66,3995.90,4006.16,4028.60,4104.72,4181.51,4134.13,4157.54,4217.15,4165.21,4141.23,4172.14,4121.26,4127.43,4134.00,4093.10,4065.53,4063.17,4085.31,4071.25,4026.50,4031.17,4047.32,4026.96,4028.39,4163.14,4266.42,4488.40,4201.40,4252.15,4443.96,3316.92,3536.03,3536.03])
-        self.palkat_ika_naiset=12.5*np.array([2223.96,2257.10,2284.57,2365.57,2443.64,2548.35,2648.06,2712.89,2768.83,2831.99,2896.76,2946.37,2963.84,2993.79,3040.83,3090.43,3142.91,3159.91,3226.95,3272.29,3270.97,3297.32,3333.42,3362.99,3381.84,3342.78,3345.25,3360.21,3324.67,3322.28,3326.72,3326.06,3314.82,3303.73,3302.65,3246.03,3244.65,3248.04,3223.94,3211.96,3167.00,3156.29,3175.23,3228.67,3388.39,3457.17,3400.23,3293.52,2967.68,2702.05,2528.84,2528.84])
+        self.palkat_ika_miehet=12.5*np.array([2339.01,2489.09,2571.40,2632.58,2718.03,2774.21,2884.89,2987.55,3072.40,3198.48,3283.81,3336.51,3437.30,3483.45,3576.67,3623.00,3731.27,3809.58,3853.66,3995.90,4006.16,4028.60,4104.72,4181.51,4134.13,4157.54,4217.15,4165.21,4141.23,4172.14,4121.26,4127.43,4134.00,4093.10,4065.53,4063.17,4085.31,4071.25,4026.50,4031.17,4047.32,4026.96,4028.39,4163.14,4266.42,4488.40,4201.40,4252.15,4443.96,3316.92,3536.03,3536.03,3536.03])
+        self.palkat_ika_naiset=12.5*np.array([2223.96,2257.10,2284.57,2365.57,2443.64,2548.35,2648.06,2712.89,2768.83,2831.99,2896.76,2946.37,2963.84,2993.79,3040.83,3090.43,3142.91,3159.91,3226.95,3272.29,3270.97,3297.32,3333.42,3362.99,3381.84,3342.78,3345.25,3360.21,3324.67,3322.28,3326.72,3326.06,3314.82,3303.73,3302.65,3246.03,3244.65,3248.04,3223.94,3211.96,3167.00,3156.29,3175.23,3228.67,3388.39,3457.17,3400.23,3293.52,2967.68,2702.05,2528.84,2528.84,2528.84])
 
     def compute_salary(self,initial_salary=None,initial_age=None):
         if initial_salary is not None:
@@ -860,9 +889,9 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
                 time_in_state=random.choices(np.array([0,1,2,3,4,5],dtype=int),weights=[0.25,0.25,0.20,0.10,0.10,0.10])[0] # 60% tm-tuella
                 employment_status=random.choices(np.array([0,1],dtype=int),weights=[0.5,0.5])[0]
                 if random.random()<0.5:
-                    age=int(np.random.uniform(low=self.min_age,high=self.max_age-1))
+                    age=int(np.random.uniform(low=self.min_age,high=self.max_age-5))
                 else:
-                    age=int(np.random.uniform(low=58,high=self.max_age-1))
+                    age=int(np.random.uniform(low=58,high=self.max_age-5))
                 initial_salary=np.random.uniform(low=1_000,high=110_000)
                 pension=np.random.uniform(low=0,high=90_000)
                 initial_age=age
