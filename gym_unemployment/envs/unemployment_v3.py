@@ -115,10 +115,10 @@ class UnemploymentLargeEnv_v3(gym.Env):
         self.kht_kesto=2.0 # kotihoidontuen kesto 2 v
         self.tyohistoria_vaatimus=3.0 # 3 vuotta
         self.tyohistoria_vaatimus500=5.0 # 5 vuotta
-        self.ansiopvraha_kesto500=500 # 
+        self.ansiopvraha_kesto500=500 # päivää
         self.minage_500=58 # minimi-ikä 500 päivälle
-        self.ansiopvraha_kesto400=400
-        self.ansiopvraha_kesto300=300
+        self.ansiopvraha_kesto400=400 # päivää
+        self.ansiopvraha_kesto300=300 # päivää
         #self.min_salary=1000 # julkaistut laskelmat olettavat tämän
         self.min_salary=1000 # julkaistujen laskelmien jälkeen
 
@@ -276,10 +276,6 @@ class UnemploymentLargeEnv_v3(gym.Env):
                 if value is not None:
                     self.porrasta_toe=value
  
-        # ei skaalata!
-        #self.ansiopvraha_kesto400=self.ansiopvraha_kesto400/(12*21.5)
-        #self.ansiopvraha_kesto300=self.ansiopvraha_kesto300/(12*21.5)              
-
         self.gamma=gamma**self.timestep # discounting
         self.palkkakerroin=(0.8*1+0.2*1.0/self.reaalinen_palkkojenkasvu)**self.timestep
         self.elakeindeksi=(0.2*1+0.8*1.0/self.reaalinen_palkkojenkasvu)**self.timestep
@@ -385,7 +381,13 @@ class UnemploymentLargeEnv_v3(gym.Env):
         self.state = None
 
         self.steps_beyond_done = None
-
+        
+        # normitetaan työttömyysjaksot askelvälin monikerroiksi
+        scale=21.5*12
+        self.apvkesto300=np.round(self.ansiopvraha_kesto300/scale/self.timestep)*self.timestep
+        self.apvkesto400=np.round(self.ansiopvraha_kesto400/scale/self.timestep)*self.timestep
+        self.apvkesto500=np.round(self.ansiopvraha_kesto500/scale/self.timestep)*self.timestep
+                
         if self.perustulo:
             self.ben = fin_benefits.BasicIncomeBenefits(**kwargs)
         else:
@@ -966,8 +968,7 @@ class UnemploymentLargeEnv_v3(gym.Env):
             return True
         else:
             return False
-    
-            
+                
     def setup_unempdays_left(self,porrastus=False):
         if porrastus:
             self.comp_unempdays_left=self.comp_unempdays_left_porrastus
@@ -976,12 +977,19 @@ class UnemploymentLargeEnv_v3(gym.Env):
             self.comp_unempdays_left=self.comp_unempdays_left_nykytila
             self.paivarahapaivia_jaljella=self.paivarahapaivia_jaljella_nykytila
     
-    def comp_unempdays_left_nykytila(self,kesto,tyoura,age,toe,emp,alkanut_ansiosidonnainen,toe58):
+    def comp_unempdays_left_nykytila(self,kesto,tyoura,age,toe,emp,alkanut_ansiosidonnainen,toe58,old_toe,printti=False):
         if emp in set([2,3,8,9]):
             return 0
     
-        scale=21.5*12
-        
+        # normitetaan työttömyysjaksot askelvälin monikerroiksi
+        #scale=21.5*12
+        #apvkesto300=np.round(self.ansiopvraha_kesto300/scale/self.timestep)*self.timestep
+        #apvkesto400=np.round(self.ansiopvraha_kesto400/scale/self.timestep)*self.timestep
+        #apvkesto500=np.round(self.ansiopvraha_kesto500/scale/self.timestep)*self.timestep
+                
+        if emp==4:
+            return min(0,65-age)
+
         if (not self.tyossaoloehto(toe,tyoura,age)) and alkanut_ansiosidonnainen<1:
             return 0 
 
@@ -989,58 +997,71 @@ class UnemploymentLargeEnv_v3(gym.Env):
             kesto=0
 
         if tyoura>=self.tyohistoria_vaatimus500 and age>=self.minage_500 and toe58>0:
-            ret=max(0,self.ansiopvraha_kesto500/scale-kesto)
+            ret=max(0,self.apvkesto500-kesto)
         elif tyoura>=self.tyohistoria_vaatimus:
-            ret=max(0,self.ansiopvraha_kesto400/scale-kesto)
+            ret=max(0,self.apvkesto400-kesto)
         else:
-            ret=max(0,self.ansiopvraha_kesto300/scale-kesto)
+            ret=max(0,self.apvkesto300-kesto)
             
-        return max(0,min(ret,65-age))
+        toekesto=np.round(ret/self.timestep)*self.timestep
+
+            
+        return max(0,min(toekesto,65-age))
 
     def paivarahapaivia_jaljella_nykytila(self,kesto,tyoura,age,toe58,toe):
         if age>=65:
             return False
+
+        # normitetaan työttömyysjaksot askelvälin monikerroiksi
+        #scale=21.5*12
+        #apvkesto300=np.round(self.ansiopvraha_kesto300/scale/self.timestep)*self.timestep
+        #apvkesto400=np.round(self.ansiopvraha_kesto400/scale/self.timestep)*self.timestep
+        #apvkesto500=np.round(self.ansiopvraha_kesto500/scale/self.timestep)*self.timestep
             
-        if ((tyoura>=self.tyohistoria_vaatimus500 and kesto>=self.ansiopvraha_kesto500 and age>=self.minage_500 and toe58>0) \
-            or (tyoura>=self.tyohistoria_vaatimus and kesto>=self.ansiopvraha_kesto400 and (age<self.minage_500 or tyoura<self.tyohistoria_vaatimus500 or toe58<1)) \
-            or (tyoura<self.tyohistoria_vaatimus and kesto>=self.ansiopvraha_kesto300)):    
+        if ((tyoura>=self.tyohistoria_vaatimus500 and kesto>=self.apvkesto500 and age>=self.minage_500 and toe58>0) \
+            or (tyoura>=self.tyohistoria_vaatimus and kesto>=self.apvkesto400 and (age<self.minage_500 or tyoura<self.apvkesto500 or toe58<1)) \
+            or (tyoura<self.tyohistoria_vaatimus and kesto>=self.apvkesto300)):    
             return False
         else:
             return True
             
-    def comp_unempdays_left_porrastus(self,kesto,tyoura,age,toe,emp,alkanut_ansiosidonnainen,toe58):
+    def comp_unempdays_left_porrastus(self,kesto,tyoura,age,toe,emp,alkanut_ansiosidonnainen,toe58,old_toe,printti=False):
         if emp in set([2,3,8,9]):
             return 0
     
         scale=21.5*12
+        #apvkesto500=np.round(self.ansiopvraha_kesto500/scale/self.timestep)*self.timestep
         
-        if (not self.tyossaoloehto(toe,tyoura,age)) and alkanut_ansiosidonnainen<1:
+        if emp==4:
+            return min(0,65-age)
+        
+        if (not self.tyossaoloehto(old_toe,tyoura,age)) and alkanut_ansiosidonnainen<1:
             return 0 
 
         if self.tyossaoloehto(toe,tyoura,age):
             kesto=0
 
         if tyoura>=self.tyohistoria_vaatimus500 and age>=self.minage_500 and toe58>0:
-            ret=max(0,self.ansiopvraha_kesto500-kesto)
-        elif tyoura>=self.tyohistoria_vaatimus:
-            toekesto=max(0,min(toe,26/12)-0.5)*20/(21.5)+5/12
-            ret=max(0,toekesto-kesto)
+            ret=max(0,self.apvkesto500-kesto)
         else:
-            toekesto=max(0,min(toe,21/12)-0.5)*20/(21.5)+5/12
+            toekesto_raw=max(0,min(toe,21/12)-0.5)*20/(21.5)+100/scale
+            toekesto=np.round(toekesto_raw/self.timestep)*self.timestep
+            if printti:
+                print('toekesto',toekesto,kesto,toekesto-kesto,max(0,toekesto-kesto))
+            #toekesto=max(0,min(toe,21/12))
             ret=max(0,toekesto-kesto)
             
         return max(0,min(ret,65-age))
 
     def toe_porrastus_kesto(self,kesto,toe,tyoura):
-        scale=21.5*12
         if toe<0.5:
             return False    
-        elif tyoura>=self.tyohistoria_vaatimus:
-            toekesto=max(0,min(toe,26/12)-0.5)*20/(21.5)+5/12
-        else:
-            toekesto=max(0,min(toe,21/12)-0.5)*20/(21.5)+5/12
+
+        scale=21.5*12
+        toekesto_raw=max(0,min(toe,21/12)-0.5)*20/(21.5)+100/scale
+        toekesto=np.round(toekesto_raw/self.timestep)*self.timestep
             
-        if kesto/scale<toekesto:
+        if kesto/scale<=toekesto:
             return True
         else:
             return False
@@ -1048,9 +1069,12 @@ class UnemploymentLargeEnv_v3(gym.Env):
     def paivarahapaivia_jaljella_porrastus(self,kesto,tyoura,age,toe58,toe):
         if age>=65:
             return False
+
+        #scale=21.5*12
+        #apvkesto500=np.round(self.ansiopvraha_kesto500/scale/self.timestep)*self.timestep
             
-        if (tyoura>=self.tyohistoria_vaatimus500 and kesto>=self.ansiopvraha_kesto500 and age>=self.minage_500 and toe58>0) \
-            or ((not self.toe_porrastus_kesto(kesto,toe,tyoura)) and (age<self.minage_500 or tyoura<self.tyohistoria_vaatimus500 or toe58<1)):
+        if (tyoura>=self.tyohistoria_vaatimus500 and kesto>=self.apvkesto500 and age>=self.minage_500 and toe58>0) \
+            or ((not self.toe_porrastus_kesto(kesto,toe,tyoura)) and (age<self.minage_500 or tyoura<self.apvkesto500 or toe58<1)):
             return False
         else:
             return True
@@ -1096,10 +1120,16 @@ class UnemploymentLargeEnv_v3(gym.Env):
                         unempwage_basis=self.update_unempwage_basis(unempwage_basis,unempwage,True)
                     else:
                         unempwage_basis=self.update_unempwage_basis(unempwage_basis,unempwage,False)
+                    jaljella=self.paivarahapaivia_jaljella(kesto,tyoura,age,toe58,toe)
                 else:
-                    kesto=12*21.5*used_unemp_benefit
+                    #kesto=12*21.5*used_unemp_benefit
+                    kesto=used_unemp_benefit
+                    if self.porrasta_toe:
+                        jaljella=self.paivarahapaivia_jaljella(kesto,tyoura,age,toe58,self.comp_oldtoe())
+                    else:
+                        jaljella=self.paivarahapaivia_jaljella(kesto,tyoura,age,toe58,0) # toe ei vaikuta
                     
-                if self.paivarahapaivia_jaljella(kesto,tyoura,age,toe58,toe):
+                if jaljella:
                     employment_status  = 0 # siirto ansiosidonnaiselle
                     #if alkanut_ansiosidonnainen<1:
                     if irtisanottu: # or alkanut_ansiosidonnainen>0: # muuten ei oikeutta ansiopäivärahaan karenssi vuoksi
@@ -1292,14 +1322,20 @@ class UnemploymentLargeEnv_v3(gym.Env):
             wage=self.get_wage(age,wage_reduction)
             wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)
             
+            if self.porrasta_toe:
+                oldtoe=self.comp_oldtoe()
+            else:
+                oldtoe=0
+            
             if action == 4 and (not ove_paid) and (age>self.min_ove_age):
                 pension,paid_pension,ove_paid=self.move_to_ove(employment_status,pension,paid_pension,ove_paid,age,unemp_after_ra)
             else:
                 paid_pension=paid_pension*self.elakeindeksi
 
-            kesto=12*21.5*used_unemp_benefit
+            kesto=used_unemp_benefit
+            #kesto=12*21.5*used_unemp_benefit
                 
-            if not self.paivarahapaivia_jaljella(kesto,tyoura,age,toe58,toe):
+            if not self.paivarahapaivia_jaljella(kesto,tyoura,age,toe58,oldtoe):
                 if self.include_putki and age>=self.min_tyottputki_ika and tyoura>=self.tyohistoria_tyottputki: 
                     employment_status = 4 # siirto lisäpäiville
                     pension=self.pension_accrual(age,unempwage_basis,pension,state=4)
@@ -2244,7 +2280,12 @@ class UnemploymentLargeEnv_v3(gym.Env):
         elif employment_status in retired:
             alkanut_ansiosidonnainen=0
             
-        pvr_jaljella=self.comp_unempdays_left(used_unemp_benefit,tyoura,age,toe,employment_status,alkanut_ansiosidonnainen,toe58)
+        if self.porrasta_toe and (employment_status in set([0,4]) or alkanut_ansiosidonnainen>0):
+            old_toe=self.comp_oldtoe()
+            pvr_jaljella=self.comp_unempdays_left(used_unemp_benefit,tyoura,age,toe,employment_status,alkanut_ansiosidonnainen,toe58,old_toe,printti=True)
+        else:
+            pvr_jaljella=self.comp_unempdays_left(used_unemp_benefit,tyoura,age,toe,employment_status,alkanut_ansiosidonnainen,toe58,toe)
+            
         kassanjasenyys=self.get_kassanjasenyys()
         
         #self.render_infostate()
@@ -2359,37 +2400,37 @@ class UnemploymentLargeEnv_v3(gym.Env):
             self.women_kappa_pinkslip=0.05
         else:
             
-            self.salary_const=0.05*self.timestep # työttömyydestä palkka alenee tämän verran aika-askeleessa
+            self.salary_const=0.045*self.timestep # työttömyydestä palkka alenee tämän verran aika-askeleessa
             self.salary_const_up=0.02*self.timestep # työssäolo palauttaa ansioita tämän verran vuodessa
             self.salary_const_student=0.05*self.timestep # opiskelu pienentää leikkausta tämän verran vuodessa
             self.wage_initial_reduction=0.010 # työttömäksi siirtymisestä tuleva alennus tuleviin palkkoihin
             
-            self.men_kappa_fulltime=0.680 # 0.670 # vapaa-ajan menetyksestä rangaistus miehille
+            self.men_kappa_fulltime=0.655 # 0.670 # vapaa-ajan menetyksestä rangaistus miehille
             self.men_mu_scale=0.14 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
             self.men_mu_age=self.min_retirementage-1.0 # P.O. 60??
-            self.men_kappa_osaaika=0.395 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
+            self.men_kappa_osaaika=0.410 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
             self.men_kappa_osaaika_old=0.350 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan, alle 35v
             self.men_kappa_hoitovapaa=0.03 # hyöty hoitovapaalla olosta
-            self.men_kappa_ve=0.00 # ehkä 0.10?
+            self.men_kappa_ve=0.00 # 0.03 # ehkä 0.10?
             if self.perustulo:
                 self.men_kappa_pinkslip_young=0.10 
                 self.men_kappa_pinkslip=0.12
             else:
                 self.men_kappa_pinkslip_young=0.00
-                self.men_kappa_pinkslip=0.10
+                self.men_kappa_pinkslip=0.09
             
-            self.women_kappa_fulltime=0.640 # 0.610 # vapaa-ajan menetyksestä rangaistus naisille
-            self.women_mu_scale=0.13 # 0.25 # 0.25 # 0.17 # how much penalty is associated with work increase with age after mu_age
+            self.women_kappa_fulltime=0.635 # 0.620 # 0.610 # vapaa-ajan menetyksestä rangaistus naisille
+            self.women_mu_scale=0.12 # 0.25 # how much penalty is associated with work increase with age after mu_age
             self.women_mu_age=self.min_retirementage-1.0 # 61 #5 P.O. 60??
-            self.women_kappa_osaaika=0.375
-            self.women_kappa_osaaika_old=0.400
-            self.women_kappa_hoitovapaa=0.14
-            self.women_kappa_ve=0.00 # ehkä 0.10?
+            self.women_kappa_osaaika=0.378
+            self.women_kappa_osaaika_old=0.405
+            self.women_kappa_hoitovapaa=0.10 # 0.08
+            self.women_kappa_ve=0.00 # 0.03 # ehkä 0.10?
             if self.perustulo:
                 self.women_kappa_pinkslip_young=0.10
                 self.women_kappa_pinkslip=0.17
             else:
-                self.women_kappa_pinkslip_young=0.00
+                self.women_kappa_pinkslip_young=0.05
                 self.women_kappa_pinkslip=0.15
 
 #     def log_utility_default_params(self):
@@ -3191,7 +3232,7 @@ class UnemploymentLargeEnv_v3(gym.Env):
         if employment_state==0:
             tyohist=1.0
             toe=0.0
-            wage_reduction=np.random.uniform(low=0.10,high=0.30)
+            wage_reduction=np.random.uniform(low=0.05,high=0.25)
             used_unemp_benefit=0.0
             unempwage_basis=old_wage
             alkanut_ansiosidonnainen=1
@@ -3199,7 +3240,7 @@ class UnemploymentLargeEnv_v3(gym.Env):
         elif employment_state==13:
             tyohist=0.0
             toe=0.0
-            wage_reduction=np.random.uniform(low=0.25,high=0.65)
+            wage_reduction=np.random.uniform(low=0.15,high=0.40)
             used_unemp_benefit=2.0
         elif employment_state==12:
             tyohist=0.0
@@ -3209,7 +3250,7 @@ class UnemploymentLargeEnv_v3(gym.Env):
         elif employment_state==11:
             tyohist=0.0
             toe=0.0
-            wage_reduction=np.random.uniform(low=0.25,high=0.60)
+            wage_reduction=np.random.uniform(low=0.15,high=0.40)
         elif employment_state==3:
             wage5y=next_wage
             paid_pension=pension
@@ -3226,7 +3267,7 @@ class UnemploymentLargeEnv_v3(gym.Env):
         if employment_state in set([1,10]):
             unempwage=old_wage
             
-        unemp_benefit_left=self.comp_unempdays_left(used_unemp_benefit,tyohist,age,toe,employment_state,alkanut_ansiosidonnainen,toe58)
+        unemp_benefit_left=self.comp_unempdays_left(used_unemp_benefit,tyohist,age,toe,employment_state,alkanut_ansiosidonnainen,toe58,toe)
         
         self.init_infostate()
         kassanjasenyys=self.get_kassanjasenyys()
@@ -3325,7 +3366,7 @@ class UnemploymentLargeEnv_v3(gym.Env):
         elif employment_state in set([1,10]):
             unempwage=old_wage
             
-        unemp_benefit_left=self.comp_unempdays_left(used_unemp_benefit,tyohist,age,toe,employment_state,alkanut_ansiosidonnainen,toe58)
+        unemp_benefit_left=self.comp_unempdays_left(used_unemp_benefit,tyohist,age,toe,employment_state,alkanut_ansiosidonnainen,toe58,toe)
         
         return employment_state,pension,time_in_state,paid_pension,pink,toe,tyohist,\
                 used_unemp_benefit,wage_reduction,unemp_after_ra,unempwage,unempwage_basis,\
@@ -3339,6 +3380,13 @@ class UnemploymentLargeEnv_v3(gym.Env):
         emp,g,pension,wage,age,time_in_state,paid_pension,pink,toe,tyohist,used_unemp_benefit,\
             wage_red,unemp_after_ra,unempwage,unempwage_basis,prefnoise,c3,c7,c18,\
             unemp_left,oikeus,toe58,ove_paid,jasen,next_wage=self.state_decode(self.state,return_nextwage=True)
+            
+        #if emp in set([0,4]):
+        #    old_toe=self.comp_oldtoe()
+        #    print(old_toe)
+        #else:
+        #    old_toe=0
+
             
         if reward is None:
             print('s {} g {} sal {:.0f} nw {:.0f} ikä {:.2f} tis {:.2f} tul e {:.0f} alk e {:.0f} irti {} toe {:.2f} työuraura {:.2f} ueb {:.2f} wr {:.2f} uew {:.2f} (b {:.2f}) c3 {:.0f} c7 {:.0f} c18 {:.0f} uleft {:.2f} aa {:.0f} 58 {:.0f} ove {:.0f}'.format(\
@@ -3547,13 +3595,13 @@ class UnemploymentLargeEnv_v3(gym.Env):
         Tilastointia varten lasketaan jäljellä olevat ansiosidonnaiset työttömyysturvapäivät
         '''
         if ika>=self.minage_500 and tyohistoria>=self.tyohistoria_vaatimus500:
-            kesto=self.ansiopvraha_kesto500
+            kesto=self.apvkesto500 #ansiopvraha_kesto500
         elif tyohistoria>=self.tyohistoria_vaatimus:
-            kesto=self.ansiopvraha_kesto400
+            kesto=self.apvkesto400 #ansiopvraha_kesto400
         else:
-            kesto=self.ansiopvraha_kesto300
+            kesto=self.apvkesto300 #ansiopvraha_kesto300
         
-        kesto=kesto/(12*21.5)
+        #kesto=kesto/(12*21.5)
         #if irtisanottu<1 and time_in_state<self.karenssi_kesto: # karenssi, jos ei irtisanottu
         
         if emp==13:
@@ -3806,3 +3854,42 @@ class UnemploymentLargeEnv_v3(gym.Env):
                 print('{}:{:.2f} '.format(x,a[x]),end='')
                 
         print('')
+        
+    def comp_oldtoe(self):
+        # laske työssäoloehto tarkasti
+        # laske työttömyysturvaan vaikuttavat lasten määrät
+        toes=0
+        n_toe=int(np.floor(self.max_toe/self.timestep))
+        emp_states={1,10}
+        unemp_states={0,4,13}
+        family_states={5,6,7}
+        ret_states={2,3,8,9}
+        wage=0
+        
+        lstate=int(self.infostate['states'][self.infostate['latest']])
+        
+        if lstate!=0:
+            return 0
+        
+        nt=0
+        t2=max(0,self.infostate['enimmaisaika_alkaa']-1)
+        emp_states={1,10}
+        unemp_states={0,4}
+        family_states={5,6,7}
+        while nt<n_toe:
+            emps=self.infostate['states'][t2]
+            if emps in family_states:
+                pass
+            elif emps in emp_states:
+                if self.infostate['wage'][t2]>self.min_toewage:
+                    toes+=self.timestep
+                elif self.include_halftoe and self.infostate['wage'][t2]>=self.min_halftoewage and emps==10:
+                    toes+=0.5*self.timestep
+                nt=nt+1
+            elif emps in unemp_states:
+                nt=nt+1
+            else:
+                nt=nt+1
+            t2=t2-1
+
+        return toes
