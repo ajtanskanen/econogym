@@ -714,9 +714,9 @@ class UnemploymentLargeEnv_v3(gym.Env):
             # tilat [13,0,1,10,3,11,12] siis [tmtuki,ansiosidonnainen,kokoaikatyö,osaaikatyö,työvoimanulkopuolella,opiskelija]
             # lasketaan painotetut kertoimet eri tulotasoille
             tyoton=0.019
-            m1,m2,m3=get_wees(1.3,1.0,tyoton)
+            m1,m2,m3=get_wees(1.25,1.0,tyoton)
             tyoton=0.016
-            w1,w2,w3=get_wees(1.3,1.0,tyoton)
+            w1,w2,w3=get_wees(1.2,1.0,tyoton)
             om=0.686+0.267 # miehet töissä + opiskelija
             om1,om2,om3=get_wees(1.2,1.0,0.267)
             ow=0.607+0.340
@@ -724,7 +724,7 @@ class UnemploymentLargeEnv_v3(gym.Env):
             tyovoimanulkop=0.029
             um1,um2,um3=get_wees(1.3,1.0,tyovoimanulkop)
             tyovoimanulkop=0.025
-            uw1,uw2,uw3=get_wees(1.3,1.0,tyovoimanulkop)
+            uw1,uw2,uw3=get_wees(1.2,1.0,tyovoimanulkop)
             
             initial_weight[0,:]=[m1*4/5,m1*1/5,0.68*om1,0.32*om1,0.014339,um1,om-om1]
             initial_weight[1,:]=[m2*4/5,m2*1/5,0.68*om2,0.32*om2,0.014339,um2,om-om2]
@@ -738,9 +738,9 @@ class UnemploymentLargeEnv_v3(gym.Env):
             #initial_weight[3:6,:]=[0.017*4/5,0.017*1/5,0.44*0.360,0.56*0.360,0.0071558,0.027,0.587]
 
             tyoton=0.021
-            m1,m2,m3=get_wees(1.3,1.0,tyoton)
+            m1,m2,m3=get_wees(1.25,1.0,tyoton)
             tyoton=0.017
-            w1,w2,w3=get_wees(1.3,1.0,tyoton)
+            w1,w2,w3=get_wees(1.2,1.0,tyoton)
             om=0.679+0.261
             om1,om2,om3=get_wees(1.2,1.0,0.261)
             ow=0.587+0.360
@@ -748,7 +748,7 @@ class UnemploymentLargeEnv_v3(gym.Env):
             tyovoimanulkop=0.030
             um1,um2,um3=get_wees(1.3,1.0,tyovoimanulkop)
             tyovoimanulkop=0.027
-            uw1,uw2,uw3=get_wees(1.3,1.0,tyovoimanulkop)
+            uw1,uw2,uw3=get_wees(1.2,1.0,tyovoimanulkop)
             
             
             initial_weight[0,:]=[m1*4/5,m1*1/5,0.68*om1,0.32*om1,0.010315,um1,om-om1]
@@ -2405,33 +2405,33 @@ class UnemploymentLargeEnv_v3(gym.Env):
             self.salary_const_student=0.05*self.timestep # opiskelu pienentää leikkausta tämän verran vuodessa
             self.wage_initial_reduction=0.010 # työttömäksi siirtymisestä tuleva alennus tuleviin palkkoihin
             
-            self.men_kappa_fulltime=0.655 # 0.670 # vapaa-ajan menetyksestä rangaistus miehille
-            self.men_mu_scale=0.14 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-            self.men_mu_age=self.min_retirementage-1.0 # P.O. 60??
+            self.men_kappa_fulltime=0.665 # 0.670 # vapaa-ajan menetyksestä rangaistus miehille
+            self.men_mu_scale=0.12 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+            self.men_mu_age=self.min_retirementage-2.0 # P.O. 60??
             self.men_kappa_osaaika=0.410 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
             self.men_kappa_osaaika_old=0.350 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan, alle 35v
-            self.men_kappa_hoitovapaa=0.03 # hyöty hoitovapaalla olosta
+            self.men_kappa_hoitovapaa=0.02 # hyöty hoitovapaalla olosta
             self.men_kappa_ve=0.00 # 0.03 # ehkä 0.10?
             if self.perustulo:
                 self.men_kappa_pinkslip_young=0.10 
                 self.men_kappa_pinkslip=0.12
             else:
                 self.men_kappa_pinkslip_young=0.00
-                self.men_kappa_pinkslip=0.09
+                self.men_kappa_pinkslip=0.16
             
-            self.women_kappa_fulltime=0.635 # 0.620 # 0.610 # vapaa-ajan menetyksestä rangaistus naisille
+            self.women_kappa_fulltime=0.645 # 0.620 # 0.610 # vapaa-ajan menetyksestä rangaistus naisille
             self.women_mu_scale=0.12 # 0.25 # how much penalty is associated with work increase with age after mu_age
-            self.women_mu_age=self.min_retirementage-1.0 # 61 #5 P.O. 60??
+            self.women_mu_age=self.min_retirementage-1.5 # 61 #5 P.O. 60??
             self.women_kappa_osaaika=0.378
             self.women_kappa_osaaika_old=0.405
-            self.women_kappa_hoitovapaa=0.10 # 0.08
+            self.women_kappa_hoitovapaa=0.04 # 0.08
             self.women_kappa_ve=0.00 # 0.03 # ehkä 0.10?
             if self.perustulo:
                 self.women_kappa_pinkslip_young=0.10
                 self.women_kappa_pinkslip=0.17
             else:
                 self.women_kappa_pinkslip_young=0.05
-                self.women_kappa_pinkslip=0.15
+                self.women_kappa_pinkslip=0.14
 
 #     def log_utility_default_params(self):
 #         # paljonko työstä poissaolo vaikuttaa palkkaan
@@ -3240,7 +3240,7 @@ class UnemploymentLargeEnv_v3(gym.Env):
         elif employment_state==13:
             tyohist=0.0
             toe=0.0
-            wage_reduction=np.random.uniform(low=0.15,high=0.40)
+            wage_reduction=np.random.uniform(low=0.15,high=0.50)
             used_unemp_benefit=2.0
         elif employment_state==12:
             tyohist=0.0
@@ -3250,7 +3250,7 @@ class UnemploymentLargeEnv_v3(gym.Env):
         elif employment_state==11:
             tyohist=0.0
             toe=0.0
-            wage_reduction=np.random.uniform(low=0.15,high=0.40)
+            wage_reduction=np.random.uniform(low=0.15,high=0.50)
         elif employment_state==3:
             wage5y=next_wage
             paid_pension=pension
@@ -3569,7 +3569,7 @@ class UnemploymentLargeEnv_v3(gym.Env):
         self.high=np.array(high)
 
     def check_toe58(self,age,toe,tyoura,toe58):
-        scale=21.5*12
+        #scale=21.5*12 
     
         if age<self.minage_500:
             return 0

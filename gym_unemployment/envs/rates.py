@@ -14,7 +14,19 @@ class Rates():
         self.max_age=max_age
         self.n_groups=n_groups
         self.timestep=timestep
+        
+        self.group_weights=np.zeros(3)
+        self.group_weights=[0.3,0.5,0.2]
 
+    def get_wees(self,w0,w1,intensity):
+        '''
+        Säätää kolmannen ryhmän intensiteetin niin että kaikkien kolmen ryhmän painot ovat 1.0
+        '''
+        return w0*intensity,w1*intensity,get_w(w0,w1)*intensity
+    
+    def get_w(self,a0,a1):
+        return (1-a0*self.group_weights[0]-a1*self.group_weights[1])/self.group_weights[2]
+        
     def get_mort_rate(self,debug=False):
         '''
         Kuolleisuus-intensiteetit eri ryhmille
