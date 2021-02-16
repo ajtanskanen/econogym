@@ -115,10 +115,15 @@ class UnemploymentLargeEnv_v3(gym.Env):
         self.kht_kesto=2.0 # kotihoidontuen kesto 2 v
         self.tyohistoria_vaatimus=3.0 # 3 vuotta
         self.tyohistoria_vaatimus500=5.0 # 5 vuotta
-        self.ansiopvraha_kesto500=500 # päivää
+        if True:
+            self.ansiopvraha_kesto400=400 # päivää
+            self.ansiopvraha_kesto300=300 # päivää
+            self.ansiopvraha_kesto500=500 # päivää
+        else:
+            self.ansiopvraha_kesto400=500 # päivää
+            self.ansiopvraha_kesto300=400 # päivää
+            self.ansiopvraha_kesto500=500 # päivää
         self.minage_500=58 # minimi-ikä 500 päivälle
-        self.ansiopvraha_kesto400=400 # päivää
-        self.ansiopvraha_kesto300=300 # päivää
         #self.min_salary=1000 # julkaistut laskelmat olettavat tämän
         self.min_salary=1000 # julkaistujen laskelmien jälkeen
 
@@ -161,6 +166,7 @@ class UnemploymentLargeEnv_v3(gym.Env):
         self.scale_additional_unemp_benefit=0
         self.include_halftoe=True
         self.porrasta_toe=False
+        self.porrastus500=True
         
         gamma=0.92
         
@@ -320,13 +326,12 @@ class UnemploymentLargeEnv_v3(gym.Env):
         self.log_transform=False
         self.eps=1e-20
 
-        self.salary=np.zeros(self.max_age+1)
-        self.setup_salaries_v3()
+        #self.salary=np.zeros(self.max_age+1)
 
         # ryhmäkohtaisia muuttujia
         self.rates=Rates(year=self.year,max_age=self.max_age,n_groups=self.n_groups,timestep=self.timestep)
+        self.setup_salaries_v3()
 
-        #self.disability_intensity=self.get_disability_rate() #*self.timestep # tn tulla työkyvyttömäksi
         self.disability_intensity=self.rates.get_eff_disab_rate() #*self.timestep # tn tulla työkyvyttömäksi
         
         if self.include_pinkslip:
@@ -714,11 +719,11 @@ class UnemploymentLargeEnv_v3(gym.Env):
             # tilat [13,0,1,10,3,11,12] siis [tmtuki,ansiosidonnainen,kokoaikatyö,osaaikatyö,työvoimanulkopuolella,opiskelija]
             # lasketaan painotetut kertoimet eri tulotasoille
             tyoton=0.019
-            m1,m2,m3=get_wees(1.25,1.0,tyoton)
+            m1,m2,m3=get_wees(1.27,1.0,tyoton)
             tyoton=0.016
             w1,w2,w3=get_wees(1.2,1.0,tyoton)
             om=0.686+0.267 # miehet töissä + opiskelija
-            om1,om2,om3=get_wees(1.2,1.0,0.267)
+            om1,om2,om3=get_wees(1.25,1.0,0.267)
             ow=0.607+0.340
             ow1,ow2,ow3=get_wees(1.2,1.0,0.340)
             tyovoimanulkop=0.029
@@ -1019,7 +1024,7 @@ class UnemploymentLargeEnv_v3(gym.Env):
         #apvkesto500=np.round(self.ansiopvraha_kesto500/scale/self.timestep)*self.timestep
             
         if ((tyoura>=self.tyohistoria_vaatimus500 and kesto>=self.apvkesto500 and age>=self.minage_500 and toe58>0) \
-            or (tyoura>=self.tyohistoria_vaatimus and kesto>=self.apvkesto400 and (age<self.minage_500 or tyoura<self.apvkesto500 or toe58<1)) \
+            or (tyoura>=self.tyohistoria_vaatimus and kesto>=self.apvkesto400 and (age<self.minage_500 or tyoura<self.tyohistoria_vaatimus500 or toe58<1)) \
             or (tyoura<self.tyohistoria_vaatimus and kesto>=self.apvkesto300)):    
             return False
         else:
@@ -1029,9 +1034,6 @@ class UnemploymentLargeEnv_v3(gym.Env):
         if emp in set([2,3,8,9]):
             return 0
     
-        scale=21.5*12
-        #apvkesto500=np.round(self.ansiopvraha_kesto500/scale/self.timestep)*self.timestep
-        
         if emp==4:
             return min(0,65-age)
         
@@ -1041,27 +1043,37 @@ class UnemploymentLargeEnv_v3(gym.Env):
         if self.tyossaoloehto(toe,tyoura,age):
             kesto=0
 
-        if tyoura>=self.tyohistoria_vaatimus500 and age>=self.minage_500 and toe58>0:
+        if tyoura>=self.tyohistoria_vaatimus500 and age>=self.minage_500 and toe58>0 and not self.porrastus500:
             ret=max(0,self.apvkesto500-kesto)
         else:
-            toekesto_raw=max(0,min(toe,21/12)-0.5)*20/(21.5)+100/scale
+            scale=21.5*12
+            if self.porrastus500:
+                t2=np.floor(toe*2)/2
+                toekesto_raw=min(500,max(0,t2-0.5)*200+200)/scale
+            else:
+                toekesto_raw=max(0,min(toe,21/12)-0.5)*20/(21.5)+100/scale
+                            
             toekesto=np.round(toekesto_raw/self.timestep)*self.timestep
             if printti:
                 print('toekesto',toekesto,kesto,toekesto-kesto,max(0,toekesto-kesto))
-            #toekesto=max(0,min(toe,21/12))
             ret=max(0,toekesto-kesto)
             
         return max(0,min(ret,65-age))
 
     def toe_porrastus_kesto(self,kesto,toe,tyoura):
         if toe<0.5:
-            return False    
+            return False
 
         scale=21.5*12
-        toekesto_raw=max(0,min(toe,21/12)-0.5)*20/(21.5)+100/scale
+        if self.porrastus500:
+            t2=np.floor(toe*2)/2
+            toekesto_raw=min(500,max(0,t2-0.5)*200+200)/scale
+        else:
+            toekesto_raw=max(0,min(toe,21/12)-0.5)*20/(21.5)+100/scale
+            
         toekesto=np.round(toekesto_raw/self.timestep)*self.timestep
             
-        if kesto/scale<=toekesto:
+        if kesto<toekesto:
             return True
         else:
             return False
@@ -1070,11 +1082,8 @@ class UnemploymentLargeEnv_v3(gym.Env):
         if age>=65:
             return False
 
-        #scale=21.5*12
-        #apvkesto500=np.round(self.ansiopvraha_kesto500/scale/self.timestep)*self.timestep
-            
-        if (tyoura>=self.tyohistoria_vaatimus500 and kesto>=self.apvkesto500 and age>=self.minage_500 and toe58>0) \
-            or ((not self.toe_porrastus_kesto(kesto,toe,tyoura)) and (age<self.minage_500 or tyoura<self.apvkesto500 or toe58<1)):
+        if (tyoura>=self.tyohistoria_vaatimus500 and kesto>=self.apvkesto500 and age>=self.minage_500 and toe58>0 and not self.porrastus500) \
+            or ((not self.toe_porrastus_kesto(kesto,toe,tyoura)) and (age<self.minage_500 or tyoura<self.tyohistoria_vaatimus500 or toe58<1)):
             return False
         else:
             return True
@@ -2405,12 +2414,12 @@ class UnemploymentLargeEnv_v3(gym.Env):
             self.salary_const_student=0.05*self.timestep # opiskelu pienentää leikkausta tämän verran vuodessa
             self.wage_initial_reduction=0.010 # työttömäksi siirtymisestä tuleva alennus tuleviin palkkoihin
             
-            self.men_kappa_fulltime=0.665 # 0.670 # vapaa-ajan menetyksestä rangaistus miehille
+            self.men_kappa_fulltime=0.685 # 0.670 # vapaa-ajan menetyksestä rangaistus miehille
             self.men_mu_scale=0.12 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
             self.men_mu_age=self.min_retirementage-2.0 # P.O. 60??
-            self.men_kappa_osaaika=0.410 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
+            self.men_kappa_osaaika=0.420 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
             self.men_kappa_osaaika_old=0.350 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan, alle 35v
-            self.men_kappa_hoitovapaa=0.02 # hyöty hoitovapaalla olosta
+            self.men_kappa_hoitovapaa=0.00 # hyöty hoitovapaalla olosta
             self.men_kappa_ve=0.00 # 0.03 # ehkä 0.10?
             if self.perustulo:
                 self.men_kappa_pinkslip_young=0.10 
@@ -2421,17 +2430,17 @@ class UnemploymentLargeEnv_v3(gym.Env):
             
             self.women_kappa_fulltime=0.645 # 0.620 # 0.610 # vapaa-ajan menetyksestä rangaistus naisille
             self.women_mu_scale=0.12 # 0.25 # how much penalty is associated with work increase with age after mu_age
-            self.women_mu_age=self.min_retirementage-1.5 # 61 #5 P.O. 60??
-            self.women_kappa_osaaika=0.378
+            self.women_mu_age=self.min_retirementage-0.5 # 61 #5 P.O. 60??
+            self.women_kappa_osaaika=0.375
             self.women_kappa_osaaika_old=0.405
-            self.women_kappa_hoitovapaa=0.04 # 0.08
+            self.women_kappa_hoitovapaa=0.00 # 0.08
             self.women_kappa_ve=0.00 # 0.03 # ehkä 0.10?
             if self.perustulo:
                 self.women_kappa_pinkslip_young=0.10
                 self.women_kappa_pinkslip=0.17
             else:
                 self.women_kappa_pinkslip_young=0.05
-                self.women_kappa_pinkslip=0.14
+                self.women_kappa_pinkslip=0.16
 
 #     def log_utility_default_params(self):
 #         # paljonko työstä poissaolo vaikuttaa palkkaan
@@ -2692,53 +2701,53 @@ class UnemploymentLargeEnv_v3(gym.Env):
         return u/10 # tulot ovat vuositasolla, mutta skaalataan hyöty
 
 
-    # From Määttänen, 2013
-    def wage_process(self,w,age,ave=3300*12):
-        '''
-        Palkkaprosessi lähteestä Määttänen, 2013 
-        '''
-        eps=np.random.normal(loc=0,scale=0.02,size=1)[0]
-        a0=ave
-        a1=0.89
-        if w>0:
-            wt=a0*np.exp(a1*np.log(w/a0)+eps)
-        else:
-            wt=a0*np.exp(eps)
-
-        return wt
-
-    def wage_process_simple(self,w,age,ave=3300*12):
-        '''
-        debug-versio palkkaprosessista
-        '''
-        return w
-
-    def compute_salary(self,group=1,debug=True):
-        '''
-        Alussa ajettava funktio, joka tekee palkat yhtä episodia varten
-        '''
-        group_ave=np.array([2000,3300,5000,0.85*2000,0.85*3300,0.85*5000])*12
-
-        a0=group_ave[group]
-
-        self.salary[self.min_age]=np.maximum(self.min_salary,np.random.normal(loc=a0,scale=12*1000,size=1)[0]) # e/y
-
-        if debug:
-            self.salary[self.min_age+1:self.max_age+1]=self.salary[self.min_age]
-        else:
-            for age in range(self.min_age+1,self.max_age+1):
-                self.salary[age]=self.wage_process(self.salary[age-1],age,ave=a0)
-
-    def get_wage_v0(self,age,reduction):
-        '''
-        palkka age-ikäiselle time_in_state-vähennyksellä työllistymispalkkaan
-        '''
-        intage=int(np.floor(age))
-        if intage<self.max_age and intage>=self.min_age-1:
-            return np.maximum(self.min_salary,self.salary[intage]*max(0,(1-reduction)))
-        else:
-            return 0
-
+#     From Määttänen, 2013
+#     def wage_process(self,w,age,ave=3300*12):
+#         '''
+#         Palkkaprosessi lähteestä Määttänen, 2013 
+#         '''
+#         eps=np.random.normal(loc=0,scale=0.02,size=1)[0]
+#         a0=ave
+#         a1=0.89
+#         if w>0:
+#             wt=a0*np.exp(a1*np.log(w/a0)+eps)
+#         else:
+#             wt=a0*np.exp(eps)
+# 
+#         return wt
+# 
+#     def wage_process_simple(self,w,age,ave=3300*12):
+#         '''
+#         debug-versio palkkaprosessista
+#         '''
+#         return w
+# 
+#     def compute_salary(self,group=1,debug=True):
+#         '''
+#         Alussa ajettava funktio, joka tekee palkat yhtä episodia varten
+#         '''
+#         group_ave=np.array([2000,3300,5000,0.85*2000,0.85*3300,0.85*5000])*12
+# 
+#         a0=group_ave[group]
+# 
+#         self.salary[self.min_age]=np.maximum(self.min_salary,np.random.normal(loc=a0,scale=12*1000,size=1)[0]) # e/y
+# 
+#         if debug:
+#             self.salary[self.min_age+1:self.max_age+1]=self.salary[self.min_age]
+#         else:
+#             for age in range(self.min_age+1,self.max_age+1):
+#                 self.salary[age]=self.wage_process(self.salary[age-1],age,ave=a0)
+# 
+#     def get_wage_v0(self,age,reduction):
+#         '''
+#         palkka age-ikäiselle time_in_state-vähennyksellä työllistymispalkkaan
+#         '''
+#         intage=int(np.floor(age))
+#         if intage<self.max_age and intage>=self.min_age-1:
+#             return np.maximum(self.min_salary,self.salary[intage]*max(0,(1-reduction)))
+#         else:
+#             return 0
+# 
     def get_wage_step(self,age,reduction):
         '''
         palkka age-ikäiselle time_in_state-vähennyksellä työllistymispalkkaan, step-kohtaisesti, ei vuosikohtaisesti
@@ -2785,8 +2794,8 @@ class UnemploymentLargeEnv_v3(gym.Env):
             self.palkat_ika_miehet=12.5*np.array([2339.01,2339.01,2339.01,2489.09,2571.40,2632.58,2718.03,2774.21,2884.89,2987.55,3072.40,3198.48,3283.81,3336.51,3437.30,3483.45,3576.67,3623.00,3731.27,3809.58,3853.66,3995.90,4006.16,4028.60,4104.72,4181.51,4134.13,4157.54,4217.15,4165.21,4141.23,4172.14,4121.26,4127.43,4134.00,4093.10,4065.53,4063.17,4085.31,4071.25,4026.50,4031.17,4047.32,4026.96,4028.39,4163.14,4266.42,4488.40,4201.40,4252.15,4443.96,3316.92,3536.03,3536.03])
             self.palkat_ika_naiset=12.5*np.array([2223.96,2223.96,2223.96,2257.10,2284.57,2365.57,2443.64,2548.35,2648.06,2712.89,2768.83,2831.99,2896.76,2946.37,2963.84,2993.79,3040.83,3090.43,3142.91,3159.91,3226.95,3272.29,3270.97,3297.32,3333.42,3362.99,3381.84,3342.78,3345.25,3360.21,3324.67,3322.28,3326.72,3326.06,3314.82,3303.73,3302.65,3246.03,3244.65,3248.04,3223.94,3211.96,3167.00,3156.29,3175.23,3228.67,3388.39,3457.17,3400.23,3293.52,2967.68,2702.05,2528.84,2528.84])
         elif self.year==2019:
-            self.palkat_ika_miehet=12.5*np.array([2339.01,2339.01,2339.01,2489.09,2571.40,2632.58,2718.03,2774.21,2884.89,2987.55,3072.40,3198.48,3283.81,3336.51,3437.30,3483.45,3576.67,3623.00,3731.27,3809.58,3853.66,3995.90,4006.16,4028.60,4104.72,4181.51,4134.13,4157.54,4217.15,4165.21,4141.23,4172.14,4121.26,4127.43,4134.00,4093.10,4065.53,4063.17,4085.31,4071.25,4026.50,4031.17,4047.32,4026.96,4028.39,4163.14,4266.42,4488.40,4201.40,4252.15,4443.96,3316.92,3536.03,3536.03])
-            self.palkat_ika_naiset=12.5*np.array([2223.96,2223.96,2223.96,2257.10,2284.57,2365.57,2443.64,2548.35,2648.06,2712.89,2768.83,2831.99,2896.76,2946.37,2963.84,2993.79,3040.83,3090.43,3142.91,3159.91,3226.95,3272.29,3270.97,3297.32,3333.42,3362.99,3381.84,3342.78,3345.25,3360.21,3324.67,3322.28,3326.72,3326.06,3314.82,3303.73,3302.65,3246.03,3244.65,3248.04,3223.94,3211.96,3167.00,3156.29,3175.23,3228.67,3388.39,3457.17,3400.23,3293.52,2967.68,2702.05,2528.84,2528.84])
+            self.palkat_ika_miehet=12.5*np.array([2039,2334,2461,2498,2612,2683,2725,2833,2915,3014,3115,3196,3325,3389,3477,3540,3601,3690,3724,3863,3917,4018,4073,4150,4189,4212,4301,4273,4261,4323,4273,4225,4239,4188,4213,4174,4159,4165,4131,4136,4167,4135,4117,4134,4126,4101,4257,4368,4417,3916,4369,4045,3165,3923,2521,2982,3238,2898,3489,3063,6388,6388])
+            self.palkat_ika_naiset=12.5*np.array([1926,2107,2188,2235,2283,2347,2417,2541,2639,2722,2796,2845,2907,2980,3032,3073,3109,3150,3225,3281,3333,3402,3467,3462,3492,3546,3593,3577,3603,3542,3525,3511,3515,3470,3484,3482,3477,3480,3408,3417,3428,3381,3361,3351,3292,3314,3461,3553,3583,3441,3039,2797,3320,2168,2360,3316,4525,4525,4525,2449,2449,1393])
         else:
             error(1001)
             
