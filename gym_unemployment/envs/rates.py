@@ -300,3 +300,18 @@ class Rates():
         birth=1-(1-birth)**self.timestep
 
         return birth
+        
+    def get_pinkslip_rate(self):
+        pinkslip_intensity=np.zeros(6)
+        if False:
+            pinkslip_intensity[0:3]=0.05 # todennäköisyys tulla irtisanotuksi vuodessa, miehet
+            pinkslip_intensity[3:6]=0.05 # todennäköisyys tulla irtisanotuksi vuodessa, naiset
+        else:
+            pinkslip_intensity[0]=0.07 # todennäköisyys tulla irtisanotuksi vuodessa, miehet
+            pinkslip_intensity[1]=0.04 # todennäköisyys tulla irtisanotuksi vuodessa, miehet
+            pinkslip_intensity[2]=0.02 # todennäköisyys tulla irtisanotuksi vuodessa, miehet
+            pinkslip_intensity[3]=0.05 # todennäköisyys tulla irtisanotuksi vuodessa, naiset
+            pinkslip_intensity[4]=0.04 # todennäköisyys tulla irtisanotuksi vuodessa, naiset
+            pinkslip_intensity[5]=0.02 # todennäköisyys tulla irtisanotuksi vuodessa, naiset
+
+        return pinkslip_intensity
