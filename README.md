@@ -3,7 +3,30 @@
 This library implements Finnish social security as an OpenAI Gym-environment that
 can be used in a life-cycle model to predict, e.g., employment rate.
 
-Description of the environment can be found (in Finnish!) from articles (Tanskanen, 2019a; Tanskanen, 2019b).
+Description of the environment can be found from articles (Tanskanen, 2019; Tanskanen, 2020).
+
+## Versions
+
+# v0 - minimal
+
+# v1 - baseline
+
+# v2 - improved
+
+# v3 - the latest
+
+## Rewards
+
+Reward is log utility of net income minus a constant representing the free time lost.
+
+# Installation
+
+Clone the repository and run command 
+
+	pip install -e .
+
+in the parent directory of gym_unemployment, where you can find setup.py file.
+
 
 # Adding a new environment
 
@@ -34,7 +57,7 @@ command
 in the parent directory of gym_unemployment, where you can find setup.py file.
 
 
-## Viittaukset
+## References
 
 	@misc{econogym,
 	  author = {Antti J. Tanskanen},
@@ -45,13 +68,20 @@ in the parent directory of gym_unemployment, where you can find setup.py file.
 	  howpublished = {\url{https://github.com/ajtanskanen/econogym}},
 	}
 	
-Lyhyt kuvaus kirjastosta on myös julkaisussa
+The library is described in articles
+
+    @article{tanskanen2020deep,
+      title={Deep reinforced learning enables solving discrete-choice life cycle models to analyze social security reforms},
+      author={Tanskanen, Antti J},
+      journal={arXiv preprint arXiv:2010.13471},
+      year={2020}
+    }
 	
 	@misc{lifecycle_rl_kak,
 	  author = {Antti J. Tanskanen},
 	  title = {Unelmoivatko robotit ansiosidonnaisesta sosiaaliturvasta?},
-	  year = {2019b},
+	  year = {2019},
 	  publisher = {},
 	  journal = {KAK},
 	  howpublished = {TBD},
-	}		
+	}	
