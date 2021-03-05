@@ -35,7 +35,7 @@ class UnemploymentLargeEnv_v3(gym.Env):
         This environment corresponds to the environment of the Finnish Social Security
 
     Observation: 
-        Type: Box(17) 
+        Type: Box(17)  UPDATE!
         Num    Observation                Min           Max
         0    Employment status             0             12
         1    Ryhmä                         0              6
@@ -59,21 +59,21 @@ class UnemploymentLargeEnv_v3(gym.Env):
     Employment states:
         Type: Int
         Num     State
-        0   Unemployed
+        0   Earnings-related Unemployed
         1   Employed
         2   Retired
         3   Disabled
-        4   Työttömyysputki
-        5   Äitiysvapaa
-        6   Isyysvapaa
-        7   Kotihoidontuki
-        8   Vanhuuseläke+Osa-aikatyö   
-        9   Vanhuuseläke+Kokoaikatyö   
-        10  Osa-aikatyö
-        11  Työvoiman ulkopuolella, ei tukia
-        12  Opiskelija tai armeijassa
-        13  Työmarkkinatuki
-        14  Kuollut (jos kuolleisuus mukana)
+        4   Extended earnings-related unemployment
+        5   Mother's leave
+        6   Father's leave
+        7   Support for taking care of children at home
+        8   Retired working part-time
+        9   Retired worling full-time   
+        10  Part-time work
+        11  Outside of work-force
+        12  Student or in the army 
+        13  Earnings-unrelated Unemployment (Työmarkkinatuki)
+        14  Dead
 
     Actions:
         These really depend on the state (see function step)

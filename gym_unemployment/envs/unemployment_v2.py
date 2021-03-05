@@ -79,11 +79,6 @@ class UnemploymentLargeEnv_v2(gym.Env):
         12  Opiskelija
         13  Työmarkkinatuki
         #14  Armeijassa
-        #15  Täysiaikatyö + OVE   TBI
-        #16  Osa-aikatyö + OVE    TBI
-        #17  Työtön + OVE         TBI
-        #18  Osatk + työ          TBI
-        #19  Osatk + työtön       TBI
         14  Kuollut (jos kuolleisuus mukana)
 
     Actions:

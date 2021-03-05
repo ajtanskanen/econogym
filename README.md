@@ -12,20 +12,21 @@ Description of the environment can be found from articles (Tanskanen, 2019; Tans
 ### v0 - minimal
 
 Minimal environment with only three states: working, unemployed, retired.
-A more realistic environment with only ten states. This is the version used in article Tanskanen (2020)
+This is the version used in article Deep reinforced learning enables solving discrete-choice life cycle models to analyze social security reforms (2020)
 
 ### v1 - baseline
 
-A more realistic environment with only ten states. This is the version used in article Tanskanen (2019)
+A more realistic environment with only ten states. This is the version used in article 
+Ty{\"o}llisyysvaikutuksien arviointia teko{\"a}lyll{\"a}: Unelmoivatko robotit ansiosidonnaisesta sosiaaliturvasta.
 
 ### v2 - improved
 
-A more realistic environment with only 13 states. This is the version used in article Tanskanen (2020b)
+A more realistic environment with 15 states. This is the version used in article Tanskanen (2020b)
 Includes fixes to version v1.
 
 ### v3 - the latest
 
-A more realistic environment with only 12 states. This is the version used that will be used in future articles.
+A more realistic environment with 15 states. This is the version used that will be used in future articles.
 Includes fixes to versions v1 and v3. This is the one that should be used.
 
 ## Rewards
@@ -89,11 +90,12 @@ The library is described in articles
       journal={arXiv preprint arXiv:2010.13471},
       year={2020}
     }
-	
-	@misc{lifecycle_rl_kak,
-	  author = {Antti J. Tanskanen},
-	  title = {Unelmoivatko robotit ansiosidonnaisesta sosiaaliturvasta?},
-	  year = {2019},
-	  publisher = {},
-	  journal = {KAK},
-	}	
+    
+    @article{tanskanen2020tyollisyysvaikutuksien,
+      title={Ty{\"o}llisyysvaikutuksien arviointia teko{\"a}lyll{\"a}: Unelmoivatko robotit ansiosidonnaisesta sosiaaliturvasta},
+      author={Tanskanen, Antti J},
+      journal={Kansantaloudellinen aikakauskirja},
+      volume={2},
+      pages={292--321},
+      year={2020}
+    }
