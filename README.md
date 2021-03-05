@@ -1,19 +1,32 @@
 # Finnish social security as an OpenAI Gym-environment
 
-This library implements Finnish social security as an OpenAI Gym-environment that
+This library implements life-cycle of an individual s an OpenAI Gym-environmen.
 can be used in a life-cycle model to predict, e.g., employment rate.
+
+The library depends on the benefits library that implements Finnish social security a
 
 Description of the environment can be found from articles (Tanskanen, 2019; Tanskanen, 2020).
 
 ## Versions
 
-# v0 - minimal
+### v0 - minimal
 
-# v1 - baseline
+Minimal environment with only three states: working, unemployed, retired.
+A more realistic environment with only ten states. This is the version used in article Tanskanen (2020)
 
-# v2 - improved
+### v1 - baseline
 
-# v3 - the latest
+A more realistic environment with only ten states. This is the version used in article Tanskanen (2019)
+
+### v2 - improved
+
+A more realistic environment with only 13 states. This is the version used in article Tanskanen (2020b)
+Includes fixes to version v1.
+
+### v3 - the latest
+
+A more realistic environment with only 12 states. This is the version used that will be used in future articles.
+Includes fixes to versions v1 and v3. This is the one that should be used.
 
 ## Rewards
 
@@ -83,5 +96,4 @@ The library is described in articles
 	  year = {2019},
 	  publisher = {},
 	  journal = {KAK},
-	  howpublished = {TBD},
 	}	
