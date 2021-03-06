@@ -113,7 +113,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         if 'kwargs' in kwargs:
             kwarg=kwargs['kwargs']
         else:
-            kwarg={}
+            kwarg=kwargs
             
         for key, value in kwarg.items():
             if key=='step':

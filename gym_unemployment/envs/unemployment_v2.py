@@ -182,7 +182,7 @@ class UnemploymentLargeEnv_v2(gym.Env):
         if 'kwargs' in kwargs:
             kwarg=kwargs['kwargs']
         else:
-            kwarg={}
+            kwarg=kwargs
 
         for key, value in kwarg.items():
             if key=='step':
