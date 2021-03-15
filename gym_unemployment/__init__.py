@@ -20,14 +20,19 @@ register(
     entry_point='gym_unemployment.envs:UnemploymentLargeEnv_v3',
 )
 
-register(
-    id='unemploymentEK-v0',
-    entry_point='gym_unemployment.envs:UnemploymentEKEnv',
-)
+#register(
+#    id='unemploymentEK-v0',
+#    entry_point='gym_unemployment.envs:UnemploymentEKEnv',
+#)
+
+#register(
+#    id='unemploymentEK-v1',
+#    entry_point='gym_unemployment.envs:UnemploymentEKLargeEnv',
+#)
 
 register(
-    id='unemploymentEK-v1',
-    entry_point='gym_unemployment.envs:UnemploymentEKLargeEnv',
+    id='unemploymentEK-v3',
+    entry_point='gym_unemployment.envs:UnemploymentEKLargeEnv_v3',
 )
 
 register(
