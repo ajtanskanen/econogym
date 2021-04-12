@@ -1,6 +1,6 @@
 """
 
-    unemployment_v3
+    unemployment_v4
 
 
     Gym module implementing the Finnish social security including earnings-related components,
@@ -26,7 +26,7 @@ from . rates import Rates
 #         return 'Unknown state '+key
 
 
-class UnemploymentLargeEnv_v3(gym.Env):
+class UnemploymentLargeEnv_v4(gym.Env):
     """
     Description:
         The Finnish Unemployment Pension Scheme 

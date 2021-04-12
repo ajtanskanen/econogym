@@ -9,9 +9,9 @@ from gym import spaces, logger, utils, error
 from gym.utils import seeding
 import numpy as np
 from fin_benefits import BenefitsEK
-from .unemployment_v0 import UnemploymentEnv_v0
+from .unemployment_rev_v0 import UnemploymentRevEnv_v0
 
-class UnemploymentLongEnv_v0(UnemploymentEnv_v0):
+class UnemploymentLongEnv_v0(UnemploymentRevEnv_v0):
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
         self.ansiopvraha_kesto=2.0

@@ -6,6 +6,11 @@ register(
 )
 
 register(
+    id='unemployment-rev-v0',
+    entry_point='gym_unemployment.envs:UnemploymentRevEnv_v0',
+)
+
+register(
     id='unemployment-v1',
     entry_point='gym_unemployment.envs:UnemploymentLargeEnv',
 )
@@ -18,6 +23,11 @@ register(
 register(
     id='unemployment-v3',
     entry_point='gym_unemployment.envs:UnemploymentLargeEnv_v3',
+)
+
+register(
+    id='unemployment-v4',
+    entry_point='gym_unemployment.envs:UnemploymentLargeEnv_v4',
 )
 
 #register(
