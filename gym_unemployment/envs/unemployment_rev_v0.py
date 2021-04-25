@@ -86,7 +86,8 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         self.max_age=70
         self.min_age=18
         self.min_retirementage=65
-        self.max_retirementage=70        
+        self.max_retirementage=70       
+        self.max_unemp_age=65 
         
         self.ansiopvraha_kesto=1.0
         self.karenssi_kesto=0.24 # vuotta
@@ -105,6 +106,8 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         self.scale_tyel_accrual=True
         self.scale_additional_tyel_accrual=0
         self.scale_additional_unemp_benefit=0
+        self.include_pt=False
+        self.perustulo=False # onko Kelan perustulo laskelmissa
         
         if 'kwargs' in kwargs:
             kwarg=kwargs['kwargs']
@@ -121,6 +124,9 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
             elif key=='train':
                 if value is not None:
                     self.train=value
+            elif key=='perustulo':
+                if value is not None:
+                    self.perustulo=value
             elif key=='reset_exploration_go':
                 if value is not None:
                     self.reset_exploration_go=value
@@ -193,9 +199,14 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         print('minimal model')
         self.n_age=self.max_age-self.min_age+1
         self.n_empl=4 # states of employment, 0,1,2,3
-        self.n_actions=4
-        self.n_empl=4 # states of employment, 0,1,2,3
-        self.n_actions=3
+        
+        if self.min_retirementage>self.max_unemp_age:
+            self.max_unemp_age=self.min_retirementage 
+    
+        if self.include_pt:
+            self.n_actions=4
+        else:
+            self.n_actions=3
             
         self.salary=np.zeros(self.max_age+1)
         
@@ -212,14 +223,18 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         self.viewer = None
         self.state = None
         
-        if self.wage_without_tis:
-            self.get_wage=self.get_wage_without_tis
-        else:
-            self.get_wage=self.get_wage_with_tis
+        #if self.wage_without_tis:
+        self.get_wage=self.get_wage_without_tis
+        #else:
+        #    self.get_wage=self.get_wage_with_tis
         
         self.steps_beyond_done = None
         
-        self.ben = fin_benefits.Benefits()
+        if self.perustulo:
+            self.ben = fin_benefits.BasicIncomeBenefits(**kwargs)
+        else:
+            self.ben = fin_benefits.Benefits(**kwargs)
+
         self.setup_salaries()
         
         self.explain()
@@ -233,7 +248,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         '''
         return self.n_empl,self.n_actions
         
-    def comp_benefits(self,wage,old_wage,pension,employment_status,time_in_state,ika=25):
+    def comp_benefits(self,wage,old_wage,pension,employment_status,time_in_state,ika):
         '''
         Laske etuuksien arvo, kun 
             wage on palkka
@@ -244,8 +259,8 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
             ika on henkilön ikä
         '''
         p={}
-
-        p['perustulo']=0
+        
+        p['perustulo']=self.perustulo
         p['toimeentulotuki_vahennys']=0
         p['ika']=ika
         p['lapsia']=0
@@ -271,7 +286,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
             p['elakkeella']=0
             p['saa_ansiopaivarahaa']=0
         elif employment_status==0: # työtön, ansiopäiväraha alle 60 ja työmarkkinatuki
-            if ika<65:
+            if ika<self.max_unemp_age:
                 p['tyoton']=1
                 p['t']=0
                 p['vakiintunutpalkka']=old_wage/12
@@ -305,7 +320,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
             print('Unknown employment_status ',employment_status)
     
         # tarkastellaan yksinasuvia henkilöitä
-        if ika<65 or employment_status>0:
+        if ika<self.max_unemp_age or employment_status>0:
             p['asumismenot_toimeentulo']=500
             p['asumismenot_asumistuki']=500
         else:
@@ -321,6 +336,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         
         netto,benefitq=self.ben.laske_tulot(p)
         netto=netto*12
+        #print(benefitq)
         
         return netto
         
@@ -480,10 +496,10 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
     # from Hakola and Määttänen, 2005
     def log_utility(self,income,employment_state,age):
         # kappa tells how much person values free-time
-        kappa_fulltime=0.665
-        kappa_parttime=0.20
-        kappa_retirement=0.10
-        mu_age=56
+        kappa_fulltime=0.77
+        kappa_parttime=0.10
+        kappa_retirement=0.0
+        mu_age=58
         
         if age>mu_age:
             mu=0.08
@@ -491,9 +507,9 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
             kappa_parttime += mu*max(0,min(6,age-mu_age))
             #kappa_fulltime *= (1+mu*max(0,min(68,age)-mu_age))
             #kappa_parttime *= (1+mu*max(0,min(68,age)-mu_age))
-        elif age<40:
-            kappa_fulltime += 0.015*min(6,40-age)
-            kappa_parttime += 0.010*min(6,40-age)
+        #elif age<40:
+            #kappa_fulltime += 0.015*min(6,40-age)
+            #kappa_parttime += 0.010*min(6,40-age)
         
         if employment_state == 1:
             u=np.log(income)-kappa_fulltime
@@ -567,17 +583,19 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         
         if w_cum<self.min_salary:
             c=0
+            #wt=factor*max(a1*np.exp(c1*np.log(max(w_old,self.min_salary)/a0)-0.5*sigma*sigma),self.min_salary)
             wt=factor*max(a1*np.exp(c1*np.log(max(w_old,self.min_salary)/a0)-0.5*sigma*sigma),self.min_salary)
             c=lognorm.cdf(self.min_salary/wt,sigma,loc=0,scale=1)
         else:
             #wt=self.get_wage_raw(age,w_old,state)
+            #wt=factor*max(a1*np.exp(c1*np.log(max(w_old,self.min_salary)/a0)-0.5*sigma*sigma),self.min_salary)
             wt=factor*max(a1*np.exp(c1*np.log(max(w_old,self.min_salary)/a0)-0.5*sigma*sigma),self.min_salary)
             c=lognorm.cdf(w_cum/wt,sigma,loc=0,scale=1)
             #print(f'c {c} w_cum {w_cum} wt {wt} w_old {w_old} s {state}')
 
         return c
 
-    def wage_process_mean(self,w_cum,w_old,age,state=1):
+    def wage_process_map(self,pp,w_old,age,state=1):
         '''
         wage process cumulative function
         Palkkaprosessin kertymäfunktio 
@@ -600,15 +618,36 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         sigma=0.07
         c1=0.89
         
-        if w_cum<self.min_salary:
-            c=0
-            wt=factor*max(a1*np.exp(c1*np.log(max(w_old,self.min_salary)/a0)-0.5*sigma*sigma),self.min_salary)
-            c=lognorm.mean(self.min_salary/wt,sigma,loc=0,scale=1)
+        wt=factor*max(a1*np.exp(c1*np.log(max(w_old,self.min_salary)/a0)-0.5*sigma*sigma),self.min_salary)
+        c=lognorm.ppf(pp,sigma,loc=0,scale=1)*wt
+
+        return c
+
+    def wage_process_mean(self,w_old,age,state=1):
+        '''
+        wage process cumulative function
+        Palkkaprosessin kertymäfunktio 
+        palkka vuositasolla
+        
+        w_cum  cumulative probability until w_cum
+        w_old  vanha palkka
+        age    ika
+        state  employment state
+        '''
+        
+        a0=self.palkat_ika_miehet[max(0,age-1-self.min_age)]
+        a1=self.palkat_ika_miehet[age-self.min_age]
+           
+        if state==0:
+           factor=self.unemp_wageshock # 0.95
         else:
-            #wt=self.get_wage_raw(age,w_old,state)
-            wt=factor*max(a1*np.exp(c1*np.log(max(w_old,self.min_salary)/a0)-0.5*sigma*sigma),self.min_salary)
-            c=lognorm.mean(w_cum/wt,sigma,loc=0,scale=1)
-            #print(f'c {c} w_cum {w_cum} wt {wt} w_old {w_old} s {state}')
+           factor=1.0
+                
+        sigma=0.07
+        c1=0.89
+        
+        wt=factor*max(a1*np.exp(c1*np.log(max(w_old,self.min_salary)/a0)-0.5*sigma*sigma),self.min_salary)
+        c=lognorm.median(sigma,loc=0,scale=1)+wt
 
         return c
     
@@ -644,11 +683,14 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
             self.salary[age]=self.wage_process(self.salary[age-1],age,a0,a1)
             #print('age {} sal {}'.format(age,self.salary[age]))
         
-    def scale_pension(self,pension,age,debug=False):
+    def scale_pension(self,pension,age,debug=False,emp=1,time_in_state=0):
         if debug:
             return pension*self.elakeindeksi
         else:
-            return self.elinaikakerroin*pension*self.elakeindeksi*(1+0.048*(age-self.min_retirementage))
+            if emp==0:
+                return self.elinaikakerroin*pension*self.elakeindeksi*(1+0.048*max(0,age-self.min_retirementage-time_in_state))
+            else:
+                return self.elinaikakerroin*pension*self.elakeindeksi*(1+0.048*(age-self.min_retirementage))
 
     def close(self):
         if self.viewer:
@@ -715,9 +757,9 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
             elif action == 2:
                 if age>=self.min_retirementage: # ve
                     employment_status  = 2 
-                    time_in_state=0
-                    pension=self.scale_pension(pension,age)
+                    pension=self.scale_pension(pension,age,emp=0,time_in_state=time_in_state)
                     pension=self.ben.laske_kokonaiselake(age,pension/12,include_kansanelake=True,include_takuuelake=True)*12
+                    time_in_state=0
                     netto=self.comp_benefits(0,0,pension,employment_status,0,age)
                     time_in_state+=self.timestep
                     next_wage=0
@@ -856,7 +898,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
                 self.state = self.state_encode(employment_status,pension,wage,int(np.round(age+self.timestep)),time_in_state,next_wage)
             elif self.steps_beyond_done is None:
                 self.steps_beyond_done = 0
-                if employment_status == 2:
+                if employment_status == 2 and age<self.max_age+self.timestep:
                     if self.partial_npv:
                         basenetto=self.comp_benefits(0,0,0,0,0,18)
                         reward = self.npv*(self.log_utility(netto,2,age)-self.log_utility(basenetto,0,18))
@@ -1042,7 +1084,7 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         print(f'max_retirementage {self.max_retirementage}\nmortality {self.include_mort}')
         print(f'ansiopvraha_kesto {self.ansiopvraha_kesto}\nTrain {self.train}')
         print(f'reset_exploration_go {self.reset_exploration_go}\nreset_exploration_ratio {self.reset_exploration_ratio}\nplotdebug {self.plotdebug}')
-        
+        print(f'basic income {self.perustulo}')
 
     def reset(self,init=None,debug=False,ini_age=None,pension=None,ini_wage=None,ini_old_wage=None):
         '''
@@ -1071,20 +1113,29 @@ employment_status,pension,old_wage,age,time_in_state,next_wage
         # set up salary for the entire career
         initial_salary=None
         initial_age=None
-        if self.reset_exploration_go and self.train:
-            if self.reset_exploration_ratio>np.random.uniform():
-                #print('exploration')
-                time_in_state=random.choices(np.array([0,1,2,3,4,5],dtype=int),weights=[0.25,0.25,0.20,0.10,0.10,0.10])[0] # 60% tm-tuella
-                #employment_status=random.choices(np.array([0,1,3],dtype=int),weights=[0.4,0.4,0.2])[0]
-                employment_status=random.choices(np.array([0,1],dtype=int),weights=[0.4,0.4])[0]
-                if random.random()<0.5:
-                    age=int(np.random.uniform(low=self.min_age,high=self.max_age-5))
+        if self.reset_exploration_go and self.train and self.reset_exploration_ratio>np.random.uniform():
+            #print('exploration')
+            time_in_state=random.choices(np.array([0,1,2,3,4,5],dtype=int),weights=[0.15,0.35,0.20,0.20,0.10,0.10])[0] # 60% tm-tuella
+            #employment_status=random.choices(np.array([0,1,3],dtype=int),weights=[0.4,0.4,0.2])[0]
+            if random.random()<0.5:
+                age=int(np.random.uniform(low=self.min_age,high=self.max_age-5))
+            else:
+                age=int(np.random.uniform(low=58,high=self.max_age-2))
+            if age<self.min_retirementage:
+                if self.include_pt:
+                    employment_status=random.choices(np.array([0,1,3],dtype=int),weights=[0.4,0.4,0.2])[0]
                 else:
-                    age=int(np.random.uniform(low=58,high=self.max_age-5))
-                initial_salary=np.random.uniform(low=1_000,high=110_000)
-                pension=np.random.uniform(low=0,high=90_000)
-                initial_age=age
-                #print('Explore: age {} initial {} pension {}'.format(age,initial_salary,pension))
+                    employment_status=random.choices(np.array([0,1],dtype=int),weights=[0.4,0.4])[0]
+            else:
+                if self.include_pt:
+                    employment_status=random.choices(np.array([0,1,2,3],dtype=int),weights=[0.3,0.3,0.3,0.1])[0]
+                else:
+                    employment_status=random.choices(np.array([0,1,2],dtype=int),weights=[0.4,0.3,0.3])[0]
+            
+            initial_salary=np.random.uniform(low=1_000,high=110_000)
+            pension=np.random.uniform(low=0,high=90_000)
+            initial_age=age
+            #print('Explore: age {} initial {} pension {}'.format(age,initial_salary,pension))
 
         self.compute_salary(initial_salary=initial_salary,initial_age=initial_age)
         if ini_old_wage is None:
