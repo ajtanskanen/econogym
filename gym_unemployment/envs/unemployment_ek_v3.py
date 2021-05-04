@@ -16,18 +16,18 @@ class UnemploymentEKLargeEnv_v3(UnemploymentLargeEnv_v3):
         super().__init__(**kwargs)
         
         self.ben = BenefitsEK(**kwargs)
-        #self.ben = Benefits(**kwargs)
             
         self.ben.set_year(self.year)
 
-        self.ansiopvraha_toe=1.0 # = 12kk
+        if False:
+            self.ansiopvraha_toe=1.0 # = 12kk
         
-        self.ansiopvraha_kesto400=350
-        self.ansiopvraha_kesto300=250
-        scale=21.5*12
-        self.apvkesto300=np.round(self.ansiopvraha_kesto300/scale/self.timestep)*self.timestep
-        self.apvkesto400=np.round(self.ansiopvraha_kesto400/scale/self.timestep)*self.timestep
-        self.apvkesto500=np.round(self.ansiopvraha_kesto500/scale/self.timestep)*self.timestep
+            self.ansiopvraha_kesto400=350
+            self.ansiopvraha_kesto300=250
+            scale=21.5*12
+            self.apvkesto300=np.round(self.ansiopvraha_kesto300/scale/self.timestep)*self.timestep
+            self.apvkesto400=np.round(self.ansiopvraha_kesto400/scale/self.timestep)*self.timestep
+            self.apvkesto500=np.round(self.ansiopvraha_kesto500/scale/self.timestep)*self.timestep
         
         if 'kwargs' in kwargs:
             kwarg=kwargs['kwargs']
