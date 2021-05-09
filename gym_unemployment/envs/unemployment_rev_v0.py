@@ -1121,7 +1121,7 @@ class UnemploymentRevEnv_v0(gym.Env):
         initial_age=None
         if self.reset_exploration_go and self.train and self.reset_exploration_ratio>np.random.uniform():
             #print('exploration')
-            time_in_state=random.choices(np.array([0,1,2,3,4,5],dtype=int),weights=[0.15,0.35,0.20,0.20,0.10,0.10])[0] # 60% tm-tuella
+            time_in_state=random.choices(np.array([0,1,2,3,4,5],dtype=int),weights=[0.10,0.35,0.20,0.15,0.10,0.05])[0] # 60% tm-tuella
             #employment_status=random.choices(np.array([0,1,3],dtype=int),weights=[0.4,0.4,0.2])[0]
             if random.random()<0.5:
                 age=int(np.random.uniform(low=self.min_age,high=self.max_age-5))
@@ -1138,8 +1138,8 @@ class UnemploymentRevEnv_v0(gym.Env):
                 else:
                     employment_status=random.choices(np.array([0,1,2],dtype=int),weights=[0.4,0.3,0.3])[0]
             
-            initial_salary=np.random.uniform(low=1_000,high=110_000)
-            pension=np.random.uniform(low=0,high=90_000)
+            initial_salary=np.random.uniform(low=1_000,high=80_000)
+            pension=np.random.uniform(low=0,high=50_000)
             initial_age=age
             #print('Explore: age {} initial {} pension {}'.format(age,initial_salary,pension))
 
