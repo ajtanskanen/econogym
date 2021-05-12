@@ -979,11 +979,12 @@ class UnemploymentRevEnv_v0(gym.Env):
         else:
             print('state error '+str(emp))
             
-        d[states]=(pension-40_000)/40_000 # vastainen/alkanut eläke
-        d[states+1]=(old_wage-40_000)/40_000
+        d[states]=(pension-20_000)/20_000 # vastainen/alkanut eläke
+        #d[states]=(pension-40_000)/40_000 # vastainen/alkanut eläke
+        d[states+1]=(old_wage-35_000)/35_000
         d[states+2]=(age-(self.max_age+self.min_age)/2)/((self.max_age+self.min_age)/2)
         d[states+3]=(time_in_state-20)/20
-        d[states+4]=(nextwage-40_000)/40_000
+        d[states+4]=(nextwage-35_000)/35_000
         if age>=self.min_retirementage:
             d[states+5]=1
         else:
@@ -1008,11 +1009,12 @@ class UnemploymentRevEnv_v0(gym.Env):
         if emp<0:
             print('state error '+str(vec))
             
-        pension=vec[self.n_empl]*40_000+40_000
-        wage=vec[self.n_empl+1]*40_000+40_000
+        pension=vec[self.n_empl]*20_000+20_000
+        #pension=vec[self.n_empl]*40_000+40_000
+        wage=vec[self.n_empl+1]*35_000+35_000
         age=int(np.round(vec[self.n_empl+2]*((self.max_age+self.min_age)/2)+(self.max_age+self.min_age)/2))
         time_in_state=vec[self.n_empl+3]*20+20
-        nextwage=vec[self.n_empl+4]*40_000+40_000
+        nextwage=vec[self.n_empl+4]*35_000+35_000
                 
         return int(emp),pension,wage,age,time_in_state,nextwage
 
