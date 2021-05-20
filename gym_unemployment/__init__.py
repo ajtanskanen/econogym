@@ -60,3 +60,8 @@ register(
     entry_point='gym_unemployment.envs:UnemploymentLongEnv_v0',
 )
 
+register(
+    id='savings-v0',
+    entry_point='gym_unemployment.envs:SavingsEnv_v0',
+)
+

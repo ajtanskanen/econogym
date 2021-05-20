@@ -1926,6 +1926,7 @@ class UnemploymentLargeEnv(gym.Env):
         if self.plotdebug:
             self.render(done=done,reward=reward, netto=netto)
 
+        benq['eq']=0.0
         return np.array(self.state), reward, done, benq
         
     def scale_q(self,npv,benq):

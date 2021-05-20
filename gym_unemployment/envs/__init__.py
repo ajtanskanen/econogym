@@ -10,3 +10,4 @@ from gym_unemployment.envs.unemployment_ek_v1 import UnemploymentEKLargeEnv
 from gym_unemployment.envs.unemployment_ek_v3 import UnemploymentEKLargeEnv_v3
 from gym_unemployment.envs.unemployment_porrastus_v1 import UnemploymentStepsLargeEnv
 from gym_unemployment.envs.test_environment import TestEnv
+from gym_unemployment.envs.savings_v0 import SavingsEnv_v0
