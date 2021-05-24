@@ -324,6 +324,12 @@ class UnemploymentLargeEnv(gym.Env):
         '''
         return self.n_empl,self.n_actions
 
+    def get_lc_version(self):
+        '''
+        returns the version of life-cycle model's episodestate used
+        '''
+        return 1
+        
     def comp_npv(self):
         '''
         lasketaan montako timestep:iä (diskontattuna) max_age:n jälkeen henkilö on vanhuuseläkkeellä 

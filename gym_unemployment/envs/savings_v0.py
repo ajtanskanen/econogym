@@ -252,6 +252,12 @@ class SavingsEnv_v0(gym.Env):
         '''
         return self.n_empl,self.n_actions
         
+    def get_lc_version(self):
+        '''
+        returns the version of life-cycle model's episodestate used
+        '''
+        return 101
+                
     def comp_benefits(self,wage,old_wage,pension,employment_status,time_in_state,ika):
         '''
         Laske etuuksien arvo, kun 
