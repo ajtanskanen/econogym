@@ -247,6 +247,12 @@ class UnemploymentRevEnv_v0(gym.Env):
         Palauta parametrien arvoja
         '''
         return self.n_empl,self.n_actions
+
+    def get_lc_version(self):
+        '''
+        returns the version of life-cycle model's episodestate used
+        '''
+        return 0        
         
     def comp_benefits(self,wage,old_wage,pension,employment_status,time_in_state,ika):
         '''

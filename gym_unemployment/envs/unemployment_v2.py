@@ -413,6 +413,12 @@ class UnemploymentLargeEnv_v2(gym.Env):
         '''
         return self.n_empl,self.n_actions
         
+    def get_lc_version(self):
+        '''
+        returns the version of life-cycle model's episodestate used
+        '''
+        return 2
+        
     def test_comp_npv(self):
         npv,npv0,cpsum_pension=self.comp_npv()
         

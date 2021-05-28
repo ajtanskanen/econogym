@@ -304,9 +304,15 @@ class UnemploymentLargeEnv_v3(gym.Env):
 
     def get_n_states(self):
         '''
-        Palauta parametrien arvoja
+        returns number of the employment state & number of actions
         '''
         return self.n_empl,self.n_actions
+        
+    def get_lc_version(self):
+        '''
+        returns the version of life-cycle model's episodestate used
+        '''
+        return 3
         
     def test_comp_npv(self):
         npv,npv0,cpsum_pension=self.comp_npv()
@@ -2545,39 +2551,41 @@ class UnemploymentLargeEnv_v3(gym.Env):
             self.salary_const=0.045*self.timestep # työttömyydestä palkka alenee tämän verran vuodessa
             self.salary_const_up=0.04*self.timestep # työssäolo palauttaa ansioita tämän verran vuodessa
             self.salary_const_student=0.05*self.timestep # opiskelu pienentää leikkausta tämän verran vuodessa
-            self.wage_initial_reduction=0.005 # työttömäksi siirtymisestä tuleva alennus tuleviin palkkoihin
+            self.wage_initial_reduction=0.010 # työttömäksi siirtymisestä tuleva alennus tuleviin palkkoihin
             
-            self.men_kappa_fulltime=0.690 #0.682 # 0.670 # vapaa-ajan menetyksestä rangaistus miehille
+            self.men_kappa_fulltime=0.730 # 0.675 #0.682 # 0.670 # vapaa-ajan menetyksestä rangaistus miehille
             self.men_mu_scale=0.035 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
             self.men_mu_age=self.min_retirementage-2.0 # P.O. 60??
-            self.men_kappa_osaaika=0.450 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
-            self.men_kappa_osaaika_old=0.360 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan, alle 35v
-            self.men_kappa_hoitovapaa=0.00 # hyöty hoitovapaalla olosta
-            self.men_kappa_ve=0.230 # 0.03 # ehkä 0.10?
+            self.men_kappa_osaaika_young=0.485 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
+            self.men_kappa_osaaika_middle=0.420 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
+            self.men_kappa_osaaika_old=0.370 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan, alle 35v
+            self.men_kappa_hoitovapaa=0.10 # hyöty hoitovapaalla olosta
+            self.men_kappa_ve=0.250 # 0.03 # ehkä 0.10?
             if self.perustulo:
                 self.men_kappa_pinkslip_young=0.10
                 self.men_kappa_pinkslip_middle=0.09
                 self.men_kappa_pinkslip_elderly=0.12
             else:
-                self.men_kappa_pinkslip_young=0.00
-                self.men_kappa_pinkslip_middle=0.06
-                self.men_kappa_pinkslip_elderly=0.09
+                self.men_kappa_pinkslip_young=0.05
+                self.men_kappa_pinkslip_middle=0.09
+                self.men_kappa_pinkslip_elderly=0.12
             
-            self.women_kappa_fulltime=0.640 # 0.640 # 0.620 # 0.610 # vapaa-ajan menetyksestä rangaistus naisille
-            self.women_mu_scale=0.03 # 0.25 # how much penalty is associated with work increase with age after mu_age
+            self.women_kappa_fulltime=0.620 # 0.605 # 0.640 # 0.620 # 0.610 # vapaa-ajan menetyksestä rangaistus naisille
+            self.women_mu_scale=0.030 # 0.25 # how much penalty is associated with work increase with age after mu_age
             self.women_mu_age=self.min_retirementage-1.5 # 61 #5 P.O. 60??
-            self.women_kappa_osaaika=0.385
-            self.women_kappa_osaaika_old=0.385
-            self.women_kappa_hoitovapaa=0.00 # 0.08
-            self.women_kappa_ve=0.260 # 0.03 # ehkä 0.10?
+            self.women_kappa_osaaika_young=0.390
+            self.women_kappa_osaaika_middle=0.360
+            self.women_kappa_osaaika_old=0.390
+            self.women_kappa_hoitovapaa=0.10 # 0.08
+            self.women_kappa_ve=0.280 # 0.03 # ehkä 0.10?
             if self.perustulo:
                 self.women_kappa_pinkslip_young=0.10
                 self.women_kappa_pinkslip_middle=0.14
                 self.women_kappa_pinkslip_elderly=0.14
             else:
-                self.women_kappa_pinkslip_young=0.01
-                self.women_kappa_pinkslip_middle=0.03
-                self.women_kappa_pinkslip_elderly=0.07
+                self.women_kappa_pinkslip_young=0.03
+                self.women_kappa_pinkslip_middle=0.06
+                self.women_kappa_pinkslip_elderly=0.17
 
 #     def log_utility_default_params(self):
 #         # paljonko työstä poissaolo vaikuttaa palkkaan
@@ -2868,14 +2876,16 @@ class UnemploymentLargeEnv_v3(gym.Env):
             #if self.include_preferencenoise:
             #    kappa_kokoaika += prefnoise
         
-            if age>40: # ikääntyneet preferoivat osa-aikatyötä
-                kappa_osaaika=self.men_kappa_osaaika_old*kappa_kokoaika
+            if age<25: # ikääntyneet preferoivat osa-aikatyötä
+                kappa_osaaika=self.men_kappa_osaaika_young*kappa_kokoaika
+            elif age<56: # ikääntyneet preferoivat osa-aikatyötä
+                kappa_osaaika=self.men_kappa_osaaika_middle*kappa_kokoaika
             else:
-                kappa_osaaika=self.men_kappa_osaaika*kappa_kokoaika
+                kappa_osaaika=self.men_kappa_osaaika_old*kappa_kokoaika
                 
             kappa_hoitovapaa=self.men_kappa_hoitovapaa
             kappa_ve=self.men_kappa_ve
-            if age>55:
+            if age>56:
                 kappa_pinkslip=self.men_kappa_pinkslip_elderly
             elif age>26:
                 kappa_pinkslip=self.men_kappa_pinkslip_middle
@@ -2889,13 +2899,15 @@ class UnemploymentLargeEnv_v3(gym.Env):
             #if self.include_preferencenoise:
             #    kappa_kokoaika += prefnoise
         
-            if age>50: # ikääntyneet preferoivat osa-aikatyötä
-                kappa_osaaika=self.women_kappa_osaaika_old*kappa_kokoaika
+            if age<25: # ikääntyneet preferoivat osa-aikatyötä
+                kappa_osaaika=self.women_kappa_osaaika_young*kappa_kokoaika
+            elif age<56: # ikääntyneet preferoivat osa-aikatyötä
+                kappa_osaaika=self.women_kappa_osaaika_middle*kappa_kokoaika
             else:
-                kappa_osaaika=self.women_kappa_osaaika*kappa_kokoaika
+                kappa_osaaika=self.women_kappa_osaaika_old*kappa_kokoaika
             kappa_hoitovapaa=self.women_kappa_hoitovapaa
             kappa_ve=self.women_kappa_ve
-            if age>55:
+            if age>56:
                 kappa_pinkslip=self.women_kappa_pinkslip_elderly
             elif age>26:
                 kappa_pinkslip=self.women_kappa_pinkslip_middle
