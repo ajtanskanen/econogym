@@ -504,13 +504,13 @@ class SavingsEnv_v0(gym.Env):
     # from Hakola and Määttänen, 2005
     def log_utility(self,income,employment_state,age):
         # kappa tells how much person values free-time
-        kappa_fulltime=0.60
+        kappa_fulltime=0.75
         kappa_parttime=0.30
         kappa_retirement=0.10
         mu_age=58+(self.min_retirementage-63.5)
         
         if age>mu_age:
-            mu=0.01 #45
+            mu=0.05 #45
             kappa_fulltime += mu*max(0,min(6,age-mu_age))
             kappa_parttime += mu*max(0,min(6,age-mu_age))
             #kappa_fulltime *= (1+mu*max(0,min(68,age)-mu_age))
