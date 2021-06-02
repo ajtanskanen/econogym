@@ -2556,11 +2556,11 @@ class UnemploymentLargeEnv_v3(gym.Env):
             self.men_kappa_fulltime=0.730 # 0.675 #0.682 # 0.670 # vapaa-ajan menetyksestä rangaistus miehille
             self.men_mu_scale=0.035 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
             self.men_mu_age=self.min_retirementage-2.0 # P.O. 60??
-            self.men_kappa_osaaika_young=0.485 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
+            self.men_kappa_osaaika_young=0.490 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
             self.men_kappa_osaaika_middle=0.420 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
             self.men_kappa_osaaika_old=0.370 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan, alle 35v
             self.men_kappa_hoitovapaa=0.10 # hyöty hoitovapaalla olosta
-            self.men_kappa_ve=0.250 # 0.03 # ehkä 0.10?
+            self.men_kappa_ve=0.245 # 0.03 # ehkä 0.10?
             if self.perustulo:
                 self.men_kappa_pinkslip_young=0.10
                 self.men_kappa_pinkslip_middle=0.09
@@ -2573,19 +2573,19 @@ class UnemploymentLargeEnv_v3(gym.Env):
             self.women_kappa_fulltime=0.620 # 0.605 # 0.640 # 0.620 # 0.610 # vapaa-ajan menetyksestä rangaistus naisille
             self.women_mu_scale=0.030 # 0.25 # how much penalty is associated with work increase with age after mu_age
             self.women_mu_age=self.min_retirementage-1.5 # 61 #5 P.O. 60??
-            self.women_kappa_osaaika_young=0.390
+            self.women_kappa_osaaika_young=0.385
             self.women_kappa_osaaika_middle=0.360
-            self.women_kappa_osaaika_old=0.390
+            self.women_kappa_osaaika_old=0.385
             self.women_kappa_hoitovapaa=0.10 # 0.08
-            self.women_kappa_ve=0.280 # 0.03 # ehkä 0.10?
+            self.women_kappa_ve=0.250 # 0.03 # ehkä 0.10?
             if self.perustulo:
                 self.women_kappa_pinkslip_young=0.10
                 self.women_kappa_pinkslip_middle=0.14
                 self.women_kappa_pinkslip_elderly=0.14
             else:
-                self.women_kappa_pinkslip_young=0.03
+                self.women_kappa_pinkslip_young=0.035
                 self.women_kappa_pinkslip_middle=0.06
-                self.women_kappa_pinkslip_elderly=0.17
+                self.women_kappa_pinkslip_elderly=0.16
 
 #     def log_utility_default_params(self):
 #         # paljonko työstä poissaolo vaikuttaa palkkaan
@@ -2918,7 +2918,7 @@ class UnemploymentLargeEnv_v3(gym.Env):
             kappa_pinkslip = 0 # irtisanotuille ei vaikutuksia
         
         if age>mu_age:
-            mage=min(self.min_retirementage+3,age)
+            mage=min(self.min_retirementage+8,age)
             kappa_kokoaika += mu_scale*max(0,mage-mu_age)
             kappa_osaaika += mu_scale*max(0,mage-mu_age)
             #kappa_kokoaika *= (1+mu_scale*max(0,age-mu_age))
