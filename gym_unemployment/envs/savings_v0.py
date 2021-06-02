@@ -252,12 +252,6 @@ class SavingsEnv_v0(gym.Env):
         '''
         return self.n_empl,self.n_actions
         
-    def get_lc_version(self):
-        '''
-        returns the version of life-cycle model's episodestate used
-        '''
-        return 101
-                
     def comp_benefits(self,wage,old_wage,pension,employment_status,time_in_state,ika):
         '''
         Laske etuuksien arvo, kun 
@@ -510,13 +504,13 @@ class SavingsEnv_v0(gym.Env):
     # from Hakola and Määttänen, 2005
     def log_utility(self,income,employment_state,age):
         # kappa tells how much person values free-time
-        kappa_fulltime=0.70
+        kappa_fulltime=0.75
         kappa_parttime=0.30
         kappa_retirement=0.10
         mu_age=58+(self.min_retirementage-63.5)
         
         if age>mu_age:
-            mu=0.01 #45
+            mu=0.05 #45
             kappa_fulltime += mu*max(0,min(6,age-mu_age))
             kappa_parttime += mu*max(0,min(6,age-mu_age))
             #kappa_fulltime *= (1+mu*max(0,min(68,age)-mu_age))
@@ -735,12 +729,12 @@ class SavingsEnv_v0(gym.Env):
     def update_savings(self,netto,savings,sav_action):
         savings=savings*self.r # interest
         
-        if sav_action>=0:
+        if sav_action>0:
             sav_action=min(sav_action,netto)
             netto-=sav_action
             savings+=sav_action
         else:
-            sav_action=min(abs(sav_action),max(0,savings))
+            sav_action=min(sav_action,savings)
             netto+=sav_action
             savings-=sav_action            
         
