@@ -15,8 +15,8 @@ from gym.utils import seeding
 import numpy as np
 import fin_benefits
 import random
-from scipy.interpolate import interp1d
 from . rates import Rates
+from scipy.interpolate import interp1d
 
 # class StayDict(dict):
 #     '''
@@ -188,6 +188,12 @@ class UnemploymentLargeEnv_v3(gym.Env):
         # sets parameters based on kwargs
         self.set_parameters(**kwargs)
  
+        if self.perustulo:
+            self.ben = fin_benefits.BasicIncomeBenefits(**kwargs)
+        else:
+            #self.ben = fin_benefits.CyBenefits(**kwargs)
+            self.ben = fin_benefits.Benefits(**kwargs)
+            
         self.gamma=gamma**self.timestep # discounting
         self.palkkakerroin=(0.8*1+0.2*1.0/self.reaalinen_palkkojenkasvu)**self.timestep
         self.elakeindeksi=(0.2*1+0.8*1.0/self.reaalinen_palkkojenkasvu)**self.timestep
@@ -212,19 +218,7 @@ class UnemploymentLargeEnv_v3(gym.Env):
         #self.min_family_accwage=12*757
 
         # parametrejä
-        if self.porrasta_toe:
-            self.max_toe=35/12
-            self.min_toewage=844*12 # vuoden 2019 luku tilanteessa, jossa ei tessiä
-            self.min_halftoewage=422*12 # vuoden 2019 luku tilanteessa, jossa ei tessiä
-        else:
-            self.max_toe=28/12
-            self.min_toewage=1211*12 # vuoden 2019 luku tilanteessa, jossa ei tessiä
-            self.min_halftoewage=800*12 # vuoden 2019 luku tilanteessa, jossa ei tessiä
-        self.setup_unempdays_left(porrastus=self.porrasta_toe)
-
-        self.accbasis_kht=719.0*12
-        self.accbasis_tmtuki=0 # 1413.75*12
-        self.disabbasis_tmtuki=1413.75*12
+        #self.inflationfactor=1.0 # dummy
         
         self.log_utility_default_params()
 
@@ -237,19 +231,7 @@ class UnemploymentLargeEnv_v3(gym.Env):
         self.log_transform=False
         self.eps=1e-20
 
-        # ryhmäkohtaisia muuttujia
-        self.rates=Rates(year=self.year,max_age=self.max_age,n_groups=self.n_groups,timestep=self.timestep)
-        self.setup_salaries_v3()
-
-        self.disability_intensity=self.rates.get_eff_disab_rate()
-        self.pinkslip_intensity=self.rates.get_pinkslip_rate()*self.timestep
-        self.birth_intensity=self.rates.get_birth_rate()
-        self.mort_intensity=self.rates.get_mort_rate()
-        self.student_inrate,self.student_outrate=self.rates.get_student_rate() # myös armeijassa olevat tässä
-        self.outsider_inrate,self.outsider_outrate=self.rates.get_outsider_rate()
-
-        self.npv,self.npv0,self.npv_pension=self.comp_npv()
-        self.initial_weights=self.get_initial_weights()
+        self.set_year(self.year)
 
         self.set_state_limits()
         if self.include_mort: # and not self.mortstop:
@@ -278,7 +260,7 @@ class UnemploymentLargeEnv_v3(gym.Env):
         #self.seed()
         self.viewer = None
         self.state = None
-
+        
         self.steps_beyond_done = None
         
         # normitetaan työttömyysjaksot askelvälin monikerroiksi
@@ -287,13 +269,7 @@ class UnemploymentLargeEnv_v3(gym.Env):
         self.apvkesto400=np.round(self.ansiopvraha_kesto400/scale/self.timestep)*self.timestep
         self.apvkesto500=np.round(self.ansiopvraha_kesto500/scale/self.timestep)*self.timestep
                 
-        if self.perustulo:
-            self.ben = fin_benefits.BasicIncomeBenefits(**kwargs)
-        else:
-            #self.ben = fin_benefits.CyBenefits(**kwargs)
-            self.ben = fin_benefits.Benefits(**kwargs)
-            
-        self.ben.set_year(self.year)
+        #self.set_year(self.year)
         
         self.init_inforate()
         
@@ -301,6 +277,51 @@ class UnemploymentLargeEnv_v3(gym.Env):
         
         if self.plotdebug:
             self.unit_test_code_decode()
+            
+    def set_annual_params(self,year):
+        inflation_raw=np.array([1.0,1.011,1.010,1.009,1.01,1.01,1.01]) # 2018 2019 2020 2021 2022 2023
+        self.inflation=np.cumprod(inflation_raw)
+        self.inflationfactor=self.inflation[year-2018]
+        
+        if self.porrasta_toe:
+            self.max_toe=35/12
+            self.min_toewage=844*12*self.inflationfactor # vuoden 2019 luku tilanteessa, jossa ei tessiä
+            self.min_halftoewage=422*12*self.inflationfactor # vuoden 2019 luku tilanteessa, jossa ei tessiä
+        else:
+            self.max_toe=28/12
+            self.min_toewage=1211*12*self.inflationfactor # vuoden 2019 luku tilanteessa, jossa ei tessiä
+            self.min_halftoewage=800*12*self.inflationfactor # vuoden 2019 luku tilanteessa, jossa ei tessiä
+        self.setup_unempdays_left(porrastus=self.porrasta_toe)
+
+        self.accbasis_kht=719.0*12*self.inflationfactor
+        self.accbasis_tmtuki=0 # 1413.75*12
+        self.disabbasis_tmtuki=1413.75*12*self.inflationfactor
+        
+        self.opiskelija_asumismenot_toimeentulo=250*self.inflationfactor
+        self.opiskelija_asumismenot_asumistuki=250*self.inflationfactor
+        self.elakelainen_asumismenot_toimeentulo=200*self.inflationfactor
+        self.elakelainen_asumismenot_asumistuki=200*self.inflationfactor
+        self.muu_asumismenot_toimeentulo=320*self.inflationfactor # per hlö, ehkä 500 e olisi realistisempi, mutta se tuottaa suuren asumistukimenon
+        self.muu_asumismenot_asumistuki=320*self.inflationfactor
+            
+    def set_year(self,year):
+        self.year=year
+        self.set_annual_params(year)
+        self.ben.set_year(year)
+        self.rates=Rates(year=self.year,max_age=self.max_age,n_groups=self.n_groups,timestep=self.timestep,inv_timestep=self.inv_timestep)
+        self.palkat_ika_miehet,self.palkat_ika_naiset,self.g_r=self.rates.setup_salaries_v3(self.min_retirementage)
+        self.get_wage=self.get_wage_step        
+
+        self.disability_intensity=self.rates.get_eff_disab_rate()
+        self.pinkslip_intensity=self.rates.get_pinkslip_rate()*self.timestep
+        self.birth_intensity=self.rates.get_birth_rate()
+        self.mort_intensity=self.rates.get_mort_rate()
+        self.student_inrate,self.student_outrate=self.rates.get_student_rate() # myös armeijassa olevat tässä
+        self.outsider_inrate,self.outsider_outrate=self.rates.get_outsider_rate()
+
+        self.npv,self.npv0,self.npv_pension=self.comp_npv()
+        self.initial_weights=self.get_initial_weights()
+        
 
     def get_n_states(self):
         '''
@@ -564,15 +585,16 @@ class UnemploymentLargeEnv_v3(gym.Env):
             print('Unknown employment_state ',employment_state)
 
         # tarkastellaan yksinasuvia henkilöitä
+        
         if employment_state==12: # opiskelija
-            p['asumismenot_toimeentulo']=250
-            p['asumismenot_asumistuki']=250
+            p['asumismenot_toimeentulo']=self.opiskelija_asumismenot_toimeentulo
+            p['asumismenot_asumistuki']=self.opiskelija_asumismenot_asumistuki
         elif employment_state in set([2,8,9]): # eläkeläinen
-            p['asumismenot_toimeentulo']=200
-            p['asumismenot_asumistuki']=200
+            p['asumismenot_toimeentulo']=self.elakelainen_asumismenot_toimeentulo
+            p['asumismenot_asumistuki']=self.elakelainen_asumismenot_asumistuki
         else: # muu
-            p['asumismenot_toimeentulo']=320 # per hlö, ehkä 500 e olisi realistisempi, mutta se tuottaa suuren asumistukimenon
-            p['asumismenot_asumistuki']=320
+            p['asumismenot_toimeentulo']=self.muu_asumismenot_toimeentulo
+            p['asumismenot_asumistuki']=self.muu_asumismenot_asumistuki
 
         p['ansiopvrahan_suojaosa']=1
         p['ansiopvraha_lapsikorotus']=1
@@ -646,7 +668,7 @@ class UnemploymentLargeEnv_v3(gym.Env):
             initial_weight[3,:]=[w1*4/5,w1*1/5,0.44*ow1,0.56*ow1,wd,uw1,ow-ow1-uw1-w1]
             initial_weight[4,:]=[w2*4/5,w2*1/5,0.44*ow2,0.56*ow2,wd,uw2,ow-ow2-uw2-w2]
             initial_weight[5,:]=[w3*4/5,w3*1/5,0.44*ow3,0.56*ow3,wd,uw3,ow-ow3-uw3-w3]
-        elif self.year==2019:
+        elif self.year==2019 or self.year==2020 or self.year==2021:
             # tilat [13,0,1,10,3,11,12]
 
             tyoton=0.021
@@ -2696,7 +2718,7 @@ class UnemploymentLargeEnv_v3(gym.Env):
             kwarg=kwargs['kwargs']
         else:
             kwarg=kwargs
-
+            
         for key, value in kwarg.items():
             if key=='step':
                 if value is not None:
@@ -2764,9 +2786,6 @@ class UnemploymentLargeEnv_v3(gym.Env):
             elif key=='plotdebug':
                 if value is not None:
                     self.plotdebug=value  
-            elif key=='year':
-                if value is not None:
-                    self.year=value  
             elif key=='preferencenoise_level':
                 if value is not None:
                     self.preferencenoise_std=value  
@@ -2942,10 +2961,10 @@ class UnemploymentLargeEnv_v3(gym.Env):
         tau_kulutusvero=0
         if self.include_preferencenoise:
             # normaali
-            u=np.log(prefnoise*income/(1+tau_kulutusvero))+kappa
+            u=np.log(prefnoise*income/(1+tau_kulutusvero)/self.inflationfactor)+kappa
             equ=income*np.exp(-kappa)
         else:
-            u=np.log(income/(1+tau_kulutusvero))+kappa
+            u=np.log(income/(1+tau_kulutusvero)/self.inflationfactor)+kappa
             equ=income*np.exp(-kappa)
 
         if u is np.inf:
@@ -2953,7 +2972,7 @@ class UnemploymentLargeEnv_v3(gym.Env):
 
         if income<1:
             print('inf: state ',employment_state)
-
+            
         return u/10,equ # tulot ovat vuositasolla, mutta skaalataan hyöty
 
     def get_wage_step(self,age,reduction):
@@ -2992,55 +3011,6 @@ class UnemploymentLargeEnv_v3(gym.Env):
         wt=np.maximum(self.min_salary,wt)
 
         return wt
-        
-    def setup_salaries_v3(self):
-        self.get_wage=self.get_wage_step        
-        
-        # TK:n aineisto vuodelta 2018
-        # iät 18-70
-        if self.year==2018:
-            self.palkat_ika_miehet=12.5*np.array([2339.01,2339.01,2339.01,2489.09,2571.40,2632.58,2718.03,2774.21,2884.89,2987.55,3072.40,3198.48,3283.81,3336.51,3437.30,3483.45,3576.67,3623.00,3731.27,3809.58,3853.66,3995.90,4006.16,4028.60,4104.72,4181.51,4134.13,4157.54,4217.15,4165.21,4141.23,4172.14,4121.26,4127.43,4134.00,4093.10,4065.53,4063.17,4085.31,4071.25,4026.50,4031.17,4047.32,4026.96,4028.39,4163.14,4266.42,4488.40,4201.40,4252.15,4443.96,3316.92,3536.03,3536.03])
-            self.palkat_ika_naiset=12.5*np.array([2223.96,2223.96,2223.96,2257.10,2284.57,2365.57,2443.64,2548.35,2648.06,2712.89,2768.83,2831.99,2896.76,2946.37,2963.84,2993.79,3040.83,3090.43,3142.91,3159.91,3226.95,3272.29,3270.97,3297.32,3333.42,3362.99,3381.84,3342.78,3345.25,3360.21,3324.67,3322.28,3326.72,3326.06,3314.82,3303.73,3302.65,3246.03,3244.65,3248.04,3223.94,3211.96,3167.00,3156.29,3175.23,3228.67,3388.39,3457.17,3400.23,3293.52,2967.68,2702.05,2528.84,2528.84])
-        elif self.year==2019:
-            self.palkat_ika_miehet=12.5*np.array([2039,2334,2461,2498,2612,2683,2725,2833,2915,3014,3115,3196,3325,3389,3477,3540,3601,3690,3724,3863,3917,4018,4073,4150,4189,4212,4301,4273,4261,4323,4273,4225,4239,4188,4213,4174,4159,4165,4131,4136,4167,4135,4117,4134,4126,4101,4257,4368,4417,3916,4369,4045,3165,3923,2521,2982,3238,2898,3489,3063,6388,6388])
-            self.palkat_ika_naiset=12.5*np.array([1926,2107,2188,2235,2283,2347,2417,2541,2639,2722,2796,2845,2907,2980,3032,3073,3109,3150,3225,3281,3333,3402,3467,3462,3492,3546,3593,3577,3603,3542,3525,3511,3515,3470,3484,3482,3477,3480,3408,3417,3428,3381,3361,3351,3292,3314,3461,3553,3583,3441,3039,2797,3320,2168,2360,3316,4525,4525,4525,2449,2449,1393])
-        else:
-            error(1001)
-            
-        def map_age18(x):
-            return int(x-18)
-            
-        def ifunc(palkat,x1,x2):
-            x = np.linspace(18, 72, num=54, endpoint=True)
-            f = interp1d(x, palkat)
-            n_time = int(np.round((x2-x1)*self.inv_timestep))+2
-            palkat_x = np.linspace(x1, x2, num=n_time, endpoint=True)
-        
-            return f(palkat_x)        
-
-        def gfunc(palkat,x1,x2):
-            x = np.linspace(18, 73, num=55, endpoint=True)
-            n_time = int(np.round((x2-x1)*self.inv_timestep))+2
-            palkat_x = np.linspace(x1, x2, num=n_time, endpoint=True)
-            g=np.zeros((n_time,3))
-            for k in range(3):
-                f = interp1d(x, palkat[:,k])
-                g[:,k]=f(palkat_x)
-        
-            return g
-        
-        # filtteri
-        m_age=int(self.min_retirementage-1)
-        palkat_miehet_ve=self.palkat_ika_miehet[map_age18(m_age)]
-        self.palkat_ika_miehet[map_age18(m_age):]=np.minimum(self.palkat_ika_miehet[map_age18(m_age):],palkat_miehet_ve)
-        palkat_naiset_ve=self.palkat_ika_naiset[map_age18(m_age)]
-        self.palkat_ika_naiset[map_age18(m_age):]=np.minimum(self.palkat_ika_naiset[map_age18(m_age):],palkat_naiset_ve)
-
-        self.palkat_ika_miehet=ifunc(self.palkat_ika_miehet,self.min_age,self.max_age)
-        self.palkat_ika_naiset=ifunc(self.palkat_ika_naiset,self.min_age,self.max_age)
-        
-        g_r=np.array([[0.81436,1.00992,1.2469],[0.81436,1.00992,1.2469],[0.81436,1.00992,1.2469],[0.8144725,1.011105,1.2677425],[0.814585,1.01229,1.288585],[0.8146975,1.013475,1.3094275],[0.81481,1.01466,1.33027],[0.81481,1.01466,1.33027],[0.798635,1.0116225,1.34756],[0.78246,1.008585,1.36485],[0.766285,1.0055475,1.38214],[0.75011,1.00251,1.39943],[0.75011,1.00251,1.39943],[0.74420478,0.99822499,1.40395702],[0.73829957,0.99393997,1.40848403],[0.73239435,0.98965496,1.41301105],[0.72648913,0.98536995,1.41753806],[0.72058391,0.98108493,1.42206508],[0.7146787,0.97679992,1.4265921],[0.70877348,0.9725149,1.43111911],[0.70286826,0.96822989,1.43564613],[0.69696304,0.96394488,1.44017314],[0.69105783,0.95965986,1.44470016],[0.68515261,0.95537485,1.44922718],[0.67924739,0.95108984,1.45375419],[0.67334218,0.94680482,1.45828121],[0.66743696,0.94251981,1.46280822],[0.66153174,0.93823479,1.46733524],[0.65562652,0.93394978,1.47186226],[0.64972131,0.92966477,1.47638927],[0.64381609,0.92537975,1.48091629],[0.63791087,0.92109474,1.4854433],[0.63791087,0.92109474,1.4854433],[0.63791087,0.92109474,1.4854433],[0.63791087,0.92109474,1.4854433],[0.63791087,0.92109474,1.4854433],[0.63791087,0.92109474,1.4854433],[0.63791087,0.92109474,1.4854433],[0.63791087,0.92109474,1.4854433],[0.63791087,0.92109474,1.4854433],[0.63791087,0.92109474,1.4854433],[0.63791087,0.92109474,1.4854433],[0.63791087,0.92109474,1.4854433],[0.63791087,0.92109474,1.4854433],[0.63791087,0.92109474,1.4854433],[0.63791087,0.92109474,1.4854433],[0.63791087,0.92109474,1.4854433],[0.63791087,0.92109474,1.4854433],[0.63791087,0.92109474,1.4854433],[0.63791087,0.92109474,1.4854433],[0.63791087,0.92109474,1.4854433],[0.63791087,0.92109474,1.4854433],[0.63791087,0.92109474,1.4854433],[0.63791087,0.92109474,1.4854433],[0.63791087,0.92109474,1.4854433]])
-        self.g_r=gfunc(g_r,self.min_age,self.max_age)
 
     def compute_salary_TK_v3(self,group=1,debug=False,initial_salary=None):
         '''
@@ -3800,7 +3770,8 @@ class UnemploymentLargeEnv_v3(gym.Env):
             return kesto-bu
             
     def init_inforate(self):
-        self.infostat_kassanjasenyys_rate()
+        #self.infostat_kassanjasenyys_rate()
+        self.kassanjasenyys_joinrate,self.kassanjasenyys_rate=self.rates.infostat_kassanjasenyys_rate()
             
     def init_infostate(self,lapsia=0,lasten_iat=np.zeros(15),lapsia_paivakodissa=0,age=18):
         '''
@@ -3856,32 +3827,6 @@ class UnemploymentLargeEnv_v3(gym.Env):
 
     def set_kassanjasenyys(self,value):
         self.infostate['kassanjasen']=value
-        
-    def infostat_kassanjasenyys_rate(self):
-        rate_age=np.array([18,30,40,50,60,74])
-        #rate_obs=np.array([0.429,0.836,0.917,0.946,0.933,0.933])
-        rate_obs=np.array([0.20,0.836,0.917,0.946,0.933,0.933])
-        self.initial_kassanjasenia=rate_obs[0]
-        
-        x1=self.min_age
-        x2=self.max_age+1
-        f = interp1d(rate_age, rate_obs)
-        n_time = int(np.round((x2-x1)*self.inv_timestep))+2
-        jasenyys_x = np.linspace(x1, x2, num=n_time, endpoint=True)
-
-        rate=f(jasenyys_x)
-        self.kassanjasenyys_joinrate=rate*0
-        for k in range(0,rate.shape[0]-1):
-            self.kassanjasenyys_joinrate[k+1]=(rate[k+1]-rate[k])/(1-rate[k]) #*self.timestep
-            
-        self.kassanjasenyys_rate=rate
-            
-    def infostat_kassanjasenyys_update(self,age):
-        if self.infostate['kassanjasen']<1:
-            sattuma = np.random.uniform(size=1)
-            intage=self.map_age(age)
-            if sattuma<self.kassanjasenyys_joinrate[intage]:
-                self.infostate['kassanjasen']=1
         
     def comp_toe_wage_nykytila(self):
         lstate=int(self.infostate['states'][self.infostate['latest']])
@@ -4109,6 +4054,13 @@ class UnemploymentLargeEnv_v3(gym.Env):
             return True
         else:
             return False
+            
+    def infostat_kassanjasenyys_update(self,age):
+        if self.infostate['kassanjasen']<1:
+            sattuma = np.random.uniform(size=1)
+            intage=self.map_age(age)
+            if sattuma<self.kassanjasenyys_joinrate[intage]:
+                self.infostate['kassanjasen']=1
         
     def setup_state_encoding(self):
         self.state_encoding=np.zeros((self.n_empl,self.n_empl))
