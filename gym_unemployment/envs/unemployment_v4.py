@@ -2648,7 +2648,8 @@ class UnemploymentLargeEnv_v4(gym.Env):
         #self.render_infostate()
 
         if not done:
-            reward,equivalent = self.log_utility(netto,int(employment_status),age,g=g,pinkslip=pinkslip)
+            kulutusvero=benq['alv']
+            reward,equivalent = self.log_utility(netto,int(employment_status),age,kulutusvero,g=g,pinkslip=pinkslip)
         elif self.steps_beyond_done is None:
             self.steps_beyond_done = 0
             
@@ -2660,11 +2661,13 @@ class UnemploymentLargeEnv_v4(gym.Env):
                 # pitäisi laskea tarkemmin, ei huomioi eläkkeen indeksointia!
                 if self.include_npv_mort:
                     npv,npv0,npv_pension=self.comp_npv_simulation(g)
-                    reward,equivalent = self.log_utility(netto,employment_status,age,pinkslip=0)
+                    kulutusvero=benq['alv']
+                    reward,equivalent = self.log_utility(netto,employment_status,age,kulutusvero,pinkslip=0)
                     reward*=npv
                 else:
                     npv,npv0,npv_pension=self.npv[g],self.npv0[g],self.npv_pension[g]
-                    reward,equivalent = self.log_utility(netto,employment_status,age,pinkslip=0)
+                    kulutusvero=benq['alv']
+                    reward,equivalent = self.log_utility(netto,employment_status,age,kulutusvero,pinkslip=0)
                     reward*=self.npv[g]
                 
                 # npv0 is undiscounted
@@ -3059,7 +3062,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
                 if value is not None:
                     self.kappa_pinkslip=value
                     
-    def log_utility(self,income,employment_state,age,g=0,pinkslip=0,prefnoise=0):
+    def log_utility(self,income,employment_state,age,kulutusvero,g=0,pinkslip=0,prefnoise=0):
         '''
         Log-utiliteettifunktio muokattuna lähteestä Määttänen, 2013 & Hakola & Määttänen, 2005
 
@@ -3152,11 +3155,11 @@ class UnemploymentLargeEnv_v4(gym.Env):
         tau_kulutusvero=0 # huomioidaan muualla
         if self.include_preferencenoise:
             # normaali
-            u=np.log(prefnoise*income/(1+tau_kulutusvero)/self.inflationfactor)+kappa
-            equ=income*np.exp(-kappa)
+            u=np.log(prefnoise*(income-kulutusvero)/self.inflationfactor)+kappa
+            equ=(income-kulutusvero)*np.exp(-kappa)
         else:
-            u=np.log(income/(1+tau_kulutusvero)/self.inflationfactor)+kappa
-            equ=income*np.exp(-kappa)
+            u=np.log((income-kulutusvero)/self.inflationfactor)+kappa
+            equ=(income-kulutusvero)*np.exp(-kappa)
 
         if u is np.inf:
             print('inf: state ',employment_state)
