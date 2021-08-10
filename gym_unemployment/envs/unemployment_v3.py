@@ -2821,6 +2821,10 @@ class UnemploymentLargeEnv_v3(gym.Env):
                     self.include_ove=value  
                
 
+    def set_tax_params(self,additional_income_tax,extra_ppr):
+        self.additional_income_tax=tax
+        self.extra_ppr=scale
+
     def set_utility_params(self,**kwargs):
         if 'kwargs' in kwargs:
             kwarg=kwargs['kwargs']

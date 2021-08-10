@@ -148,6 +148,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
         
         self.train=False
 
+        self.include_spouses=False # Puolisot mukana?
         self.include_mort=True # onko kuolleisuus mukana laskelmissa
         self.include_npv_mort=False # onko kuolleisuus mukana laskelmissa
         self.include_preferencenoise=False # onko työllisyyspreferenssissä hajonta mukana 
@@ -166,7 +167,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
         self.additional_income_tax_high=0
         self.additional_tyel_premium=0
         self.additional_kunnallisvero=0
-        self.scale_tyel_accrual=True
+        self.scale_tyel_accrual=False
         self.scale_additional_tyel_accrual=0
         self.scale_additional_unemp_benefit=0
         self.include_halftoe=True
@@ -304,8 +305,11 @@ class UnemploymentLargeEnv_v4(gym.Env):
         self.opiskelija_asumismenot_asumistuki=250*self.inflationfactor
         self.elakelainen_asumismenot_toimeentulo=200*self.inflationfactor
         self.elakelainen_asumismenot_asumistuki=200*self.inflationfactor
+        self.elakelainen_asumismenot_puoliso=250*self.inflationfactor
         self.muu_asumismenot_toimeentulo=320*self.inflationfactor # per hlö, ehkä 500 e olisi realistisempi, mutta se tuottaa suuren asumistukimenon
         self.muu_asumismenot_asumistuki=320*self.inflationfactor
+        self.muu_asumismenot_lapsi=100*self.inflationfactor
+        self.muu_asumismenot_puoliso=250*self.inflationfactor
             
     def set_year(self,year):
         self.year=year
@@ -636,7 +640,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
 
         netto,benefitq=self.ben.laske_tulot(p,include_takuuelake=self.include_takuuelake)
         
-        netto -= q['alv']
+        netto -= benefitq['alv']
         netto=netto*12
         
         if retq:
@@ -2456,6 +2460,16 @@ class UnemploymentLargeEnv_v4(gym.Env):
         
         return wage_reduction
         
+    def get_family_wage(self,age,g):
+        if g<3:
+            palkka=self.palkat_ika_miehet[age]*self.g_r[age,g]
+        else:
+            palkka=self.palkat_ika_naiset[age]*self.g_r[age,g-3]
+            
+        #print('puolison palkka',palkka)
+
+        return palkka
+        
     def update_family(self,puoliso,puoliso_tila,puoliso_palkka,age,g):
         sattuma = np.random.uniform(size=2)
         
@@ -2472,12 +2486,12 @@ class UnemploymentLargeEnv_v4(gym.Env):
             else:
                 puoliso=1
                 puoliso_tila=1
-                puoliso_palkka=40_000
+                puoliso_palkka=self.get_family_wage(age,g)
         else:
             if self.marriage_rate[gender,age]>sattuma[0]:
                 puoliso=1
                 puoliso_tila=1
-                puoliso_palkka=40_000
+                puoliso_palkka=self.get_family_wage(age,g)
             else:
                 puoliso=0
                 puoliso_tila=0
@@ -2488,7 +2502,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
                 if puoliso_tila==0:
                     if sattuma[1]<0.5:
                         puoliso_tila=1
-                        puoliso_palkka=40_000
+                        puoliso_palkka=self.get_family_wage(age,g)
                 else:
                     if sattuma[1]<self.pinkslip_intensity[0]:
                         puoliso_tila=0
@@ -2524,7 +2538,10 @@ class UnemploymentLargeEnv_v4(gym.Env):
             # kaikki satunnaisuus kerralla
             sattuma = np.random.uniform(size=7)
             
-            puoliso,puoliso_tila,puoliso_palkka=self.update_family(puoliso,puoliso_tila,puoliso_palkka,intage,g)
+            if self.include_spouses:
+                puoliso,puoliso_tila,puoliso_palkka=self.update_family(puoliso,puoliso_tila,puoliso_palkka,intage,g)
+            else:
+                puoliso,puoliso_tila,puoliso_palkka=0,0,0
             
             # siirtymät
             move_prob=self.disability_intensity[intage,g]+self.birth_intensity[intage,g]+self.student_inrate[intage,g]+self.outsider_inrate[intage,g]
