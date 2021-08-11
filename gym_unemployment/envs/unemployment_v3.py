@@ -3746,12 +3746,15 @@ class UnemploymentLargeEnv_v3(gym.Env):
         '''
         Tulosta laskennan parametrit
         '''
-        print('Parameters of lifecycle:\ntimestep {}\ngamma {} ({} per anno)\nmin_age {}\nmax_age {}\nmin_retirementage {}'.format(self.timestep,self.gamma,self.gamma**(1.0/self.timestep),self.min_age,self.max_age,self.min_retirementage))
-        print('max_retirementage {}\nansiopvraha_kesto300 {}\nansiopvraha_kesto400 {}\nansiopvraha_kesto500 {}\nansiopvraha_toe {}'.format(self.max_retirementage,self.ansiopvraha_kesto300,self.ansiopvraha_kesto400,self.ansiopvraha_kesto500,self.ansiopvraha_toe))
-        print('perustulo {}\nkarenssi_kesto {}\nmortality {}\nrandomness {}'.format(self.perustulo,self.karenssi_kesto,self.include_mort,self.randomness))
-        print('include_putki {}\ninclude_pinkslip {}'.format(self.include_putki,self.include_pinkslip))
+        per_anno=self.gamma**(1.0/self.timestep)
+        print('Parameters of lifecycle:\n')
+        print(f'timestep {self.timestep}\ngamma {self.gamma} ({per_anno} per anno)\nmin_age {self.min_age}\nmax_age {self.max_age}\nmin_retirementage {self.min_retirementage}')
+        print(f'max_retirementage {self.max_retirementage}\nansiopvraha_kesto300 {self.ansiopvraha_kesto300}\nansiopvraha_kesto400 {self.ansiopvraha_kesto400}\nansiopvraha_kesto500 {self.ansiopvraha_kesto500}\nansiopvraha_toe {self.ansiopvraha_toe}')
+        print(f'perustulo {self.perustulo}\nkarenssi_kesto {self.karenssi_kesto}\nmortality {self.include_mort}\nrandomness {self.randomness}')
+        print(f'include_putki {self.include_putki}\ninclude_pinkslip {self.include_pinkslip}')
         print(f'perustulo {self.perustulo}\nsigma_reduction {self.use_sigma_reduction}\nplotdebug {self.plotdebug}')
-        print('additional_tyel_premium {}\nscale_tyel_accrual {}\ninclude_ove {}'.format(self.additional_tyel_premium,self.scale_tyel_accrual,self.include_ove))
+        print(f'additional_tyel_premium {self.additional_tyel_premium}\nscale_tyel_accrual {self.scale_tyel_accrual}\ninclude_ove {self.include_ove}')
+        print(f'additional_income_tax {self.additional_income_tax}\nadditional_kunnallisvero {self.additional_kunnallisvero}\n')
         print(f'unemp_limit_reemp {self.unemp_limit_reemp}\n')
 
     def unempright_left(self,emp,tis,bu,ika,tyohistoria):
