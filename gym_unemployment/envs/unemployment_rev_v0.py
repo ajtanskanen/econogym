@@ -923,9 +923,9 @@ class UnemploymentRevEnv_v0(gym.Env):
                     reward = self.npv*reward
                     equivalent=self.npv*equivalent
                 else:
-                    reward = 0.0
-                    equivalent = 0.0
-                    netto=0.0
+                    reward = 0.1
+                    equivalent = 1.0
+                    netto=1.0
 
                 #benq=self.scale_q(npv,npv0,npv_pension,benq)                
                 netto=netto*self.npv_pension
