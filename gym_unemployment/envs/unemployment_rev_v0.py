@@ -907,9 +907,9 @@ class UnemploymentRevEnv_v0(gym.Env):
                         reward = self.npv*reward
                         equivalent=self.npv*equivalent
                     else:
-                        reward = 0.0
-                        equivalent=0.0
-                        netto=0.0
+                        reward = 0.1
+                        equivalent=1.0
+                        netto=0.1
                         
                     self.state = self.state_encode(employment_status,pension,wage,next_age,time_in_state,next_wage)
         else:
@@ -936,9 +936,9 @@ class UnemploymentRevEnv_v0(gym.Env):
                 if self.steps_beyond_done == 0:
                     logger.warn("You are calling 'step()' even though this environment has already returned done = True. You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior.")
                 self.steps_beyond_done += 1
-                reward = 0.0
-                equivalent=0.0
-                netto=0.0
+                reward = 0.1
+                equivalent=1.0
+                netto=1.0
                 
         if self.plotdebug:
             self.render(done=done,reward=reward, netto=netto)
