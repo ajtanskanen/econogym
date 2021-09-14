@@ -92,7 +92,7 @@ class UnemploymentRevEnv_v0(gym.Env):
 
         self.max_age=70
         self.min_age=18
-        
+        self.startage=self.min_age
     
         self.min_retirementage=65
         self.max_retirementage=70       
@@ -190,6 +190,11 @@ class UnemploymentRevEnv_v0(gym.Env):
             elif key=='scale_additional_tyel_accrual':
                 if value is not None:
                     self.scale_additional_tyel_accrual=value
+            elif key=='startage': 
+                if value is not None:
+                    self.startage=value
+
+        self.startage=max(self.min_age,self.startage)
 
         #if self.train:
         #    self.partial_npv=True
@@ -249,6 +254,9 @@ class UnemploymentRevEnv_v0(gym.Env):
         
         if self.plotdebug:
             self.unit_test_code_decode()
+            
+    def set_startage(self,startage):
+        self.startage=max(self.min_age,startage)
         
     def get_n_states(self):
         '''
@@ -943,7 +951,7 @@ class UnemploymentRevEnv_v0(gym.Env):
                     self.steps_beyond_done = self.steps_beyond_done+1
                     reward = 0.0
                     equivalent=0.0
-                    netto = 0.0
+                    netto = 1.0e-20
                     self.state = self.state_encode(employment_status,pension,wage,next_age,time_in_state,next_wage)
                 else:
                     self.steps_beyond_done = 0
@@ -952,10 +960,11 @@ class UnemploymentRevEnv_v0(gym.Env):
                         reward = self.npv*reward
                         equivalent=self.npv*equivalent
                     else:
-                        reward = 0.1
-                        equivalent=1.0
-                        netto=1.0
+                        reward = 0
+                        equivalent=0.0
+                        netto=1.0e-20
                         
+                    netto=netto*self.npv_pension
                     self.state = self.state_encode(employment_status,pension,wage,next_age,time_in_state,next_wage)
         else:
             if not done:
@@ -963,14 +972,14 @@ class UnemploymentRevEnv_v0(gym.Env):
                 self.state = self.state_encode(employment_status,pension,wage,next_age,time_in_state,next_wage)
             elif self.steps_beyond_done is None:
                 self.steps_beyond_done = 0
-                if employment_status == 2 and age<self.max_age+self.timestep:
+                if employment_status == 2 and age<self.max_age+0.001: #self.timestep:
                     reward,equivalent = self.log_utility(netto,2,age)
                     reward = self.npv*reward
                     equivalent=self.npv*equivalent
                 else:
-                    reward = 0.1
-                    equivalent = 1.0
-                    netto=1.0
+                    reward = 0.0
+                    equivalent =0.0
+                    netto=1.0e-20
 
                 #benq=self.scale_q(npv,npv0,npv_pension,benq)                
                 netto=netto*self.npv_pension
@@ -981,9 +990,9 @@ class UnemploymentRevEnv_v0(gym.Env):
                 if self.steps_beyond_done == 0:
                     logger.warn("You are calling 'step()' even though this environment has already returned done = True. You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior.")
                 self.steps_beyond_done += 1
-                reward = 0.1
-                equivalent=1.0
-                netto=1.0
+                reward = 0.0
+                equivalent=0.0
+                netto=1.0e-20
                 
         if self.plotdebug:
             self.render(done=done,reward=reward, netto=netto)
@@ -1150,6 +1159,9 @@ class UnemploymentRevEnv_v0(gym.Env):
     def reset(self,init=None,debug=False,ini_age=None,pension=None,ini_wage=None,ini_old_wage=None):
         '''
         Open AI-interfacen mukainen reset-funktio, joka nollaa laskennan alkutilaan
+        
+        parametrit dynaamista ohjelmointia varten
+        pl. debug
         '''
                     
         #employment_status=0
@@ -1167,7 +1179,9 @@ class UnemploymentRevEnv_v0(gym.Env):
             if ini_age is not None:
                 age=ini_age
             else:
-                age=int(self.min_age)
+                #age=int(self.min_age)
+                age=int(self.startage)
+                
             time_in_state=random.choices(np.array([0,1],dtype=int),weights=[0.40,0.60])[0] # 60% tm-tuella
             if pension is None:
                 pension=0
