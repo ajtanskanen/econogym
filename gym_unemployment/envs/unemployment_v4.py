@@ -2665,8 +2665,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
         #self.render_infostate()
 
         if not done:
-            kulutusvero=benq['alv']
-            reward,equivalent = self.log_utility(netto,int(employment_status),age,kulutusvero,g=g,pinkslip=pinkslip)
+            reward,equivalent = self.log_utility(netto,int(employment_status),age,g=g,pinkslip=pinkslip)
         elif self.steps_beyond_done is None:
             self.steps_beyond_done = 0
             
@@ -2678,13 +2677,11 @@ class UnemploymentLargeEnv_v4(gym.Env):
                 # pitäisi laskea tarkemmin, ei huomioi eläkkeen indeksointia!
                 if self.include_npv_mort:
                     npv,npv0,npv_pension=self.comp_npv_simulation(g)
-                    kulutusvero=benq['alv']
-                    reward,equivalent = self.log_utility(netto,employment_status,age,kulutusvero,pinkslip=0)
+                    reward,equivalent = self.log_utility(netto,employment_status,age,pinkslip=0)
                     reward*=npv
                 else:
                     npv,npv0,npv_pension=self.npv[g],self.npv0[g],self.npv_pension[g]
-                    kulutusvero=benq['alv']
-                    reward,equivalent = self.log_utility(netto,employment_status,age,kulutusvero,pinkslip=0)
+                    reward,equivalent = self.log_utility(netto,employment_status,age,pinkslip=0)
                     reward*=self.npv[g]
                 
                 # npv0 is undiscounted
@@ -2786,27 +2783,27 @@ class UnemploymentLargeEnv_v4(gym.Env):
             self.salary_const_student=0.05*self.timestep # opiskelu pienentää leikkausta tämän verran vuodessa
             self.wage_initial_reduction=0.010 # työttömäksi siirtymisestä tuleva alennus tuleviin palkkoihin
             
-            self.men_kappa_fulltime=0.500 # 0.675 #0.682 # 0.670 # vapaa-ajan menetyksestä rangaistus miehille
+            self.men_kappa_fulltime=0.695 # 0.675 #0.682 # 0.670 # vapaa-ajan menetyksestä rangaistus miehille
             self.men_mu_scale=0.035 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
             self.men_mu_age=self.min_retirementage-2.0 # P.O. 60??
-            self.men_kappa_osaaika_young=0.300 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
-            self.men_kappa_osaaika_middle=0.350 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
-            self.men_kappa_osaaika_old=0.375 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan, alle 35v
+            self.men_kappa_osaaika_young=0.455 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
+            self.men_kappa_osaaika_middle=0.465 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
+            self.men_kappa_osaaika_old=0.355 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan, alle 35v
             self.men_kappa_hoitovapaa=0.0 # hyöty hoitovapaalla olosta
             self.men_kappa_ve=0.220 # 0.03 # ehkä 0.10?
-            self.men_kappa_pinkslip_young=0.060
+            self.men_kappa_pinkslip_young=0.010
             self.men_kappa_pinkslip_middle=0.09
             self.men_kappa_pinkslip_elderly=0.10
             
-            self.women_kappa_fulltime=0.400 # 0.605 # 0.640 # 0.620 # 0.610 # vapaa-ajan menetyksestä rangaistus naisille
-            self.women_mu_scale=0.030 # 0.25 # how much penalty is associated with work increase with age after mu_age
-            self.women_mu_age=self.min_retirementage-1.5 # 61 #5 P.O. 60??
-            self.women_kappa_osaaika_young=0.300
-            self.women_kappa_osaaika_middle=0.350
-            self.women_kappa_osaaika_old=0.402
+            self.women_kappa_fulltime=0.590 # 0.605 # 0.640 # 0.620 # 0.610 # vapaa-ajan menetyksestä rangaistus naisille
+            self.women_mu_scale=0.010 # 0.25 # how much penalty is associated with work increase with age after mu_age
+            self.women_mu_age=self.min_retirementage-1.0 # 61 #5 P.O. 60??
+            self.women_kappa_osaaika_young=0.302
+            self.women_kappa_osaaika_middle=0.452
+            self.women_kappa_osaaika_old=0.302
             self.women_kappa_hoitovapaa=0.0 # 0.08
             self.women_kappa_ve=0.250 # 0.03 # ehkä 0.10?
-            self.women_kappa_pinkslip_young=0.0395
+            self.women_kappa_pinkslip_young=0.010
             self.women_kappa_pinkslip_middle=0.06
             self.women_kappa_pinkslip_elderly=0.15
 
@@ -3079,7 +3076,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
                 if value is not None:
                     self.kappa_pinkslip=value
                     
-    def log_utility(self,income,employment_state,age,kulutusvero,g=0,pinkslip=0,prefnoise=0):
+    def log_utility(self,income,employment_state,age,g=0,pinkslip=0,prefnoise=0):
         '''
         Log-utiliteettifunktio muokattuna lähteestä Määttänen, 2013 & Hakola & Määttänen, 2005
 
@@ -3169,14 +3166,13 @@ class UnemploymentLargeEnv_v4(gym.Env):
             kappa=0
         
         # hyöty/score
-        tau_kulutusvero=0 # huomioidaan muualla
         if self.include_preferencenoise:
             # normaali
-            u=np.log(prefnoise*(income-kulutusvero)/self.inflationfactor)+kappa
-            equ=(income-kulutusvero)*np.exp(-kappa)
+            u=np.log(prefnoise*(income)/self.inflationfactor)+kappa
+            equ=(income)*np.exp(-kappa)
         else:
-            u=np.log((income-kulutusvero)/self.inflationfactor)+kappa
-            equ=(income-kulutusvero)*np.exp(-kappa)
+            u=np.log((income)/self.inflationfactor)+kappa
+            equ=(income)*np.exp(-kappa)
 
         if u is np.inf:
             print('inf: state ',employment_state)
