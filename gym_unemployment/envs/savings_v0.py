@@ -73,6 +73,7 @@ class SavingsEnv_v0(gym.Env):
         self.palkkakerroin=(0.8*1+0.2*1.0/reaalinen_palkkojenkasvu)**self.timestep
         self.elakeindeksi=(0.2*1+0.8*1.0/reaalinen_palkkojenkasvu)**self.timestep
         self.kelaindeksi=(1.0/reaalinen_palkkojenkasvu)**self.timestep
+        self.r=1.05/reaalinen_palkkojenkasvu # reaalituotto 5 %
 
         # karttumaprosentit
         self.acc=0.015*self.timestep
@@ -84,6 +85,8 @@ class SavingsEnv_v0(gym.Env):
 
         self.max_age=90
         self.min_age=18
+        
+        self.max_debt=-20_000
             
         self.min_retirementage=65
         self.max_retirementage=70       
@@ -94,7 +97,7 @@ class SavingsEnv_v0(gym.Env):
         self.accbasis_tmtuki=1413.75*12        
         self.plotdebug=False
         self.wage_without_tis=True
-        self.include_mort=False
+        self.include_mort=True
         self.reset_exploration_go=False
         self.reset_exploration_ratio=0.3
         self.train=False
@@ -106,7 +109,7 @@ class SavingsEnv_v0(gym.Env):
         self.scale_tyel_accrual=True
         self.scale_additional_tyel_accrual=0
         self.scale_additional_unemp_benefit=0
-        self.include_pt=True
+        self.include_pt=False
         self.perustulo=False # onko Kelan perustulo laskelmissa
         
         if 'kwargs' in kwargs:
@@ -193,30 +196,33 @@ class SavingsEnv_v0(gym.Env):
 
         self.salary_const=0.05*self.timestep
         self.gamma=gamma_discount**self.timestep
-        self.r=1.03 # tuotto 2 % yli palkkojen kasvun
         
         self.parttime_income=0.5
         
         print('minimal model')
         self.n_age=self.max_age-self.min_age+1
-        self.n_empl=4 # states of employment, 0,1,2,3
         
         #if self.min_retirementage>self.max_unemp_age:
         self.max_unemp_age=self.min_retirementage 
     
         if self.include_pt:
+            self.n_empl=6 # states of employment, 0,1,2,3
             self.n_actions=4
         else:
+            self.n_empl=5 # states of employment, 0,1,2
             self.n_actions=3
 
-        self.n_savings=41 # -5,-4,-3,-2,-1,0,1,2,3,4,5
+        self.setup_state_encoding()
+
+        self.n_savings=41 # -20,...,-4,-3,-2,-1,0,1,2,3,4,...,20
         self.mid_sav_act=np.floor(self.n_savings/2)
             
         self.salary=np.zeros(self.max_age+1)
         
         self.pinkslip_intensity=0.05*self.timestep # todennäköisyys tulla irtisanotuksi vuodessa, skaalaa!
         self.mort_intensity=self.get_mort_rate()*self.timestep # todennäköisyys , skaalaa!
-        self.npv,self.npv0,self.npv_pension=self.comp_npv()
+        self.npv,self.npv0,self.npv_pension,self.npv_savings=self.comp_npv()
+        #print(self.npv,self.npv0,self.npv_pension,self.npv_savings)
         
         self.state_limits()        
 
@@ -252,7 +258,7 @@ class SavingsEnv_v0(gym.Env):
         '''
         return self.n_empl,self.n_actions
         
-    def comp_benefits(self,wage,old_wage,pension,employment_status,time_in_state,ika):
+    def comp_benefits(self,wage,old_wage,pension,employment_status,ika):
         '''
         Laske etuuksien arvo, kun 
             wage on palkka
@@ -293,17 +299,14 @@ class SavingsEnv_v0(gym.Env):
             p['vakiintunutpalkka']=0
             p['elakkeella']=0
             p['saa_ansiopaivarahaa']=0
-        elif employment_status==0: # työtön, ansiopäiväraha alle 60 ja työmarkkinatuki
+        elif employment_status==0: # työtön, ansiopäiväraha alle 60
             if ika<self.max_unemp_age:
                 p['tyoton']=1
                 p['t']=0
                 p['vakiintunutpalkka']=old_wage/12
                 p['elakkeella']=0
-                p['tyottomyyden_kesto']=time_in_state*12*21.5
-                if time_in_state<self.ansiopvraha_kesto: # ansiosidonnaista vain vuosi
-                    p['saa_ansiopaivarahaa']=1
-                else:
-                    p['saa_ansiopaivarahaa']=0
+                p['tyottomyyden_kesto']=0
+                p['saa_ansiopaivarahaa']=1
             else:
                 p['tyoton']=0 # ei oikeutta työttömyysturvaan
                 p['t']=0
@@ -311,7 +314,22 @@ class SavingsEnv_v0(gym.Env):
                 p['elakkeella']=0
                 p['saa_ansiopaivarahaa']=0
                 p['toimeentulotuki_vahennys']=1
-        elif employment_status==3: # osa-aikatyö
+        elif employment_status==3: # työtön, työmarkkinatuki
+            if ika<self.max_unemp_age:
+                p['tyoton']=1
+                p['t']=0
+                p['vakiintunutpalkka']=old_wage/12
+                p['elakkeella']=0
+                p['tyottomyyden_kesto']=2*12*21.5
+                p['saa_ansiopaivarahaa']=0
+            else:
+                p['tyoton']=0 # ei oikeutta työttömyysturvaan
+                p['t']=0
+                p['vakiintunutpalkka']=0
+                p['elakkeella']=0
+                p['saa_ansiopaivarahaa']=0
+                p['toimeentulotuki_vahennys']=1
+        elif employment_status==4: # osa-aikatyö
             p['tyoton']=0 
             p['t']=wage/12
             p['vakiintunutpalkka']=0
@@ -383,15 +401,7 @@ class SavingsEnv_v0(gym.Env):
         np.random.seed(seed)
         #return [seed]
         
-    def get_wage_with_tis(self,age,time_in_state):
-        #if age==self.min_age-1:
-        #    print(self.salary[int(np.floor(age))])
-        if age<=self.max_age and age>=self.min_age-1:
-            return self.salary[int(np.floor(age))]*(1-min(time_in_state,5)*self.salary_const)
-        else:
-            return 0
-            
-    def get_wage_without_tis(self,age,time_in_state):
+    def get_wage_without_tis(self,age):
         if age==self.min_age-1:
             print(self.salary[int(np.floor(age))])
         if age<=self.max_age and age>=self.min_age-1:
@@ -405,17 +415,12 @@ class SavingsEnv_v0(gym.Env):
         
         return mort
         
-    def pension_accrual(self,age,wage,pension,state=1,time_in_state=0):
+    def pension_accrual(self,age,wage,pension,state=1):
         '''
         Eläkkeen karttumisrutiini
         '''
         if state in set([0]):
-            #kesto=time_in_state*12*21.5
-            #if kesto>self.ansiopvraha_kesto400:
-            if time_in_state>=self.ansiopvraha_kesto:
-                w=0 #self.accbasis_tmtuki
-            else:
-                w=wage
+            w=wage
         
             if age>=52 and age<63:
                 acc=self.acc_unemp_over_52
@@ -426,7 +431,9 @@ class SavingsEnv_v0(gym.Env):
                 pension=pension*self.palkkakerroin+acc*w
             else: # muuten ei karttumaa
                 pension=pension*self.palkkakerroin
-        elif state in set([1,3]):
+        elif state in set([3]):
+            pension=pension*self.palkkakerroin
+        elif state in set([1,4]):
             if age>=52 and age<63:
                 acc=self.acc_over_52
             else:
@@ -456,20 +463,24 @@ class SavingsEnv_v0(gym.Env):
         cpsum=1
         cpsum0=1
         cpsum_pension=1
+        cpsum_savings=1
         for x in np.arange(100,self.max_age,-self.timestep):
             intx=int(np.floor(x))
             m=self.mort_intensity[intx]
             cpsum=m*1+(1-m)*(1+self.gamma*cpsum)
             cpsum0=m*1+(1-m)*(1+cpsum0)
-            cpsum_pension=m*1+(1-m)*(1+cpsum_pension*self.elakeindeksi)
+            cpsum_pension=m*1+(1-m)*(1+cpsum_pension*self.gamma*self.elakeindeksi) # puuttuuko tästä self.gamma??
+            cpsum_savings=m*1+(1-m)*(1+cpsum_savings/self.r) # ei gamma tähän, laskee paljonko etuutta saadaan säästöillä
+            
         npv=cpsum
         npv0=cpsum0
         npv_pension=cpsum_pension
+        npv_savings=cpsum_savings
             
         if self.plotdebug:
             print('npv: {}'.format(npv))
 
-        return npv,npv0,npv_pension
+        return npv,npv0,npv_pension,npv_savings
         
     def comp_npv_orig(self):
         '''
@@ -707,14 +718,14 @@ class SavingsEnv_v0(gym.Env):
             self.salary[age]=self.wage_process(self.salary[age-1],age,a0,a1)
             #print('age {} sal {}'.format(age,self.salary[age]))
         
-    def scale_pension(self,pension,age,debug=False,emp=1,time_in_state=0):
+    def scale_pension(self,pension,age,debug=False,emp=1):
         if debug:
             return pension*self.elakeindeksi
         else:
-            if emp==0:
-                return self.elinaikakerroin*pension*self.elakeindeksi*(1+0.048*max(0,age-self.min_retirementage-time_in_state))
-            else:
+            if emp in set({1,4}):
                 return self.elinaikakerroin*pension*self.elakeindeksi*(1+0.048*max(0,age-self.min_retirementage))
+            else:
+                return self.elinaikakerroin*pension*self.elakeindeksi
 
     def close(self):
         if self.viewer:
@@ -726,17 +737,21 @@ class SavingsEnv_v0(gym.Env):
         
         return s
         
-    def update_savings(self,netto,savings,sav_action):
-        savings=savings*self.r # interest
+    def update_savings(self,netto,savings,sav_action,empstate):
+        interest=savings*(self.r-1.0)
+        savings=savings+interest
         
         if sav_action>0:
-            sav_action=min(sav_action,netto)
+            #sav_action=min(sav_action,netto)
             netto-=sav_action
             savings+=sav_action
         else:
-            sav_action=min(sav_action,savings)
-            netto+=sav_action
-            savings-=sav_action            
+            if (savings>self.max_debt and empstate!=2) or (savings>0 and empstate==2):
+                netto-=sav_action-interest
+                savings+=sav_action-interest
+            else:
+                netto=netto+interest
+                savings=savings-interest
         
         return netto,savings
 
@@ -748,7 +763,7 @@ class SavingsEnv_v0(gym.Env):
         Tässä versiossa vain kolme tilaa: töissä, työtön ja vanhuuseläkkeellä
         '''
         assert self.action_space.contains(action), "%r (%s) invalid"%(action, type(action))
-        employment_status,pension,old_wage,age,time_in_state,wage,savings=self.state_decode(self.state)
+        employment_status,pension,old_wage,age,wage,savings=self.state_decode(self.state)
         intage=int(np.round(age))
         
         # here age is age at the beginning of the period
@@ -758,59 +773,79 @@ class SavingsEnv_v0(gym.Env):
         next_age=int(np.round(age+self.timestep))
         
         if self.include_mort:
-            sattuma = np.random.uniform(size=4)
-            if sattuma[3]<self.mort_intensity[intage]:
-                action=15
+            sattuma = np.random.uniform(size=1)
+            if sattuma[0]<self.mort_intensity[intage]:
+                emp_action=15
 
         if emp_action==15: # kuolee
-            employment_status,pension,old_wage,time_in_state,wage,netto=(-1,0,0,0,0,0)
+            employment_status,pension,old_wage,wage,netto=(self.n_empl-1,0,0,0,0)
             done=True
-            self.state = self.state_encode(employment_status,pension,wage,age+self.timestep,time_in_state,wage,savings)
-            reward=0
-            return np.array(self.state), reward, done, {}
+            self.state = self.state_encode(employment_status,pension,wage,age+self.timestep,wage,savings)
+            netto = 1e-20 #self.savings 
+            reward = 1e-20 #            self.log_utility(netto,2,age)
+            eq=0
+            return np.array(self.state), reward, done, {'netto': netto, 'r': reward, 'eq': eq}
         elif employment_status == 0:
             if emp_action == 0 or (emp_action==2 and age<self.min_retirementage):
                 employment_status = 0 # unchanged
-                pension=self.pension_accrual(age,old_wage,pension,state=employment_status,time_in_state=time_in_state)
-                netto=self.comp_benefits(0,old_wage,0,employment_status,time_in_state,age)
-                netto,savings = self.update_savings(netto,savings,sav_action) 
-                time_in_state+=self.timestep
-                if not dynprog:
-                    next_wage=self.get_wage_raw(next_age,wage,employment_status)
-                else:
-                    #wage=old_wage
-                    next_wage=0
+                pension=self.pension_accrual(age,old_wage,pension,state=employment_status)
+                netto=self.comp_benefits(0,old_wage,0,employment_status,age)
+                netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
+                next_wage=self.get_wage_raw(next_age,wage,employment_status)
+                employment_status  = 3 # switch to tm-tuki
             elif emp_action == 1: # 
                 employment_status  = 1 # switch to fulltime work
-                time_in_state=0
-                pension=self.pension_accrual(age,wage,pension,state=employment_status,time_in_state=time_in_state)
-                netto=self.comp_benefits(wage,0,0,employment_status,time_in_state,age)
-                netto,savings = self.update_savings(netto,savings,sav_action) 
-                time_in_state+=self.timestep
-                if not dynprog:
-                    next_wage=self.get_wage_raw(next_age,wage,employment_status)
-                else:
-                    next_wage=0
+                pension=self.pension_accrual(age,wage,pension,state=employment_status)
+                netto=self.comp_benefits(wage,0,0,employment_status,age)
+                netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
+                next_wage=self.get_wage_raw(next_age,wage,employment_status)
             elif emp_action == 3: # 
-                employment_status  = 3 # switch to parttime work
-                time_in_state=0
-                pension=self.pension_accrual(age,self.parttime_income*wage,pension,state=employment_status,time_in_state=time_in_state)
-                netto=self.comp_benefits(self.parttime_income*wage,0,0,employment_status,time_in_state,age)
-                netto,savings = self.update_savings(netto,savings,sav_action) 
-                time_in_state+=self.timestep
+                employment_status  = 4 # switch to parttime work
+                pension_accrual(age,self.parttime_income*wage,pension,state=employment_status)
+                netto=self.comp_benefits(self.parttime_income*wage,0,0,employment_status,age)
+                netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
                 if not dynprog:
                     next_wage=self.get_wage_raw(next_age,wage,employment_status)
                 else:
                     next_wage=0
             elif emp_action == 2:
                 if age>=self.min_retirementage: # ve
-                    pension=self.scale_pension(pension,age,emp=0,time_in_state=time_in_state)
+                    pension=self.scale_pension(pension,age,emp=0)
                     employment_status  = 2 
                     pension=self.ben.laske_kokonaiselake(age,pension/12,include_kansanelake=True,include_takuuelake=True)*12
-                    time_in_state=0
-                    netto=self.comp_benefits(0,0,pension,employment_status,0,age)
-                    netto,savings = self.update_savings(netto,savings,sav_action) 
-                    time_in_state+=self.timestep
+                    netto=self.comp_benefits(0,0,pension,employment_status,age)
+                    netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
+                    next_wage=0
+                else:
+                    print('error 99')
+            else:
+                print('error 17')
+        elif employment_status == 3:
+            if emp_action == 0 or (emp_action==2 and age<self.min_retirementage):
+                employment_status = 3 # unchanged
+                pension=self.pension_accrual(age,old_wage,pension,state=employment_status)
+                netto=self.comp_benefits(0,old_wage,0,employment_status,age)
+                netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
+                next_wage=self.get_wage_raw(next_age,wage,employment_status)
+            elif emp_action == 1: # 
+                employment_status  = 1 # switch to fulltime work
+                pension=self.pension_accrual(age,wage,pension,state=employment_status)
+                netto=self.comp_benefits(wage,0,0,employment_status,age)
+                netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
+                next_wage=self.get_wage_raw(next_age,wage,employment_status)
+            elif emp_action == 3: # 
+                employment_status  = 4 # switch to parttime work
+                pension=self.pension_accrual(age,self.parttime_income*wage,pension,state=employment_status)
+                netto=self.comp_benefits(self.parttime_income*wage,0,employment_status,age)
+                netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
+                next_wage=self.get_wage_raw(next_age,wage,employment_status)
+            elif emp_action == 2:
+                if age>=self.min_retirementage: # ve
+                    pension=self.scale_pension(pension,age,emp=0)
+                    employment_status  = 2 
+                    pension=self.ben.laske_kokonaiselake(age,pension/12,include_kansanelake=True,include_takuuelake=True)*12
+                    netto=self.comp_benefits(0,0,pension,employment_status,age)
+                    netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
                     next_wage=0
                 else:
                     print('error 99')
@@ -820,91 +855,62 @@ class SavingsEnv_v0(gym.Env):
             if emp_action == 0 or (emp_action==2 and age<self.min_retirementage):
                 employment_status  = 1 # unchanged
                 pension=self.pension_accrual(age,wage,pension,state=employment_status)
-                netto=self.comp_benefits(wage,0,0,employment_status,time_in_state,age)
-                netto,savings = self.update_savings(netto,savings,sav_action) 
-                time_in_state+=self.timestep
-                if not dynprog:
-                    next_wage=self.get_wage_raw(next_age,wage,employment_status)
-                else:
-                    next_wage=0
+                netto=self.comp_benefits(wage,0,0,employment_status,age)
+                netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
+                next_wage=self.get_wage_raw(next_age,wage,employment_status)
             elif emp_action == 1: # työttömäksi
                 employment_status = 0 # switch
-                time_in_state=0
-                pension=self.pension_accrual(age,old_wage,pension,state=employment_status,time_in_state=time_in_state)
-                netto=self.comp_benefits(0,old_wage,0,employment_status,time_in_state,age)
-                netto,savings = self.update_savings(netto,savings,sav_action) 
-                time_in_state+=self.timestep
+                pension=self.pension_accrual(age,old_wage,pension,state=employment_status)
+                netto=self.comp_benefits(0,old_wage,0,employment_status,age)
+                netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
                 if not dynprog:
                     next_wage=self.get_wage_raw(next_age,wage,employment_status)
                 else:
                     next_wage=0
             elif emp_action == 3: # 
-                employment_status = 3 # switch to parttime work
-                time_in_state=0
-                pension=self.pension_accrual(age,self.parttime_income*wage,pension,state=employment_status,time_in_state=time_in_state)
-                netto=self.comp_benefits(self.parttime_income*wage,0,0,employment_status,time_in_state,age)
-                netto,savings = self.update_savings(netto,savings,sav_action) 
-                time_in_state+=self.timestep
-                if not dynprog:
-                    next_wage=self.get_wage_raw(next_age,wage,employment_status)
-                else:
-                    next_wage=0
+                employment_status = 4 # switch to parttime work
+                pension=self.pension_accrual(age,self.parttime_income*wage,pension,state=employment_status)
+                netto=self.comp_benefits(self.parttime_income*wage,0,0,employment_status,age)
+                netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
+                next_wage=self.get_wage_raw(next_age,wage,employment_status)
             elif emp_action==2:
                 if age>=self.min_retirementage: # ve
                     employment_status = 2 # unchanged
                     pension=self.scale_pension(pension,age,emp=1)
                     pension=self.ben.laske_kokonaiselake(age,pension/12,include_kansanelake=True,include_takuuelake=True)*12
-                    time_in_state=0
-                    netto=self.comp_benefits(0,0,pension,employment_status,0,age)
-                    netto,savings = self.update_savings(netto,savings,sav_action) 
-                    time_in_state+=self.timestep
+                    netto=self.comp_benefits(0,0,pension,employment_status,age)
+                    netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
                     next_wage=0
                 else:
                     print('error 13')
             else:
                 print('error 12')
-        elif employment_status == 3:
+        elif employment_status == 4:
             if emp_action == 0 or (emp_action==2 and age<self.min_retirementage):
                 employment_status  = 3 # unchanged
                 pension=self.pension_accrual(age,self.parttime_income*wage,pension,state=3)
-                netto=self.comp_benefits(self.parttime_income*wage,0,0,employment_status,time_in_state,age)
-                netto,savings = self.update_savings(netto,savings,sav_action) 
-                time_in_state+=self.timestep
-                if not dynprog:
-                    next_wage=self.get_wage_raw(next_age,wage,employment_status)
-                else:
-                    next_wage=0
+                netto=self.comp_benefits(self.parttime_income*wage,0,0,employment_status,age)
+                netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
+                next_wage=self.get_wage_raw(next_age,wage,employment_status)
             elif emp_action == 1: # työttömäksi
                 employment_status = 0 # switch
-                time_in_state=0
-                pension=self.pension_accrual(age,self.parttime_income*old_wage,pension,state=employment_status,time_in_state=time_in_state)
-                netto=self.comp_benefits(0,self.parttime_income*old_wage,0,employment_status,time_in_state,age)
-                netto,savings = self.update_savings(netto,savings,sav_action) 
-                time_in_state+=self.timestep
-                if not dynprog:
-                    next_wage=self.get_wage_raw(next_age,wage,employment_status)
-                else:
-                    next_wage=0
+                pension=self.pension_accrual(age,self.parttime_income*old_wage,pension,state=employment_status)
+                netto=self.comp_benefits(0,self.parttime_income*old_wage,0,employment_status,age)
+                netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
+                next_wage=self.get_wage_raw(next_age,wage,employment_status)
             elif emp_action == 3: # 
                 employment_status  = 1 # switch to fulltime
-                time_in_state=0
                 pension=self.pension_accrual(age,wage,pension,state=employment_status)
-                netto=self.comp_benefits(wage,0,0,employment_status,time_in_state,age)
-                netto,savings = self.update_savings(netto,savings,sav_action) 
-                time_in_state+=self.timestep
-                if not dynprog:
-                    next_wage=self.get_wage_raw(next_age,wage,employment_status)
-                else:
-                    next_wage=0
+                netto=self.comp_benefits(wage,0,0,employment_status,age)
+                netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
+                next_wage=self.get_wage_raw(next_age,wage,employment_status)
             elif emp_action==2:
                 if age>=self.min_retirementage: # ve
                     employment_status  = 2 # unchanged
                     pension=self.scale_pension(pension,age,emp=3)
                     pension=self.ben.laske_kokonaiselake(age,pension/12,include_kansanelake=True,include_takuuelake=True)*12
-                    time_in_state=0
-                    netto=self.comp_benefits(0,0,pension,employment_status,0,age)
-                    netto,savings = self.update_savings(netto,savings,sav_action) 
-                    time_in_state+=self.timestep
+                    netto=self.comp_benefits(0,0,pension,employment_status,age)
+                    netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
                     next_wage=0
                 else:
                     print('error 13')
@@ -913,9 +919,8 @@ class SavingsEnv_v0(gym.Env):
         elif employment_status == 2: # eläkkeellä, ei voi palata töihin
             employment_status = 2 # unchanged
             pension=pension*self.elakeindeksi
-            netto=self.comp_benefits(0,0,pension,employment_status,0,age)
-            netto,savings = self.update_savings(netto,savings,sav_action) 
-            time_in_state+=self.timestep
+            netto=self.comp_benefits(0,0,pension,employment_status,age)
+            netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
             next_wage=0
         else:
             print('Unknown employment_status {s} of type {t}'.format(s=employment_status,t=type(employment_status)))
@@ -923,125 +928,104 @@ class SavingsEnv_v0(gym.Env):
         done = age >= self.max_age
         done = bool(done)
         
-        if dynprog: # only for fitting dynprog
-            if not done:
-                reward,equivalent = self.log_utility(netto,int(employment_status),age)
-                self.state = self.state_encode(employment_status,pension,wage,next_age,time_in_state,next_wage,savings)
-            else:
-                if age>self.max_age+0.001:
-                    self.steps_beyond_done = self.steps_beyond_done+1
-                    reward = 0.0
-                    equivalent=0.0
-                    netto = 0.0
-                    self.state = self.state_encode(employment_status,pension,wage,next_age,time_in_state,next_wage,savings)
-                else:
-                    self.steps_beyond_done = 0
-                    if employment_status==2:
-                        reward,equivalent = self.log_utility(netto,2,age)
-                        reward = self.npv*reward
-                        equivalent=self.npv*equivalent
-                    else:
-                        reward = 0.0
-                        equivalent=0.0
-                        netto=0.0
-                        
-                    self.state = self.state_encode(employment_status,pension,wage,next_age,time_in_state,next_wage,savings)
-        else:
-            if not done:
-                reward,equivalent = self.log_utility(netto,int(employment_status),age)
-                self.state = self.state_encode(employment_status,pension,wage,next_age,time_in_state,next_wage,savings)
-            elif self.steps_beyond_done is None:
-                self.steps_beyond_done = 0
-                if employment_status == 2 and age<self.max_age+self.timestep:
-                    reward,equivalent = self.log_utility(netto,2,age)
-                    reward = self.npv*reward
-                    equivalent=self.npv*equivalent
-                else:
-                    reward = 0.0
-                    equivalent = 0.0
-                    netto=0.0
-
-                #benq=self.scale_q(npv,npv0,npv_pension,benq)                
-                netto=netto*self.npv_pension+savings
+        if not done:
+            reward,equivalent = self.log_utility(netto,int(employment_status),age)
+            self.state = self.state_encode(employment_status,pension,wage,next_age,next_wage,savings)
+        elif self.steps_beyond_done is None:
+            self.steps_beyond_done = 0
+            #if employment_status == 2 and age<self.max_age+self.timestep:
+            if age<self.max_age+self.timestep:
+                savings_component=max(0,savings/self.npv_savings)
+                netto=netto+savings_component
                 savings=0
-
-                self.state = self.state_encode(employment_status,pension,wage,next_age,time_in_state,next_wage,savings)
+                reward,equivalent = self.log_utility(netto,2,age)
+                reward = self.npv*reward
+                equivalent=self.npv*equivalent
             else:
-                self.state = self.state_encode(employment_status,pension,wage,next_age,time_in_state,next_wage,savings)
-                if self.steps_beyond_done == 0:
-                    logger.warn("You are calling 'step()' even though this environment has already returned done = True. You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior.")
-                self.steps_beyond_done += 1
-                reward = 0.0
-                equivalent=0.0
-                netto=0.0
+                reward = 1e-10
+                equivalent = 1e-10
+                netto=1e-10
+
+            #benq=self.scale_q(npv,npv0,npv_pension,benq)                
+            #netto=netto*self.npv_pension+savings
+            #savings=0
+
+            self.state = self.state_encode(employment_status,pension,wage,next_age,next_wage,savings)
+        else:
+            self.state = self.state_encode(employment_status,pension,wage,next_age,next_wage,savings)
+            if self.steps_beyond_done == 0:
+                logger.warn("You are calling 'step()' even though this environment has already returned done = True. You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior.")
+            self.steps_beyond_done += 1
+            reward = 1e-10
+            equivalent=1e-10
+            netto=1e-10
                 
         if self.plotdebug:
-            self.render(done=done,reward=reward, netto=netto)
+            self.render(done=done,reward=reward,netto=netto,s_ac=sav_action)
             
         return np.array(self.state), reward, done, {'netto': netto, 'r': reward, 'eq': equivalent}
 
-    def render(self, mode='human', close=False, done=False, reward=None, netto=None,state=None,pred_r=None):
+    def get_lc_version(self):
+        '''
+        returns the version of life-cycle model's episodestate used
+        '''
+        return 101
+
+    def render(self, mode='human', close=False, done=False, reward=None, netto=None,state=None,pred_r=None,s_ac=None):
         '''
         Tulostus-rutiini
         '''
         if state is None:
-            emp,pension,wage,age,time_in_state,nextwage,savings=self.state_decode(self.state)
+            emp,pension,wage,age,nextwage,savings=self.state_decode(self.state)
         else:
-            emp,pension,wage,age,time_in_state,nextwage,savings=self.state_decode(state)
+            emp,pension,wage,age,nextwage,savings=self.state_decode(state)
             
-        if reward is None:
-            print('Tila {} palkka {:.2f} ikä {} t-i-s {} elake {:.2f} seur.palkka {:.2f} sav {:.2f}'.format(\
-                emp,wage,age,time_in_state,pension,nextwage,savings))
-        elif netto is None:
-            if pred_r is not None:
-                print('Tila {} palkka {:.2f} ikä {} t-i-s {} elake {:.2f} seur.palkka {:.2f} sav {:.2f} r {:.4f} pr {:.4f} d {:.4f} '.format(\
-                    emp,wage,age,time_in_state,pension,nextwage,savings,reward,pred_r,reward-pred_r))
-            else:
-                print('Tila {} palkka {:.2f} ikä {} t-i-s {} elake {:.2f} seur.palkka {:.2f} sav {:.2f} r {:.4f}'.format(\
-                    emp,wage,age,time_in_state,pension,nextwage,savings,reward))
-        else:
-            if pred_r is not None:
-                print('Tila {} palkka {:.2f} ikä {} t-i-s {} elake {:.2f} seur.palkka {:.2f} sav {:.2f} r {:.4f} pr {:.4f} d {:.4f} n {:.2f}'.format(\
-                    emp,wage,age,time_in_state,pension,nextwage,savings,reward,pred_r,netto,reward-pred_r))
-            else:
-                print('Tila {} palkka {:.2f} ikä {} t-i-s {} elake {:.2f} seur.palkka {:.2f} sav {:.2f} r {:.4f} n {:.2f}'.format(\
-                    emp,wage,age,time_in_state,pension,nextwage,savings,reward,netto))
+        str=f'Tila {emp} palkka {wage:.2f} ikä {age} elake {pension:.2f} seur.palkka {nextwage:.2f}'
+                
+        if netto is not None:
+            str+=f' n {netto:.2f}'
+
+        if reward is not None:
+            str+=f' r {reward:.4f}'
+
+        if pred_r is not None:
+            str+=f' pr {pred_r:.4f}'
+            
+        if pred_r is not None and reward is not None:
+            str+=' d {:.4f}'.format(reward-pred_r)
+            
+        str+=f' sav {savings:.2f}'
+
+        if s_ac is not None:
+            str+=f' s_ac {s_ac:.4f}'
+
+        print(str)
+
         if done:
             print('-------------------------------------------------------------------------------------------------------')
 
-    def state_encode(self,emp,pension,old_wage,age,time_in_state,nextwage,savings):
-        d=np.zeros(self.n_empl+9)
+    def setup_state_encoding(self):
+        self.state_encoding=np.zeros((self.n_empl,self.n_empl))
+        for s in range(self.n_empl):
+            self.state_encoding[s,s]=1
+        
+    def state_encode(self,emp,pension,old_wage,age,nextwage,savings):
+        d=np.zeros(self.n_empl+7)
         states=self.n_empl
-        if emp==1:
-            d[0:states]=np.array([0,1,0,0])
-        elif emp==0:
-            d[0:states]=np.array([1,0,0,0])
-        elif emp==2:
-            d[0:states]=np.array([0,0,1,0])
-        elif emp==3:
-            d[0:states]=np.array([0,0,0,1])
-        else:
-            print('state error '+str(emp))
+        d[0:states]=self.state_encoding[emp,:]
             
         d[states]=(pension-20_000)/20_000 # vastainen/alkanut eläke
-        #d[states]=(pension-40_000)/40_000 # vastainen/alkanut eläke
         d[states+1]=(old_wage-35_000)/35_000
         d[states+2]=(age-(self.max_age+self.min_age)/2)/((self.max_age+self.min_age)/2)
-        d[states+3]=(time_in_state-20)/20
-        d[states+4]=(nextwage-35_000)/35_000
+        d[states+3]=(nextwage-35_000)/35_000
         if age>=self.min_retirementage:
-            d[states+5]=1
+            d[states+4]=1
         else:
-            d[states+5]=0
+            d[states+4]=0
             
-        if time_in_state<self.ansiopvraha_kesto:
-            d[states+6]=1
-        else:
-            d[states+6]=0
-            
-        d[states+7]=(self.min_retirementage-age)/max(self.max_age-self.min_retirementage,self.min_retirementage-self.min_age)
+        d[states+5]=(self.min_retirementage-age)/max(self.max_age-self.min_retirementage,self.min_retirementage-self.min_age)
         
-        d[states+8]=(savings-10_000)/10_000
+        d[states+6]=(savings-20_000)/20_000
         
         return d
 
@@ -1056,14 +1040,12 @@ class SavingsEnv_v0(gym.Env):
             print('state error '+str(vec))
         
         pension=vec[self.n_empl]*20_000+20_000
-        #pension=vec[self.n_empl]*40_000+40_000
         wage=vec[self.n_empl+1]*35_000+35_000
         age=int(np.round(vec[self.n_empl+2]*((self.max_age+self.min_age)/2)+(self.max_age+self.min_age)/2))
-        time_in_state=vec[self.n_empl+3]*20+20
-        nextwage=vec[self.n_empl+4]*35_000+35_000
-        savings=vec[self.n_empl+8]*10_000+10_000
+        nextwage=vec[self.n_empl+3]*35_000+35_000
+        savings=vec[self.n_empl+6]*20_000+20_000
                 
-        return int(emp),pension,wage,age,time_in_state,nextwage,savings
+        return int(emp),pension,wage,age,nextwage,savings
 
     def unit_test_code_decode(self):
         for k in range(100):
@@ -1071,31 +1053,27 @@ class SavingsEnv_v0(gym.Env):
             pension=random.uniform(0,80_000)
             old_wage=random.uniform(0,80_000)
             age=np.random.randint(self.min_age,self.max_age)
-            time_in_state=random.uniform(0,30)
             nextwage=random.uniform(0,80_000)
             savings=random.uniform(0,80_000)
         
-            vec=self.state_encode(emp,pension,old_wage,age,time_in_state,nextwage,savings)
+            vec=self.state_encode(emp,pension,old_wage,age,nextwage,savings)
                                 
-            emp2,pension2,old_wage2,age2,time_in_state2,nextwage2,savings2\
+            emp2,pension2,old_wage2,age2,nextwage2,savings2\
                 =self.state_decode(vec)
                 
-            self.check_state(emp,pension,old_wage,age,time_in_state,nextwage,savings,
-                             emp2,pension2,old_wage2,age2,time_in_state2,nextwage2,savings2)
+            self.check_state(emp,pension,old_wage,age,nextwage,savings,emp2,pension2,old_wage2,age2,nextwage2,savings2)
                              
         return 'Unit test done'
         
     
-    def check_state(self,emp,pension,old_wage,age,time_in_state,nextwage,savings,
-                             emp2,pension2,old_wage2,age2,time_in_state2,nextwage2,savings2):
+    def check_state(self,emp,pension,old_wage,age,nextwage,savings,
+                             emp2,pension2,old_wage2,age2,nextwage2,savings2):
         if not emp==emp2:  
             print('emp: {} vs {}'.format(emp,emp2))
         if not pension==pension2:  
             print('pension: {} vs {}'.format(pension,pension2))
         if not old_wage==old_wage2:  
             print('old_wage: {} vs {}'.format(old_wage,old_wage2))
-        if not time_in_state==time_in_state2:  
-            print('time_in_state: {} vs {}'.format(time_in_state,time_in_state2))
         if not age==age2:  
             print('age: {} vs {}'.format(age,age2))
         if not nextwage==nextwage2:  
@@ -1111,16 +1089,16 @@ class SavingsEnv_v0(gym.Env):
             0,
             0,
             0,
-            -1.0,
+            0,
             -1.0,
             -1.0,
             -1.0,
             -1.0,
             0,
-            0,
             -1.0,
-            0.0])
+            -2.0])
         self.high = np.array([
+            1,
             1,
             1,
             1,
@@ -1129,8 +1107,6 @@ class SavingsEnv_v0(gym.Env):
             10.0,
             1.0,
             10.0,
-            10.0,
-            1,
             1,
             1.0,
             10.0])
@@ -1158,7 +1134,6 @@ class SavingsEnv_v0(gym.Env):
         if debug:
             age=self.min_age
             initial_age=age
-            time_in_state=random.choices(np.array([0,1],dtype=int),weights=[0.40,0.60])[0] # 60% tm-tuella
             initial_salary=np.random.uniform(low=1_000,high=70_000)
             pension=np.random.uniform(low=0,high=40_000)
         else:
@@ -1166,7 +1141,6 @@ class SavingsEnv_v0(gym.Env):
                 age=ini_age
             else:
                 age=int(self.min_age)
-            time_in_state=random.choices(np.array([0,1],dtype=int),weights=[0.40,0.60])[0] # 60% tm-tuella
             if pension is None:
                 pension=0
                 
@@ -1175,7 +1149,6 @@ class SavingsEnv_v0(gym.Env):
         initial_age=None
         if self.reset_exploration_go and self.train and self.reset_exploration_ratio>np.random.uniform():
             #print('exploration')
-            time_in_state=random.choices(np.array([0,1,2,3,4,5],dtype=int),weights=[0.10,0.35,0.20,0.15,0.10,0.05])[0] # 60% tm-tuella
             #employment_status=random.choices(np.array([0,1,3],dtype=int),weights=[0.4,0.4,0.2])[0]
             if random.random()<0.5:
                 age=int(np.random.uniform(low=self.min_age,high=self.max_age-5))
@@ -1212,7 +1185,7 @@ class SavingsEnv_v0(gym.Env):
         
         #print(initial_salary,old_wage,wage)
 
-        self.state = self.state_encode(employment_status,pension,old_wage,age,time_in_state,wage,savings)
+        self.state = self.state_encode(employment_status,pension,old_wage,age,wage,savings)
         self.steps_beyond_done = None
         
         if self.plotdebug: # or debug:
@@ -1220,6 +1193,6 @@ class SavingsEnv_v0(gym.Env):
         
         return np.array(self.state)
 
-    def set_state(self,employment_status,pension,old_wage,age,time_in_state,wage):
-        s0=self.env.state_encode(employment_status,pension,old_wage,age,time_in_state,wage)
+    def set_state(self,employment_status,pension,old_wage,age,wage,savings):
+        s0=self.env.state_encode(employment_status,pension,old_wage,age,wage,savings)
         self.state=s0
