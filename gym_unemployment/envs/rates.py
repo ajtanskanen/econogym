@@ -437,13 +437,15 @@ class Rates():
 
         return disab        
 
-    def get_birth_rate(self,debug=False):
+    def get_birth_rate(self,debug=False,symmetric=False):
         '''
         Syntyvyysdata
         '''
         birth=np.zeros((self.max_age+1,self.n_groups))
         if debug:
             dfactor=np.array([1.0,1.0,1.0,1.0,1.0,1.0])
+        elif symmetric:
+            dfactor=np.array([0.8,1.0,1.25,0.8,1.0,1.25])
         else:
             dfactor=np.array([0.75,1.0,1.25,0.5,1.0,1.5])
         for g in range(self.n_groups):
@@ -549,33 +551,52 @@ class Rates():
                     
         return arr
         
+    def get_initial_marriage_ratio(self):
+        return 0.0367
+        
+#     def get_marriage_rate(self):
+#         #if self.year==2018:
+#         mar_miehet=self.map_5year(np.array([0.9,8.9,31.0,40.5,32.4,25.6,26.9,15.1,11.3,7.2,4.1,2.0])/1000.0)
+#         mar_naiset=self.map_5year(np.array([2.4,16.6,45.3,46.6,33.4,25.8,27.9,11.2,7.5,4.2,2.4,0.5])/1000.0)
+#         # avoliitot, arvio
+#         mar_miehet+=self.map_5year(np.array([20.0,20.0,10.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0])/1000.0)
+#         mar_naiset+=self.map_5year(np.array([20.0,20.0,10.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0])/1000.0)
+# 
+#         marriage_rate=np.zeros((2,self.max_age+2))
+#         marriage_rate[0]=mar_miehet
+#         marriage_rate[1]=mar_naiset
+#         
+#         return marriage_rate*self.timestep
+#         
     def get_marriage_rate(self):
-        #if self.year==2018:
-        mar_miehet=self.map_5year(np.array([0.9,8.9,31.0,40.5,32.4,25.6,26.9,15.1,11.3,7.2,4.1,2.0])/1000.0)
-        mar_naiset=self.map_5year(np.array([2.4,16.6,45.3,46.6,33.4,25.8,27.9,11.2,7.5,4.2,2.4,0.5])/1000.0)
-        # avoliitot, arvio
-        mar_miehet+=self.map_5year(np.array([20.0,20.0,10.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0])/1000.0)
-        mar_naiset+=self.map_5year(np.array([20.0,20.0,10.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0])/1000.0)
-
-        marriage_rate=np.zeros((2,self.max_age+2))
-        marriage_rate[0]=mar_miehet
-        marriage_rate[1]=mar_naiset
+        '''
+        Sisältää avoliitot ja avioliitot
+        '''
+        marriage_rate=np.zeros(105)
+        marriage_rate[18:]=np.array([0.061535,0.081337,0.080677,0.073297,0.088120,0.094667,0.099613,0.094117,0.115097,0.107895,0.121581,0.121740,0.116324,0.127059,0.109727,0.119645,0.113208,0.119336,0.120546,0.110704,0.125037,0.105828,0.119247,0.107601,0.109261,0.106336,0.104943,0.104873,0.103252,0.101176,0.100522,0.097700,0.096217,0.094577,0.094306,0.094023,0.093713,0.096377,0.093411,0.091398,0.090822,0.093518,0.093685,0.091468,0.090411,0.092768,0.095283,0.091210,0.095431,0.096708,0.092017,0.092312,0.089747,0.086757,0.085602,0.084154,0.082202,0.078667,0.074467,0.071651,0.066600,0.062303,0.057827,0.054465,0.047675,0.044414,0.040251,0.035600,0.031737,0.028336,0.025519,0.022941,0.019428,0.016490,0.014366,0.012364,0.010709,0.007886,0.007179,0.007030,0.005709,0.004829,0.003198,0.002946,0.062049,0.003788,0.003333])
         
         return marriage_rate*self.timestep
-        
-    def get_divorce_rate(self):
-        #if self.year==2018:
-        mar_miehet=self.map_5year(np.array([0.9,8.9,31.0,40.5,32.4,25.6,26.9,15.1,11.3,7.2,4.1,2.0])/1000.0)
-        mar_naiset=self.map_5year(np.array([2.4,16.6,45.3,46.6,33.4,25.8,27.9,11.2,7.5,4.2,2.4,0.5])/1000.0)
-        # avoliitot, arvio, 50% avoliitto-intensiteetistä
-        mar_miehet+=self.map_5year(np.array([20.0,20.0,10.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0])/1000.0)*0.5
-        mar_naiset+=self.map_5year(np.array([20.0,20.0,10.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0])/1000.0)*0.5
 
-        divorce_rate=np.zeros((2,self.max_age+2))
-        divorce_rate[0,:]=mar_miehet
-        divorce_rate[1,:]=mar_naiset
-        
+    def get_divorce_rate(self):
+
+        divorce_rate=np.zeros(105)
+        divorce_rate[18:]=np.array([0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.050000,0.05,0.050000,0.050000])
+
         return divorce_rate*self.timestep
+        
+#     def get_divorce_rate(self):
+#         #if self.year==2018:
+#         mar_miehet=self.map_5year(np.array([0.9,8.9,31.0,40.5,32.4,25.6,26.9,15.1,11.3,7.2,4.1,2.0])/1000.0)
+#         mar_naiset=self.map_5year(np.array([2.4,16.6,45.3,46.6,33.4,25.8,27.9,11.2,7.5,4.2,2.4,0.5])/1000.0)
+#         # avoliitot, arvio, 50% avoliitto-intensiteetistä
+#         mar_miehet+=self.map_5year(np.array([20.0,20.0,10.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0])/1000.0)*0.5
+#         mar_naiset+=self.map_5year(np.array([20.0,20.0,10.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0])/1000.0)*0.5
+# 
+#         divorce_rate=np.zeros((2,self.max_age+2))
+#         divorce_rate[0,:]=mar_miehet
+#         divorce_rate[1,:]=mar_naiset
+#         
+#         return divorce_rate*self.timestep
 
     def setup_salaries_v3(self,min_retirementage):
         # TK:n aineisto vuodelta 2018
