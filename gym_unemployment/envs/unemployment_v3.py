@@ -2528,7 +2528,7 @@ class UnemploymentLargeEnv_v3(gym.Env):
         benq['elake_maksussa']*=npv_pension
         benq['kokoelake']*=npv_pension
         benq['perustulo']*=npv_pension
-        benq['toimtuki']*=npv_pension
+        benq['toimeentulotuki']*=npv_pension
         #benq['palkkatulot']*=npv0
         benq['kateen']*=npv_pension
         benq['multiplier']=npv0
