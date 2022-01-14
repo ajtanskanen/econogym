@@ -2538,6 +2538,9 @@ class UnemploymentLargeEnv_v3(gym.Env):
 
 #  Perussetti, tuottaa korkean elastisuuden
 
+    def get_mortstate(self):
+        return 14
+
     def log_utility_default_params(self):
         # paljonko työstä poissaolo vaikuttaa palkkaan
     
