@@ -26,7 +26,7 @@ class Rates():
         '''
         Säätää kolmannen ryhmän intensiteetin niin että kaikkien kolmen ryhmän painot ovat 1.0
         '''
-        return w0*intensity,w1*intensity,get_w(w0,w1)*intensity
+        return w0*intensity,w1*intensity,self.get_w(w0,w1)*intensity
     
     def get_w(self,a0,a1):
         return (1-a0*self.group_weights[0]-a1*self.group_weights[1])/self.group_weights[2]
@@ -156,12 +156,12 @@ class Rates():
             error(1)        
             
         inrate=np.zeros((101,self.n_groups))
-        inrate[18:71,0] =miehet_in
-        inrate[18:71,1] =miehet_in
-        inrate[18:71,2] =miehet_in
-        inrate[18:71,3] =naiset_in
-        inrate[18:71,4] =naiset_in
-        inrate[18:71,5] =naiset_in
+        inrate[18:71,0] =0.8*miehet_in
+        inrate[18:71,1] =1.0*miehet_in
+        inrate[18:71,2] =1.2*miehet_in
+        inrate[18:71,3] =0.7*naiset_in
+        inrate[18:71,4] =1.0*naiset_in
+        inrate[18:71,5] =1.3*naiset_in
         
         outrate=np.zeros((101,self.n_groups))
         outrate[18:71,0]=miehet_ulos
@@ -220,18 +220,18 @@ class Rates():
         
         min_age=18
         max_spv=71
-        inrate[min_age:max_spv,0]=miehet_in
-        inrate[min_age:max_spv,1]=miehet_in
-        inrate[min_age:max_spv,2]=miehet_in
-        inrate[min_age:max_spv,3]=naiset_in
-        inrate[min_age:max_spv,4]=naiset_in
-        inrate[min_age:max_spv,5]=naiset_in
-        outrate[min_age:max_spv,0]=miehet_ulos
-        outrate[min_age:max_spv,1]=miehet_ulos
-        outrate[min_age:max_spv,2]=miehet_ulos
-        outrate[min_age:max_spv,3]=naiset_ulos
-        outrate[min_age:max_spv,4]=naiset_ulos
-        outrate[min_age:max_spv,5]=naiset_ulos
+        inrate[min_age:max_spv,0]=1.3*miehet_in
+        inrate[min_age:max_spv,1]=1.0*miehet_in
+        inrate[min_age:max_spv,2]=0.7*miehet_in
+        inrate[min_age:max_spv,3]=1.2*naiset_in
+        inrate[min_age:max_spv,4]=1.0*naiset_in
+        inrate[min_age:max_spv,5]=0.8*naiset_in
+        outrate[min_age:max_spv,0]=0.7*miehet_ulos
+        outrate[min_age:max_spv,1]=1.0*miehet_ulos
+        outrate[min_age:max_spv,2]=1.3*miehet_ulos
+        outrate[min_age:max_spv,3]=0.8*naiset_ulos
+        outrate[min_age:max_spv,4]=1.0*naiset_ulos
+        outrate[min_age:max_spv,5]=1.2*naiset_ulos
         
         inrate=inrate*self.timestep
         #outrate=outsider_outrate*self.timestep
@@ -356,7 +356,7 @@ class Rates():
         else:
              # uusitalon selvityksestä Työkyvyttömyyden vuoksi menetetty työura
              # skaalattu alaspäin, jotta tk:laisten kokonaismäärä menee paremmin oikein
-            dfactor=np.array([1.3,0.95,0.6,1.2,1.0,0.7])
+            dfactor=np.array([1.3,0.92,0.6,1.2,0.98,0.7])
             
         if not self.silent:
             print(f'disability rate from year {self.year}')
@@ -674,7 +674,7 @@ class Rates():
         
         return palkat_ika_miehet,palkat_ika_naiset,g_r
         
-    def infostat_kassanjasenyys_rate(self):
+    def infostate_kassanjasenyys_rate(self):
         rate_age=np.array([18,30,40,50,60,74])
         #rate_obs=np.array([0.429,0.836,0.917,0.946,0.933,0.933])
         rate_obs=np.array([0.20,0.836,0.917,0.946,0.933,0.933])
@@ -700,9 +700,9 @@ class Rates():
         reemployment probability in 3 months
         '''
         reemp=np.zeros(100)
-        reemp[0:27]=0.30
-        reemp[27:51]=0.5
-        reemp[50:100]=0.45
+        reemp[0:25]=0.40
+        reemp[25:50]=0.5
+        reemp[50:100]=0.50
         
         return reemp
         
