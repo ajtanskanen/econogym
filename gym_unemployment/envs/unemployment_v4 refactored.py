@@ -6,9 +6,9 @@
     Gym module implementing the Finnish social security including earnings-related components,
     e.g., the unemployment benefit
     
-    - sisältää täyden tuen lapsille
-    - mukana myös puolisot (as first-class citizens)
-    - arvonlisävero toteutettu
+    - sis√§lt√§√§ t√§yden tuen lapsille
+    - mukana my√∂s puolisot (as first-class citizens)
+    - arvonlis√§vero toteutettu
     - full scale kotitaloudet mukana
     
     Spouse:
@@ -26,12 +26,13 @@ from gym.utils import seeding
 import numpy as np
 import fin_benefits
 import random
+from . infostate_v4 import infostate
 from . rates import Rates
 from scipy.interpolate import interp1d
-
+from . util import pretty_print
 # class StayDict(dict):
 #     '''
-#     Apuluokka, jonka avulla tehdään virheenkorjausta 
+#     Apuluokka, jonka avulla tehd√§√§n virheenkorjausta 
 #     '''
 #     def __missing__(self, key):
 #         return 'Unknown state '+key
@@ -49,19 +50,19 @@ class UnemploymentLargeEnv_v4(gym.Env):
         Type: Box(17)  UPDATE! Sama puolisolle
         Num    Observation                Min           Max
         0    Employment status             0             12
-        1    Ryhmä                         0              6
+        1    Ryhm√§                         0              6
         2    time-in-state                 0              2
         3    Accrued old-age pension       0            inf
         4    Paid old-age pension          0            inf
         5    Salary                        0            inf
         6    Age                          25             69
-        7    Työssä-olo-Ehto               0          28/12
-        8    Työuran kesto                 0             50
-        9    Työstä pois (aika)            0            100 OK?
+        7    ty√∂ss√§-olo-Ehto               0          28/12
+        8    ty√∂uran kesto                 0             50
+        9    ty√∂st√§ pois (aika)            0            100 OK?
        10    Irtisanottu                   0              1
-       11    Käytetty työttömyyskorvausaika
+       11    K√§ytetty ty√∂tt√§myyskorvausaika
        12    Palkka-alennus
-       13    Aika työttömänä ve-iässä
+       13    Aika ty√∂tt√§m√§n√§ ve-i√§ss√§
        14    TOE-ajan palkka (tuleva)
        15    Ansiosid. tt-etuuden perustepalkka
        16    OVE maksussa
@@ -86,7 +87,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
         10  Part-time work
         11  Outside of work-force
         12  Student or in the army 
-        13  Earnings-unrelated Unemployment (Työmarkkinatuki)
+        13  Earnings-unrelated Unemployment (ty√∂markkinatuki)
         14  Dead
 
     Actions:
@@ -131,23 +132,23 @@ class UnemploymentLargeEnv_v4(gym.Env):
         self.karenssi_kesto=0.25 #0.25 # = 3kk
         self.isyysvapaa_kesto=0.25 # = 3kk
         self.aitiysvapaa_kesto=0.75 # = 9kk ml vanhempainvapaa
-        self.aitiysvapaa_pois=0.06/0.25
-        self.min_tyottputki_ika=61 # vuotta. Ikä, jonka täytyttyä pääsee putkeen
-        self.tyohistoria_tyottputki=5 # vuotta. vähimmäistyöura putkeenpääsylle
+        self.aitiysvapaa_pois=0.06 # per vuosi
+        self.min_tyottputki_ika=61 # vuotta. Ik√§, jonka t√§ytytty√∂ p√§√§see putkeen
+        self.tyohistoria_tyottputki=5 # vuotta. v√§himm√§isty√∂ura putkeenp√§√§sylle
         self.kht_kesto=2.0 # kotihoidontuen kesto 2 v
         self.tyohistoria_vaatimus=3.0 # 3 vuotta
-        self.tyohistoria_vaatimus500=5.0 # 5 vuotta
-        self.ansiopvraha_kesto400=400 # päivää
-        self.ansiopvraha_kesto300=300 # päivää
-        self.ansiopvraha_kesto500=500 # päivää
-        self.minage_500=58 # minimi-ikä 500 päivälle
-        #self.min_salary=1000 # julkaistut laskelmat olettavat tämän
-        self.min_salary=1000 # julkaistujen laskelmien jälkeen
+        self.tyohistoria_vaatimus500=10.0 # p.o. 5 vuotta 20v aikana; 10v tarkoittaa, ett√§ 18-38 v√§lin ollut t√∂iss√§ + 5v/20v 
+        self.ansiopvraha_kesto400=400 # p√§iv√§√§
+        self.ansiopvraha_kesto300=300 # p√§iv√§√§
+        self.ansiopvraha_kesto500=500 # p√§iv√§√§
+        self.minage_500=58 # minimi-ik√§ 500 p√§iv√§lle
+        #self.min_salary=1000 # julkaistut laskelmat olettavat t√§m√§n
+        self.min_salary=1000 # julkaistujen laskelmien j√§lkeen
         
         self.map_stays={0: self.stay_unemployed,  1: self.stay_employed,         2: self.stay_retired,       3: self.stay_disabled,
-                       4: self.stay_pipeline,    5: self.stay_motherleave,      6: self.stay_fatherleave,   7: self.stay_khh,
-                       8: self.stay_oa_parttime, 9: self.stay_oa_fulltime,     10: self.stay_parttime,     11: self.stay_outsider,
-                       12: self.stay_student,   13: self.stay_tyomarkkinatuki}
+                        4: self.stay_pipeline,    5: self.stay_motherleave,      6: self.stay_fatherleave,   7: self.stay_kht,
+                        8: self.stay_oa_parttime, 9: self.stay_oa_fulltime,     10: self.stay_parttime,     11: self.stay_outsider,
+                       12: self.stay_student,    13: self.stay_tyomarkkinatuki}
 
 
         self.timestep=0.25
@@ -159,7 +160,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
 
         self.syntymavuosi=1980
         #self.elinaikakerroin=0.925 # etk:n arvio 1962 syntyneille
-        self.elinaikakerroin=0.96344 # vuoden 2017 kuolleisuutta käytettäessä myös elinaikakerroin on sieltä
+        self.elinaikakerroin=0.96344 # vuoden 2017 kuolleisuutta k√§ytett√§ess√§ my√∂s elinaikakerroin on sielt√§
         #self.elinaikakerroin=self.laske_elinaikakerroin(self.syntymavuosi)
         
         self.reaalinen_palkkojenkasvu=1.016
@@ -173,12 +174,12 @@ class UnemploymentLargeEnv_v4(gym.Env):
         self.include_spouses=True # Puolisot mukana?
         self.include_mort=True # onko kuolleisuus mukana laskelmissa
         self.include_npv_mort=True # onko kuolleisuus mukana laskelmissa
-        self.include_preferencenoise=False # onko työllisyyspreferenssissä hajonta mukana 
+        self.include_preferencenoise=False # onko ty√∂llisyyspreferenssiss√§ hajonta mukana 
         self.perustulo=False # onko Kelan perustulo laskelmissa
         self.universalcredit=False # Yleistuki
         self.randomness=True # onko stokastiikka mukana
-        self.mortstop=False # pysäytä kuolleisuuden jälkeen
-        self.include_putki=True # työttömyysputki mukana
+        self.mortstop=False # pys√§yt√§ kuolleisuuden j√§lkeen
+        self.include_putki=True # ty√∂tt√§myysputki mukana
         self.include_pinkslip=True # irtisanomiset mukana
         self.use_sigma_reduction=True # kumpi palkkareduktio
         self.include_kansanelake=True
@@ -199,7 +200,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
         self.include_ove=False
         self.mortplot=False
         
-        self.unemp_limit_reemp=True # työttömästä työlliseksi tn, jos hakee töitä
+        self.unemp_limit_reemp=True # ty√∂tt√§m√§st√§ ty√∂lliseksi tn, jos hakee t√§it√§
         
         gamma=0.92
         
@@ -210,7 +211,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
         self.ove_ratio=0.5
         self.min_ove_age=61
 
-        self.plotdebug=False # tulostetaanko rivi riviltä tiloja
+        self.plotdebug=False # tulostetaanko rivi rivilt√§ tiloja
         self.plottkdebug=False
         
         # sets parameters based on kwargs
@@ -227,9 +228,11 @@ class UnemploymentLargeEnv_v4(gym.Env):
         self.gamma=gamma**self.timestep # discounting
         self.palkkakerroin=(0.8*1+0.2*1.0/self.reaalinen_palkkojenkasvu)**self.timestep
         self.elakeindeksi=(0.2*1+0.8*1.0/self.reaalinen_palkkojenkasvu)**self.timestep
-        self.kelaindeksi=(1.0/self.reaalinen_palkkojenkasvu)**self.timestep
+        #self.kelaindeksi=(1.0/self.reaalinen_palkkojenkasvu)**self.timestep
+        #self.kelaindeksi=self.elakeindeksi # oletetaan, ett√§ KELA-indeksi ei j√§√§ j√§lkeen el√§keindeksist√§ (PTS: 50-50-indeksi)
+        self.kelaindeksi=(0.5*1+0.5*1.0/self.reaalinen_palkkojenkasvu)**self.timestep # oletetaan, ett√§ KELA-indeksi = PTS: 50-50-indeksi
         self.n_age = self.max_age-self.min_age+1
-        self.inv_timestep=int(np.round(1/self.timestep)) # pitäisi olla kokonaisluku
+        self.inv_timestep=int(np.round(1/self.timestep)) # pit√§isi olla kokonaisluku
         self.n_time = int(np.round((self.n_age-1)*self.inv_timestep))+1
 
         # karttumaprosentit
@@ -254,14 +257,18 @@ class UnemploymentLargeEnv_v4(gym.Env):
         # male low income, male mid, male high, female low, female mid, female high income
         self.n_groups=6
 
-        # käytetäänkö exp/log-muunnosta tiloissa vai ei?
+        # k√§ytet√§√§nk√§ exp/log-muunnosta tiloissa vai ei?
         self.log_transform=False
         self.eps=1e-20
 
+        self.infostate=infostate(self.n_time,self.timestep,self.min_age)
         self.set_year(self.year)
         
         if not self.train: # get stats right
             self.mortstop=False
+            
+        if not self.randomness:
+            self.include_npv_mort=False
         
         self.set_state_limits()
         if self.include_mort: # and not self.mortstop:
@@ -289,7 +296,6 @@ class UnemploymentLargeEnv_v4(gym.Env):
             self.n_spouse_actions=self.n_actions 
 
         self.action_space = spaces.MultiDiscrete([self.n_actions,self.n_spouse_actions])
-        #self.action_space = spaces.Discrete(self.n_actions)
         self.observation_space = spaces.Box(self.low, self.high, dtype=np.float32)
         
         if self.use_sigma_reduction:
@@ -306,14 +312,12 @@ class UnemploymentLargeEnv_v4(gym.Env):
         
         self.steps_beyond_done = None
         
-        # normitetaan työttömyysjaksot askelvälin monikerroiksi
+        # normitetaan ty√∂tt√§myysjaksot askelv√§lin monikerroiksi
         scale=21.5*12
         self.apvkesto300=np.round(self.ansiopvraha_kesto300/scale/self.timestep)*self.timestep
         self.apvkesto400=np.round(self.ansiopvraha_kesto400/scale/self.timestep)*self.timestep
         self.apvkesto500=np.round(self.ansiopvraha_kesto500/scale/self.timestep)*self.timestep
                 
-        self.init_inforate()
-        
         if not self.silent:
             self.explain()
         
@@ -327,28 +331,28 @@ class UnemploymentLargeEnv_v4(gym.Env):
         
         if self.porrasta_toe:
             self.max_toe=35/12
-            self.min_toewage=844*12*self.inflationfactor # vuoden 2019 luku tilanteessa, jossa ei tessiä
-            self.min_halftoewage=422*12*self.inflationfactor # vuoden 2019 luku tilanteessa, jossa ei tessiä
+            self.min_toewage=844*12*self.inflationfactor # vuoden 2019 luku tilanteessa, jossa ei tessi√§
+            self.min_halftoewage=422*12*self.inflationfactor # vuoden 2019 luku tilanteessa, jossa ei tessi√§
         else:
             self.max_toe=28/12
-            self.min_toewage=1211*12*self.inflationfactor # vuoden 2019 luku tilanteessa, jossa ei tessiä
-            self.min_halftoewage=800*12*self.inflationfactor # vuoden 2019 luku tilanteessa, jossa ei tessiä
+            self.min_toewage=1211*12*self.inflationfactor # vuoden 2019 luku tilanteessa, jossa ei tessi√§
+            self.min_halftoewage=800*12*self.inflationfactor # vuoden 2019 luku tilanteessa, jossa ei tessi√§
         self.setup_unempdays_left(porrastus=self.porrasta_toe)
 
         self.accbasis_kht=719.0*12*self.inflationfactor
         self.accbasis_tmtuki=0 # 1413.75*12
         self.disabbasis_tmtuki=1413.75*12*self.inflationfactor
-        self.min_disab_tulevaaika=17_000/2 # tämä jaettu kahdella, koska laskenta tehty 5v ajalta
+        self.min_disab_tulevaaika=17_000/10 # t√§m√§ jaettu kymmenell√§, koska vertailukohta on vuosittainen keskiarvoansios
         
-        self.opiskelija_asumismenot_toimeentulo=250*self.inflationfactor
-        self.opiskelija_asumismenot_asumistuki=250*self.inflationfactor
-        self.elakelainen_asumismenot_toimeentulo=200*self.inflationfactor
-        self.elakelainen_asumismenot_asumistuki=200*self.inflationfactor
-        self.elakelainen_asumismenot_puoliso=250*self.inflationfactor
-        self.muu_asumismenot_toimeentulo=320*self.inflationfactor # per hlö, ehkä 500 e olisi realistisempi, mutta se tuottaa suuren asumistukimenon
-        self.muu_asumismenot_asumistuki=320*self.inflationfactor
-        self.muu_asumismenot_lapsi=100*self.inflationfactor
-        self.muu_asumismenot_puoliso=250*self.inflationfactor
+        # luvut 2022 tasossa
+        kerroin=self.inflation[year-2018]/self.inflation[2024-2018]
+        self.opiskelija_asumismenot_toimeentulo=150*kerroin
+        self.opiskelija_asumismenot_asumistuki=150*kerroin
+        self.elakelainen_asumismenot_toimeentulo=200*kerroin
+        self.elakelainen_asumismenot_asumistuki=200*kerroin
+        self.muu_asumismenot_toimeentulo=300*kerroin
+        self.muu_asumismenot_asumistuki=300*kerroin
+        self.muu_asumismenot_lisa=124*kerroin
 
     def get_retirementage(self):
         return self.min_retirementage
@@ -372,6 +376,9 @@ class UnemploymentLargeEnv_v4(gym.Env):
         elif year==2023:
             self.min_retirementage=64.75
             self.max_retirementage=68
+        elif year==2024:
+            self.min_retirementage=65
+            self.max_retirementage=69
         else:
             error('retirement_age')
             
@@ -382,6 +389,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
         self.ben.set_year(year)
         self.rates=Rates(year=self.year,silent=self.silent,max_age=self.max_age,
             n_groups=self.n_groups,timestep=self.timestep,inv_timestep=self.inv_timestep)
+        self.infostate.init_inforate(self.rates)
         self.palkat_ika_miehet,self.palkat_ika_naiset,self.g_r=self.rates.setup_salaries_v3(self.min_retirementage)
         self.get_wage=self.get_wage_step        
         self.get_spousewage=self.get_spousewage_step
@@ -395,7 +403,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
         self.pinkslip_intensity=self.rates.get_pinkslip_rate()*self.timestep
         self.birth_intensity=self.rates.get_birth_rate(symmetric=True)
         self.mort_intensity=self.rates.get_mort_rate()
-        self.student_inrate,self.student_outrate=self.rates.get_student_rate_v2() # myös armeijassa olevat tässä
+        self.student_inrate,self.student_outrate=self.rates.get_student_rate_v2() # my√∂s armeijassa olevat t√§ss√§
         self.outsider_inrate,self.outsider_outrate=self.rates.get_outsider_rate()
         self.divorce_rate=self.rates.get_divorce_rate()
         self.marriage_rate=self.rates.get_marriage_rate()
@@ -433,8 +441,8 @@ class UnemploymentLargeEnv_v4(gym.Env):
 
     def comp_npv(self):
         '''
-        lasketaan montako timestep:iä (diskontattuna) max_age:n jälkeen henkilö on vanhuuseläkkeellä 
-        hyvin yksinkertainen toteutus. Tulos on odotettu lukumäärä timestep:jä
+        lasketaan montako timestep:i√§ (diskontattuna) max_age:n j√§lkeen henkil√§ on vanhuusel√§kkeell√§ 
+        hyvin yksinkertainen toteutus. Tulos on odotettu lukum√§√§r√§ timestep:j√§
         
         npv <- diskontattu
         npv0 <- ei ole diskontattu
@@ -445,10 +453,10 @@ class UnemploymentLargeEnv_v4(gym.Env):
         npv_gpension=np.zeros(self.n_groups)
 
         for g in range(self.n_groups):
-            cpsum=1
-            cpsum0=1
-            cpsum_gpension=1
-            cpsum_pension=1
+            cpsum=1.0
+            cpsum0=1.0
+            cpsum_gpension=1.0
+            cpsum_pension=1.0
             for x in np.arange(100,self.max_age,-self.timestep):
                 intx=int(np.floor(x))
                 m=self.mort_intensity[intx,g]
@@ -463,28 +471,28 @@ class UnemploymentLargeEnv_v4(gym.Env):
             #print(g,npv0)
             
         if self.plotdebug:
-            print('npv: {}'.format(npv))
-
+            print('npv:',npv)
+            
         return npv,npv0,npv_pension,npv_gpension
 
     def comp_npv_simulation(self,g):
 
         '''
-        simuloidaan npv jokaiselle erikseen montako timestep:iä (diskontattuna) max_age:n jälkeen henkilö on vanhuuseläkkeellä 
-        hyvin yksinkertainen toteutus. Tulos on odotettu lukumäärä timestep:jä
+        simuloidaan npv jokaiselle erikseen montako timestep:i√§ (diskontattuna) max_age:n j√§lkeen henkil√§ on vanhuusel√§kkeell√§ 
+        hyvin yksinkertainen toteutus. Tulos on odotettu lukum√§√§r√§ timestep:j√§
         
         npv <- diskontattu
         npv0 <- ei ole diskontattu
         '''
-        npv=0
-        npv0=0
-        npv_pension=0
-        npv_gpension=0
+        npv=0.0
+        npv0=0.0
+        npv_pension=0.0
+        npv_gpension=0.0
 
-        cpsum=1
-        cpsum0=1
-        cpsum_pension=1
-        cpsum_gpension=1
+        cpsum=1.0
+        cpsum0=1.0
+        cpsum_pension=1.0
+        cpsum_gpension=1.0
         
         alive=True
         num=int(np.ceil(100-self.max_age+2)/self.timestep)
@@ -494,10 +502,10 @@ class UnemploymentLargeEnv_v4(gym.Env):
         while alive and x<100+self.timestep:
             intx=int(np.floor(x))
             if sattuma[k]>self.mort_intensity[intx,g]:
-                cpsum=1+self.gamma*cpsum
-                cpsum0=1+cpsum0
-                cpsum_pension=1+cpsum_pension*self.elakeindeksi
-                cpsum_gpension=1+cpsum_pension*self.gamma*self.elakeindeksi
+                cpsum=1.0+self.gamma*cpsum
+                cpsum0=1.0+cpsum0
+                cpsum_pension=1.0+cpsum_pension*self.elakeindeksi
+                cpsum_gpension=1.0+cpsum_pension*self.gamma*self.elakeindeksi
             else:
                 alive=False
             k=k+1
@@ -509,110 +517,49 @@ class UnemploymentLargeEnv_v4(gym.Env):
         npv_gpension=cpsum_gpension
             
         if self.plotdebug:
-            print('npv: {}'.format(npv))
+            print('comp_npv_simulation npv:',npv)
 
         return npv,npv0,npv_pension,npv_gpension
 
-#     def comp_npv_simulation_v2(self,g,mortality=True):
-#         '''
-#         simuloidaan npv jokaiselle erikseen montako timestep:iä (diskontattuna) max_age:n jälkeen henkilö on vanhuuseläkkeellä 
-#         hyvin yksinkertainen toteutus. Tulos on odotettu lukumäärä timestep:jä
-#         
-#         npv <- diskontattu
-#         npv0 <- ei ole diskontattu
-#         '''
-#         npv=0
-#         npv0=0
-#         npv_pension=0
-# 
-#         if mortality:
-#             cpsum=1
-#             cpsum0=1
-#             cpsum_pension=1
-#             alive=True
-#             num=int(np.ceil(100-self.max_age+2)/self.timestep)
-#             sattuma = np.random.uniform(size=num)
-#             x=self.max_age+self.timestep
-#             k=0
-#             while alive and x<100+self.timestep:
-#                 intx=int(np.floor(x))
-#                 if sattuma[k]>self.mort_intensity[intx,g]:
-#                     cpsum=1+self.gamma*cpsum
-#                     cpsum0=1+cpsum0
-#                     cpsum_pension=1+cpsum_pension*self.gamma*self.elakeindeksi
-#                 else:
-#                     alive=False
-#                 k=k+1
-#                 x=x+self.timestep
-#                 
-#             npv=cpsum
-#             npv0=cpsum0
-#             npv_pension=cpsum_pension
-#         else:
-#             cpsum=1
-#             cpsum0=1
-#             cpsum_pension=1
-#             alive=True
-#             num=int(np.ceil(100-self.max_age+2)/self.timestep)
-#             sattuma = np.random.uniform(size=num)
-#             x=self.max_age+self.timestep
-#             k=0
-#                 if self.include_npv_mort:
-#                     npv,npv0,npv_pension=self.comp_npv_simulation(g)
-#                     reward,equivalent = self.log_utility(netto,employment_status,age,pinkslip=0)
-#                     reward*=npv
-#                 else:
-#                     npv,npv0,npv_pension=self.npv[g],self.npv0[g],self.npv_pension[g]
-#                     reward,equivalent = self.log_utility(netto,employment_status,age,pinkslip=0)
-#                     reward*=self.npv[g]
-#             
-#             while alive and x<100+self.timestep:
-#                 reward,equivalent = self.log_utility(netto,employment_status,age,pinkslip=0)
-#                 intx=int(np.floor(x))
-#                 m=self.mort_intensity[intx,g]
-#                 cpsum=m*1+(1-m)*(1+self.gamma*cpsum)
-#                 cpsum0=m*1+(1-m)*(1+cpsum0)
-#                 cpsum_pension=m*1+(1-m)*(1+cpsum_pension*self.gamma*self.elakeindeksi)  # self.gamma??
-# 
-#                 intx=int(np.floor(x))
-#                 if sattuma[k]>self.mort_intensity[intx,g]:
-#                     cpsum=1+self.gamma*cpsum
-#                     cpsum0=1+cpsum0
-#                     cpsum_pension=1+cpsum_pension*self.gamma*self.elakeindeksi
-#                 else:
-#                     alive=False
-#                 k=k+1
-#                 x=x+self.timestep
-#                 
-#             npv=cpsum
-#             npv0=cpsum0
-#             npv_pension=cpsum_pension
-#         
-#             
-#         if self.plotdebug:
-#             print('npv: {}'.format(npv))
-# 
-#         return npv,npv0,cpsum_pension
-
-    def setup_children(self,p,employment_state,puoliso_tila,children_under3,children_under7,children_under18,lapsikorotus_lapsia,g,p_g,alku):
-        # tässä ei alku+, koska lapset yhteisiä
-        p['lapsia']=children_under18
-        p['lapsia_paivahoidossa']=children_under7
-        p['lapsia_alle_kouluikaisia']=children_under7
-        p['lapsia_alle_3v']=children_under3
-        p['lapsia_kotihoidontuella']=0
-        p['lapsikorotus_lapsia']=lapsikorotus_lapsia
+    def setup_children(self,p,puoliso,employment_state,puoliso_tila,children_under3,children_under7,children_under18,lapsikorotus_lapsia):
+        # t√§ss√§ ei alku+, koska lapset yhteisi√§
+        if puoliso>0:
+            p['lapsia']=children_under18
+            p['lapsia_paivahoidossa']=children_under7
+            p['lapsia_alle_kouluikaisia']=children_under7
+            p['lapsia_alle_3v']=children_under3
+            p['lapsia_kotihoidontuella']=0
+            p['lapsikorotus_lapsia']=lapsikorotus_lapsia
         
-        if employment_state==5 or puoliso_tila==5: # äitiysvapaa
-            p['lapsia_paivahoidossa']=0
-        if employment_state==6 or puoliso_tila==6: # äitiysvapaa
-            p['lapsia_paivahoidossa']=0
-        if employment_state==7 or puoliso_tila==7: # hoitovapaa
-            p['lapsia_paivahoidossa']=0
-            p['lapsia_kotihoidontuella']=children_under7
+            if employment_state==5 or puoliso_tila==5: # √§itiysvapaa
+                p['lapsia_paivahoidossa']=0
+            if employment_state==6 or puoliso_tila==6: # √§itiysvapaa
+                p['lapsia_paivahoidossa']=0
+            if employment_state==7 or puoliso_tila==7: # hoitovapaa
+                p['lapsia_paivahoidossa']=0
+                p['lapsia_kotihoidontuella']=children_under7
+            p['saa_elatustukea']=0
+        else:
+            p['lapsia']=children_under18
+            p['lapsia_paivahoidossa']=children_under7
+            p['lapsia_alle_kouluikaisia']=children_under7
+            p['lapsia_alle_3v']=children_under3
+            p['lapsia_kotihoidontuella']=0
+            p['lapsikorotus_lapsia']=lapsikorotus_lapsia
+        
+            if employment_state==5 or puoliso_tila==5: # √§itiysvapaa
+                p['lapsia_paivahoidossa']=0
+            if employment_state==6 or puoliso_tila==6: # √§itiysvapaa
+                p['lapsia_paivahoidossa']=0
+            if employment_state==7 or puoliso_tila==7: # hoitovapaa
+                p['lapsia_paivahoidossa']=0
+                p['lapsia_kotihoidontuella']=children_under7
 
-        if g>p_g:
-            p[alku+'saa_elatustukea']=1 # vain yksinhuoltaja
+            if children_under18>0:
+                p['saa_elatustukea']=1 # vain yksinhuoltaja
+#                 print('saa elatustukea',children_under18,'lasta')
+#             else:
+#                 print('ei saa elatustukea',children_under18,'lasta')
 
     def setup_benefits(self,wage,old_wage,kansanelake,tyoelake,employment_state,time_in_state,ika,children_under3,children_under7,children_under18,puoliso=0,
                       irtisanottu=0,karenssia_jaljella=0,alku='omat_',p2=None,puolisoalku='puoliso_'):
@@ -656,12 +603,12 @@ class UnemploymentLargeEnv_v4(gym.Env):
             p[alku+'alive']=1
         
         if employment_state==1:
-            p[alku+'tyoton']=0 # voisi olla työtön siinä mielessä, että oikeutettu soviteltuun päivärahaan
+            p[alku+'tyoton']=0 # voisi olla ty√∂t√§n siin√§ mieless√§, ett√§ oikeutettu soviteltuun p√§iv√§rahaan
             p[alku+'t']=wage/12
             p[alku+'vakiintunutpalkka']=wage/12
             p[alku+'saa_ansiopaivarahaa']=0
             p[alku+'tyoelake']=tyoelake/12 # ove
-        elif employment_state==0: # työtön, ansiopäivärahalla
+        elif employment_state==0: # ty√∂t√§n, ansiop√§iv√§rahalla
             if ika<self.max_unemploymentbenefitage:
                 #self.render()
                 p[alku+'tyoton']=1
@@ -676,12 +623,12 @@ class UnemploymentLargeEnv_v4(gym.Env):
                     
                 p[alku+'tyoelake']=tyoelake/12 # ove
             else:
-                p[alku+'tyoton']=0 # ei oikeutta työttömyysturvaan
+                p[alku+'tyoton']=0 # ei oikeutta ty√∂tt√§myysturvaan
                 p[alku+'t']=0
                 p[alku+'vakiintunutpalkka']=0
                 p[alku+'saa_ansiopaivarahaa']=0
                 p[alku+'tyoelake']=tyoelake/12 # ove
-        elif employment_state==13: # työmarkkinatuki
+        elif employment_state==13: # ty√∂markkinatuki
             if ika<self.max_unemploymentbenefitage:
                 p[alku+'tyoton']=1
                 p[alku+'t']=0
@@ -690,7 +637,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
                 p[alku+'saa_ansiopaivarahaa']=0
                 p[alku+'tyoelake']=tyoelake/12 # ove
             else:
-                p[alku+'tyoton']=0 # ei oikeutta työttömyysturvaan
+                p[alku+'tyoton']=0 # ei oikeutta ty√∂tt√§myysturvaan
                 p[alku+'t']=0
                 p[alku+'vakiintunutpalkka']=0
                 p[alku+'saa_ansiopaivarahaa']=0
@@ -701,7 +648,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
             p[alku+'tyoelake']=tyoelake/12 # ove
             p[alku+'kansanelake']=kansanelake/12
             p[alku+'disabled']=1
-        elif employment_state==4: # työttömyysputki
+        elif employment_state==4: # ty√∂tt√§myysputki
             if ika<self.max_unemploymentbenefitage:
                 p[alku+'tyoton']=1
                 p[alku+'t']=0
@@ -710,18 +657,18 @@ class UnemploymentLargeEnv_v4(gym.Env):
                 p[alku+'tyottomyyden_kesto']=12*21.5*time_in_state
                 p[alku+'tyoelake']=tyoelake/12 # ove
             else:
-                p[alku+'tyoton']=0 # ei oikeutta työttömyysturvaan
+                p[alku+'tyoton']=0 # ei oikeutta ty√∂tt√§myysturvaan
                 p[alku+'t']=0
                 p[alku+'vakiintunutpalkka']=0
                 p[alku+'saa_ansiopaivarahaa']=0
                 p[alku+'tyoelake']=tyoelake/12 # ove
-        elif employment_state==5: # ansiosidonnainen vanhempainvapaa, äidit
+        elif employment_state==5: # ansiosidonnainen vanhempainvapaa, √§idit
             p[alku+'aitiysvapaalla']=1
             p[alku+'aitiysvapaa_kesto']=0
             p[alku+'t']=0
             p[alku+'vakiintunutpalkka']=old_wage/12
             p[alku+'saa_ansiopaivarahaa']=1
-        elif employment_state==6: # ansiosidonnainen vanhempainvapaa, isät
+        elif employment_state==6: # ansiosidonnainen vanhempainvapaa, is√§t
             p[alku+'isyysvapaalla']=1
             p[alku+'t']=0
             p[alku+'vakiintunutpalkka']=old_wage/12
@@ -731,7 +678,8 @@ class UnemploymentLargeEnv_v4(gym.Env):
             p[alku+'kotihoidontuki_kesto']=time_in_state
             p[alku+'t']=0
             p[alku+'vakiintunutpalkka']=old_wage/12
-        elif employment_state==2: # vanhuuseläke
+            p[alku+'tyoelake']=tyoelake/12
+        elif employment_state==2: # vanhuusel√§ke
             if ika>=self.min_retirementage:
                 p[alku+'t']=0
                 p[alku+'elakkeella']=1  
@@ -741,16 +689,16 @@ class UnemploymentLargeEnv_v4(gym.Env):
                 p[alku+'t']=0
                 p[alku+'elakkeella']=0
                 p[alku+'tyoelake']=0
-        elif employment_state in set([8,9]): # ve+osatyö
+        elif employment_state in set([8,9]): # ve+osaty√∂
             p[alku+'t']=wage/12
             p[alku+'elakkeella']=1  
             p[alku+'tyoelake']=tyoelake/12
             p[alku+'kansanelake']=kansanelake/12
-        elif employment_state==10: # osa-aikatyö
+        elif employment_state==10: # osa-aikaty√∂
             p[alku+'t']=wage/12
             p[alku+'tyoelake']=tyoelake/12 # ove
-        elif employment_state==11: # työelämän ulkopuolella
-            p[alku+'toimeentulotuki_vahennys']=0 # oletetaan että ei kieltäytynyt työstä
+        elif employment_state==11: # ty√∂el√§m√§n ulkopuolella
+            p[alku+'toimeentulotuki_vahennys']=0 # oletetaan ett√§ ei kielt√§ytynyt ty√∂st√§
             p[alku+'t']=0
             p[alku+'tyoelake']=tyoelake/12 # ove
         elif employment_state==12: # opiskelija
@@ -765,19 +713,6 @@ class UnemploymentLargeEnv_v4(gym.Env):
         
         p[alku+'elake_maksussa']=p[alku+'tyoelake']+p[alku+'kansanelake']
             
-        if employment_state==12: # opiskelija
-            p['asumismenot_toimeentulo']=self.opiskelija_asumismenot_toimeentulo
-            p['asumismenot_asumistuki']=self.opiskelija_asumismenot_asumistuki
-        elif employment_state in set([2,8,9]): # eläkeläinen
-            p['asumismenot_toimeentulo']=self.elakelainen_asumismenot_toimeentulo+puoliso*self.elakelainen_asumismenot_puoliso
-            p['asumismenot_asumistuki']=self.elakelainen_asumismenot_asumistuki+puoliso*self.elakelainen_asumismenot_puoliso
-        elif employment_state==14:
-            p['asumismenot_toimeentulo']=0
-            p['asumismenot_asumistuki']=0
-        else: # muu
-            p['asumismenot_toimeentulo']=self.muu_asumismenot_toimeentulo+puoliso*self.muu_asumismenot_puoliso+children_under18*self.muu_asumismenot_lapsi
-            p['asumismenot_asumistuki']=self.muu_asumismenot_asumistuki+puoliso*self.muu_asumismenot_puoliso+children_under18*self.muu_asumismenot_lapsi
-
         p['ansiopvrahan_suojaosa']=1
         p['ansiopvraha_lapsikorotus']=1
 
@@ -805,20 +740,74 @@ class UnemploymentLargeEnv_v4(gym.Env):
             
         return p    
 
+    def setup_asumismenot(self,employment_state,puoliso,puoliso_tila,children_under18,p):
+        if employment_state==12: # opiskelija
+            if puoliso>0:
+                p['asumismenot_toimeentulo']=self.opiskelija_asumismenot_toimeentulo*0.5+children_under18*self.muu_asumismenot_lisa
+                p['asumismenot_asumistuki']=self.opiskelija_asumismenot_asumistuki*0.5+children_under18*self.muu_asumismenot_lisa
+                if puoliso_tila==12:
+                    p['asumismenot_toimeentulo']+=self.opiskelija_asumismenot_toimeentulo*0.5
+                    p['asumismenot_asumistuki']+=self.opiskelija_asumismenot_asumistuki*0.5
+                elif puoliso_tila in set([2,3,8,9]):
+                    p['asumismenot_toimeentulo']+=self.elakelainen_asumismenot_toimeentulo*0.5
+                    p['asumismenot_asumistuki']+=self.elakelainen_asumismenot_asumistuki*0.5
+                else:
+                    p['asumismenot_toimeentulo']+=self.muu_asumismenot_toimeentulo*0.5
+                    p['asumismenot_asumistuki']+=self.muu_asumismenot_asumistuki*0.5
+            else:
+                p['asumismenot_toimeentulo']=self.opiskelija_asumismenot_toimeentulo+children_under18*self.muu_asumismenot_lisa
+                p['asumismenot_asumistuki']=self.opiskelija_asumismenot_asumistuki+children_under18*self.muu_asumismenot_lisa
+            
+        elif employment_state in set([2,3,8,9]): # el√§kel√§inen
+            if puoliso>0:
+                p['asumismenot_toimeentulo']=self.elakelainen_asumismenot_toimeentulo*0.5+children_under18*self.muu_asumismenot_lisa
+                p['asumismenot_asumistuki']=self.elakelainen_asumismenot_asumistuki*0.5+children_under18*self.muu_asumismenot_lisa
+                if puoliso_tila==12:
+                    p['asumismenot_toimeentulo']+=self.opiskelija_asumismenot_toimeentulo*0.5
+                    p['asumismenot_asumistuki']+=self.opiskelija_asumismenot_asumistuki*0.5
+                elif puoliso_tila in set([2,3,8,9]):
+                    p['asumismenot_toimeentulo']+=self.elakelainen_asumismenot_toimeentulo*0.5
+                    p['asumismenot_asumistuki']+=self.elakelainen_asumismenot_asumistuki*0.5
+                else:
+                    p['asumismenot_toimeentulo']+=self.muu_asumismenot_toimeentulo*0.5
+                    p['asumismenot_asumistuki']+=self.muu_asumismenot_asumistuki*0.5
+            else:
+                p['asumismenot_toimeentulo']=self.elakelainen_asumismenot_toimeentulo*0.5+children_under18*self.muu_asumismenot_lisa
+                p['asumismenot_asumistuki']=self.elakelainen_asumismenot_asumistuki*0.5+children_under18*self.muu_asumismenot_lisa            
+        elif employment_state==14:
+            p['asumismenot_toimeentulo']=0
+            p['asumismenot_asumistuki']=0
+        else: # muu
+            if puoliso>0:
+                p['asumismenot_toimeentulo']=self.muu_asumismenot_toimeentulo+children_under18*self.muu_asumismenot_lisa
+                p['asumismenot_asumistuki']=self.muu_asumismenot_asumistuki+children_under18*self.muu_asumismenot_lisa
+                if puoliso_tila==12:
+                    p['asumismenot_toimeentulo']+=self.opiskelija_asumismenot_toimeentulo
+                    p['asumismenot_asumistuki']+=self.opiskelija_asumismenot_asumistuki
+                elif puoliso_tila in set([2,3,8,9]):
+                    p['asumismenot_toimeentulo']+=self.elakelainen_asumismenot_toimeentulo
+                    p['asumismenot_asumistuki']+=self.elakelainen_asumismenot_asumistuki
+                else:
+                    p['asumismenot_toimeentulo']+=self.muu_asumismenot_toimeentulo
+                    p['asumismenot_asumistuki']+=self.muu_asumismenot_asumistuki
+            else:
+                p['asumismenot_toimeentulo']=self.muu_asumismenot_toimeentulo+children_under18*self.muu_asumismenot_lisa
+                p['asumismenot_asumistuki']=self.muu_asumismenot_asumistuki+children_under18*self.muu_asumismenot_lisa
+
     def comp_benefits(self,wage,old_wage,kansanelake,tyoelake,employment_state,time_in_state,children_under3,children_under7,children_under18,ika,
                       puoliso,puoliso_tila,puoliso_palkka,puoliso_kansanelake,puoliso_tyoelake,puoliso_old_wage,puoliso_time_in_state,
                       g,p_g,
-                      irtisanottu=0,puoliso_irtisanottu=0,karenssia_jaljella=0,puoliso_karenssia_jaljella=0,alive=1,puoliso_alive=1,
+                      irtisanottu=0,puoliso_irtisanottu=0,karenssia_jaljella=0,puoliso_karenssia_jaljella=0,
                       retq=True,ove=False,debug=False):
         '''
         Kutsuu fin_benefits-modulia, jonka avulla lasketaan etuudet ja huomioidaan verotus
         Laske etuuksien arvo, kun 
             wage on palkka
             old_wage on vanha palkka
-            pension on maksettavan eläkkeen määrä
-            employment_state on töissä olo (0)/työttömyys (1)/eläkkeellä olo (2) jne.
+            pension on maksettavan el√§kkeen m√§√§r√§
+            employment_state on t√∂iss√§ olo (0)/ty√∂tt√§myys (1)/el√§kkeell√§ olo (2) jne.
             time_in_state on kesto tilassa
-            ika on henkilön ikä
+            ika on henkil√§n ik√§
         '''
         
         if puoliso>0 and not (employment_state==14 or puoliso_tila==14): # pariskunta
@@ -831,11 +820,12 @@ class UnemploymentLargeEnv_v4(gym.Env):
                       irtisanottu=puoliso_irtisanottu,karenssia_jaljella=puoliso_karenssia_jaljella,
                       alku='puoliso_',p2=p)
                       
-            self.setup_children(p,employment_state,puoliso_tila,children_under3,children_under7,children_under18,children_under18,g,p_g,'')
+            self.setup_asumismenot(employment_state,puoliso,puoliso_tila,children_under18,p)
+            self.setup_children(p,puoliso,employment_state,puoliso_tila,children_under3,children_under7,children_under18,children_under18)
 
             p['aikuisia']=2
             
-            netto,benefitq=self.ben.laske_tulot_v2(p,include_takuuelake=self.include_takuuelake)
+            netto,benefitq=self.ben.laske_tulot_v2(p,include_takuuelake=self.include_takuuelake,omatalku='',puolisoalku='puoliso_')
             benefitq['netto']=netto
             netto=netto*12
             
@@ -858,42 +848,62 @@ class UnemploymentLargeEnv_v4(gym.Env):
             #    print(employment_state,puoliso_tila,benefitq['pvhoito'])
         else: # ei pariskunta
             if employment_state in [5,6,7]:
+                if puoliso_tila not in [5,6,7] or (puoliso_tila in [5,6,7] and g>p_g):
+                    p=self.setup_benefits(wage,old_wage,kansanelake,tyoelake,employment_state,time_in_state,ika,
+                        children_under3,children_under7,children_under18,puoliso=0,
+                        irtisanottu=irtisanottu,karenssia_jaljella=karenssia_jaljella,alku='')
+                    self.setup_children(p,puoliso,employment_state,puoliso_tila,children_under3,children_under7,children_under18,children_under18)
+                    self.setup_asumismenot(employment_state,0,-1,children_under18,p)
+                else:
+                    # lapset 0 t√§ss√§, yksinkertaistus
+                    p=self.setup_benefits(wage,old_wage,kansanelake,tyoelake,employment_state,time_in_state,ika,
+                        0,0,0,puoliso=0,irtisanottu=irtisanottu,karenssia_jaljella=karenssia_jaljella,alku='')
+                    self.setup_children(p,puoliso,employment_state,puoliso_tila,0,0,0,children_under18)
+                    self.setup_asumismenot(employment_state,0,-1,0,p)
+            elif (employment_state!=14 and g>p_g) and puoliso_tila not in [5,6,7]:
+                # lapset itsell√§, ei puolisolla. t√§ss√§ ep√§symmetria
                 p=self.setup_benefits(wage,old_wage,kansanelake,tyoelake,employment_state,time_in_state,ika,
                     children_under3,children_under7,children_under18,puoliso=0,
                     irtisanottu=irtisanottu,karenssia_jaljella=karenssia_jaljella,alku='')
-                self.setup_children(p,employment_state,puoliso_tila,children_under3,children_under7,children_under18,children_under18,g,p_g,'')
-            elif employment_state!=14 and puoliso_tila not in [5,6,7]:
-                # lapset itsellä, ei puolisolla. tässä epäsymmetria
-                p=self.setup_benefits(wage,old_wage,kansanelake,tyoelake,employment_state,time_in_state,ika,
-                    children_under3,children_under7,children_under18,puoliso=0,
-                    irtisanottu=irtisanottu,karenssia_jaljella=karenssia_jaljella,alku='')
-                self.setup_children(p,employment_state,puoliso_tila,children_under3,children_under7,children_under18,children_under18,g,p_g,'')
+                self.setup_children(p,puoliso,employment_state,puoliso_tila,children_under3,children_under7,children_under18,children_under18)
+                self.setup_asumismenot(employment_state,0,-1,children_under18,p)
             else:
-                # lapset 0 tässä, yksinkertaistus
+                # lapset 0 t√§ss√§, yksinkertaistus
                 p=self.setup_benefits(wage,old_wage,kansanelake,tyoelake,employment_state,time_in_state,ika,
                     0,0,0,puoliso=0,irtisanottu=irtisanottu,karenssia_jaljella=karenssia_jaljella,alku='')
-                self.setup_children(p,employment_state,puoliso_tila,0,0,0,children_under18,g,p_g,'')
+                self.setup_children(p,puoliso,employment_state,puoliso_tila,0,0,0,children_under18)
+                self.setup_asumismenot(employment_state,0,-1,0,p)
     
             netto1,benefitq1=self.ben.laske_tulot_v2(p,include_takuuelake=self.include_takuuelake)
             
             if puoliso_tila in [5,6,7]:
-                p2=self.setup_benefits(puoliso_palkka,puoliso_old_wage,puoliso_kansanelake,puoliso_tyoelake,puoliso_tila,puoliso_time_in_state,ika,
-                          children_under3,children_under7,children_under18,puoliso=0,irtisanottu=puoliso_irtisanottu,
-                          karenssia_jaljella=puoliso_karenssia_jaljella,alku='',p2=p)
-                self.setup_children(p2,puoliso_tila,employment_state,children_under3,children_under7,children_under18,children_under18,p_g,g)
-            elif employment_state==14:
+                if employment_state not in [5,6,7] or (employment_state in [5,6,7] and p_g>g):
+                    p2=self.setup_benefits(puoliso_palkka,puoliso_old_wage,puoliso_kansanelake,puoliso_tyoelake,puoliso_tila,puoliso_time_in_state,ika,
+                              children_under3,children_under7,children_under18,puoliso=0,irtisanottu=puoliso_irtisanottu,
+                              karenssia_jaljella=puoliso_karenssia_jaljella,alku='')
+                    self.setup_children(p2,puoliso,puoliso_tila,employment_state,children_under3,children_under7,children_under18,children_under18)
+                    self.setup_asumismenot(puoliso_tila,0,-1,children_under18,p2)
+                else:
+                    p2=self.setup_benefits(puoliso_palkka,puoliso_old_wage,puoliso_kansanelake,puoliso_tyoelake,puoliso_tila,puoliso_time_in_state,ika,
+                              0,0,0,puoliso=0,irtisanottu=puoliso_irtisanottu,karenssia_jaljella=puoliso_karenssia_jaljella,
+                              alku='',p2=p)
+                    self.setup_children(p2,puoliso,puoliso_tila,-1,0,0,0,children_under18)
+                    self.setup_asumismenot(puoliso_tila,0,-1,0,p2)
+            elif (puoliso_tila!=14 and g<p_g) and employment_state not in [5,6,7]:
                 # lapsilisat maksetaan puolisolle
                 p2=self.setup_benefits(puoliso_palkka,puoliso_old_wage,puoliso_kansanelake,puoliso_tyoelake,puoliso_tila,puoliso_time_in_state,ika,
                           children_under3,children_under7,children_under18,puoliso=0,irtisanottu=puoliso_irtisanottu,
-                          karenssia_jaljella=puoliso_karenssia_jaljella,alku='',p2=p)
-                self.setup_children(p2,puoliso_tila,employment_state,children_under3,children_under7,children_under18,children_under18,p_g,g)
+                          karenssia_jaljella=puoliso_karenssia_jaljella,alku='')
+                self.setup_children(p2,puoliso,puoliso_tila,employment_state,children_under3,children_under7,children_under18,children_under18)
+                self.setup_asumismenot(puoliso_tila,0,-1,children_under18,p2)
             else:
                 p2=self.setup_benefits(puoliso_palkka,puoliso_old_wage,puoliso_kansanelake,puoliso_tyoelake,puoliso_tila,puoliso_time_in_state,ika,
                           0,0,0,puoliso=0,irtisanottu=puoliso_irtisanottu,karenssia_jaljella=puoliso_karenssia_jaljella,
                           alku='',p2=p)
-                self.setup_children(p2,puoliso_tila,-1,0,0,0,children_under18,p_g,g)
+                self.setup_children(p2,puoliso,puoliso_tila,-1,0,0,0,children_under18)
+                self.setup_asumismenot(puoliso_tila,0,-1,0,p2)
                           
-            netto2,benefitq2=self.ben.laske_tulot_v2(p2,include_takuuelake=self.include_takuuelake,omat='puoliso_',puoliso='omat_') # switch order
+            netto2,benefitq2=self.ben.laske_tulot_v2(p2,include_takuuelake=self.include_takuuelake,omat='puoliso_',puoliso='omat_',omatalku='',puolisoalku='puoliso_') # switch order
             netto=netto1+netto2
             
             if netto1<1 and debug:
@@ -933,14 +943,14 @@ class UnemploymentLargeEnv_v4(gym.Env):
 
     def env_seed(self, seed=None):
         '''
-        Alustetaan numpy.random enviä varten
+        Alustetaan numpy.random envi√§ varten
         '''
         np.random.seed(seed)
         #return [seed]
 
     def get_initial_weights(self):
         '''
-        Lähtöarvot 18-vuotiaana
+        L√§ht√§arvot 18-vuotiaana
         '''
         group_weights=np.zeros(3)
         group_weights=[0.3,0.5,0.2]
@@ -953,30 +963,30 @@ class UnemploymentLargeEnv_v4(gym.Env):
         
         initial_weight=np.zeros((6,7))
         if self.year==2018:
-            # tilat [13,0,1,10,3,11,12] siis [tmtuki,ansiosidonnainen,kokoaikatyö,osaaikatyö,työvoimanulkopuolella,opiskelija]
+            # tilat [13,0,1,10,3,11,12] siis [tmtuki,ansiosidonnainen,kokoaikaty√∂,osaaikaty√∂,ty√∂voimanulkopuolella,opiskelija]
             # lasketaan painotetut kertoimet eri tulotasoille
-            # työttömät miehet, osuus väestöstä
+            # ty√∂tt√§m√§t miehet, osuus v√§est√§st√§
             tyoton=0.019
             m1,m2,m3=get_wees(1.27,1.0,tyoton)
-            # työttömät naiset, osuus väestöstä
+            # ty√∂tt√§m√§t naiset, osuus v√§est√§st√§
             tyoton=0.016
             w1,w2,w3=get_wees(1.2,1.0,tyoton)
-            # opiskelijat+työlliset+muut työvoiman ulkop+työttömät, miehet
-            om=0.686+0.257+0.029+0.019 # miehet töissä + opiskelija
+            # opiskelijat+ty√∂lliset+muut ty√∂voiman ulkop+ty√∂tt√§m√§t, miehet
+            om=0.686+0.257+0.029+0.019 # miehet t√∂iss√§ + opiskelija
             om1,om2,om3=get_wees(1.25,1.0,0.257)
-            # opiskelijat+työlliset+muut työvoiman ulkop+työttömät, naiset
+            # opiskelijat+ty√∂lliset+muut ty√∂voiman ulkop+ty√∂tt√§m√§t, naiset
             ow=0.587+0.360+0.027+0.017
             ow1,ow2,ow3=get_wees(1.2,1.0,0.340)
-            # työvoiman ulkopuolella, miehet
+            # ty√∂voiman ulkopuolella, miehet
             tyovoimanulkop=0.029
             um1,um2,um3=get_wees(1.3,1.0,tyovoimanulkop)
-            # työvoiman ulkopuolella, naiset
+            # ty√∂voiman ulkopuolella, naiset
             tyovoimanulkop=0.0267
             uw1,uw2,uw3=get_wees(1.2,1.0,tyovoimanulkop)
-            # työkyvyttömät, miehet
+            # ty√∂kyvytt√§m√§t, miehet
             md=0.009
             md1,md2,md3=get_wees(1.3,1.0,md)
-            # työkyvyttömät, naiset
+            # ty√∂kyvytt√§m√§t, naiset
             wd=0.00730
             wd1,wd2,wd3=get_wees(1.2,1.0,wd)
 
@@ -1024,7 +1034,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
 
     def scale_pension(self,pension,age,scale=True,unemp_after_ra=0,elinaikakerroin=True):
         '''
-        Elinaikakertoimen ja lykkäyskorotuksen huomiointi
+        Elinaikakertoimen ja lykk√§yskorotuksen huomiointi
         '''
         if elinaikakerroin:
             eak=self.elinaikakerroin
@@ -1036,27 +1046,26 @@ class UnemploymentLargeEnv_v4(gym.Env):
         else:
             return eak*pension*self.elakeindeksi
         
-    def move_to_parttime(self,wage,pension,tyoelake,old_wage,age,tyoura,time_in_state):
+    def move_to_parttime(self,wage,pension,tyoelake,old_wage,age,tyoura,time_in_state,has_spouse=False,is_spouse=False):
         '''
-        Siirtymä osa-aikaiseen työskentelyyn
+        Siirtym√§ osa-aikaiseen ty√∂skentelyyn
         '''
         employment_status = 10 # switch to part-time work
         parttimewage=0.5*wage
         tyoura += self.timestep
-        time_in_state=0
+        time_in_state=self.timestep
         old_wage=0
         pension=self.pension_accrual(age,parttimewage,pension,state=employment_status)
         pinkslip=0
-        time_in_state=self.timestep
         tyoelake = tyoelake * self.elakeindeksi
 
         return employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip
 
-    def move_to_work(self,wage,pension,tyoelake,old_wage,age,time_in_state,tyoura,pinkslip):
+    def move_to_work(self,wage,pension,tyoelake,old_wage,age,time_in_state,tyoura,pinkslip,has_spouse=False,is_spouse=False):
         '''
-        Siirtymä täysiaikaiseen työskentelyyn
+        Siirtym√§ t√§ysiaikaiseen ty√∂skentelyyn
         '''
-        employment_status = 1 # töihin
+        employment_status = 1 # t√§ihin
         pinkslip=0
         old_wage=0
         tyoura+=self.timestep
@@ -1067,28 +1076,25 @@ class UnemploymentLargeEnv_v4(gym.Env):
         return employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip
 
     def move_to_oa_fulltime(self,wage,pension,old_wage,age,kansanelake,tyoelake,employment_status,
-            unemp_after_ra,scale_acc=True,spouse=False):
+            unemp_after_ra,scale_acc=True,has_spouse=0,is_spouse=False):
         '''
-        Siirtymä vanhuuseläkkeelle
+        Siirtym√§ vanhuusel√§kkeelle
         '''
         if age>=self.max_retirementage: # move to retirement state 2
-            if employment_status in set([2,8,9]): # ve, ve+työ, ve+osatyö
-                # ei lykkäyskorotusta
+            if employment_status in set([2,8,9]): # ve, ve+ty√∂, ve+osaty√∂
+                # ei lykk√§yskorotusta
                 tyoelake = self.elakeindeksi*tyoelake+self.scale_pension(pension,age,scale=False,unemp_after_ra=unemp_after_ra)
                 kansanelake = kansanelake * self.kelaindeksi
                 pension=0
                 employment_status = 2
-            else: # ei vielä eläkkeellä
-                # lykkäyskorotus
+            else: # ei viel√§ el√§kkeell√§
+                # lykk√§yskorotus
                 tyoelake = tyoelake*self.elakeindeksi + pension
                 if self.include_kansanelake:
-                    if spouse:
-                        kansanelake = self.ben.laske_kansanelake(age,tyoelake*self.elinaikakerroin/12,0)*12 # ben-modulissa palkat kk-tasolla
-                    else:
-                        kansanelake = self.ben.laske_kansanelake(age,tyoelake*self.elinaikakerroin/12,1)*12 # ben-modulissa palkat kk-tasolla
+                    kansanelake = self.ben.laske_kansanelake(age,tyoelake*self.elinaikakerroin/12,1-has_spouse)*12 # ben-modulissa palkat kk-tasolla
                 else:
                     kansanelake = 0
-                # lykkäys ei vähennä kansaneläkettä
+                # lykk√§ys ei v√§henn√§ kansanel√§kett√§
                 tyoelake += (self.scale_pension(pension,age,scale=scale_acc,unemp_after_ra=unemp_after_ra) - pension)
                 paid_pension = tyoelake + kansanelake
                 pension=0
@@ -1098,21 +1104,30 @@ class UnemploymentLargeEnv_v4(gym.Env):
             alkanut_ansiosidonnainen=0
             ove_paid=0
         elif age>=self.min_retirementage:
-            if employment_status in set([2,8,9]): # ve, ve+työ, ve+osatyö
+            if employment_status in set([2,8,9]): # ve, ve+ty√∂, ve+osaty√∂
                 tyoelake = self.elakeindeksi*tyoelake
                 kansanelake = kansanelake * self.kelaindeksi
                 employment_status = 9
-            else:
-                # lykkäyskorotus
+            elif employment_status==4:
+                # lykk√§yskorotus
                 tyoelake = tyoelake*self.elakeindeksi + pension
                 if self.include_kansanelake:
-                    if spouse:
-                        kansanelake = self.ben.laske_kansanelake(age,tyoelake*self.elinaikakerroin/12,0)*12 # ben-modulissa palkat kk-tasolla
-                    else:
-                        kansanelake = self.ben.laske_kansanelake(age,tyoelake*self.elinaikakerroin/12,1)*12 # ben-modulissa palkat kk-tasolla
+                    # v√§hent√§m√§t√∂n kansanel√§ke
+                    kansanelake = self.ben.laske_kansanelake(age,tyoelake*self.elinaikakerroin/12,1-has_spouse,disability=True)*12 # ben-modulissa palkat kk-tasolla
                 else:
                     kansanelake = 0
-                # lykkäys ei vähennä kansaneläkettä
+                # lykk√§ys ei v√§henn√§ kansanel√§kett√§
+                tyoelake += (self.scale_pension(pension,age,scale=scale_acc,unemp_after_ra=unemp_after_ra) - pension)
+                pension=0
+                employment_status = 9
+            else:
+                # lykk√§yskorotus
+                tyoelake = tyoelake*self.elakeindeksi + pension
+                if self.include_kansanelake:
+                    kansanelake = self.ben.laske_kansanelake(age,tyoelake*self.elinaikakerroin/12,1-has_spouse)*12 # ben-modulissa palkat kk-tasolla
+                else:
+                    kansanelake = 0
+                # lykk√§ys ei v√§henn√§ kansanel√§kett√§
                 tyoelake += (self.scale_pension(pension,age,scale=scale_acc,unemp_after_ra=unemp_after_ra) - pension)
                 pension=0
                 employment_status = 9
@@ -1121,7 +1136,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
             alkanut_ansiosidonnainen=0
             pension=self.pension_accrual(age,wage,pension,state=employment_status)
             ove_paid=0
-        else: # työvoiman ulkopuolella
+        else: # ty√∂voiman ulkopuolella
             time_in_state=0
             employment_status = 2 
             pension = pension * self.palkkakerroin
@@ -1133,12 +1148,11 @@ class UnemploymentLargeEnv_v4(gym.Env):
 
     def move_to_student(self,wage,pension,tyoelake,old_wage,age,time_in_state,tyoura,pinkslip):
         '''
-        Siirtymä opiskelijaksi
-        Tässä ei muuttujien päivityksiä, koska se tehdään jo muualla!
+        Siirtym√§ opiskelijaksi
+        T√§ss√§ ei muuttujien p√§ivityksi√§, koska se tehd√§√§n jo muualla!
         '''
         employment_status = 12
-        time_in_state=0
-        time_in_state+=self.timestep
+        time_in_state=self.timestep
         pinkslip=0
         tyoelake=tyoelake*self.elakeindeksi
         pension=pension*self.palkkakerroin
@@ -1146,52 +1160,59 @@ class UnemploymentLargeEnv_v4(gym.Env):
         return employment_status,pension,tyoelake,wage,time_in_state,pinkslip
         
     def move_to_oa_parttime(self,wage,pension,old_wage,age,kansanelake,tyoelake,employment_status,
-            unemp_after_ra,scale_acc=True,spouse=False):
+            unemp_after_ra,scale_acc=True,has_spouse=0,is_spouse=False):
         '''
-        Siirtymä vanhuuseläkkeelle
+        Siirtym√§ vanhuusel√§kkeelle
         '''
         if age>=self.max_retirementage: # move to retirement state 2
-            if employment_status in set([2,8,9]): # ve, ve+työ, ve+osatyö
-                # ei lykkäyskorotusta
+            if employment_status in set([2,8,9]): # ve, ve+ty√∂, ve+osaty√∂
+                # ei lykk√§yskorotusta
                 tyoelake = self.elakeindeksi*tyoelake+self.scale_pension(pension,age,scale=False,unemp_after_ra=unemp_after_ra)
                 kansanelake = kansanelake * self.kelaindeksi
                 pension=0
                 employment_status = 2
-            else: # ei vielä eläkkeellä
-                # lykkäyskorotus
+            else: # ei viel√§ el√§kkeell√§
+                # lykk√§yskorotus
                 tyoelake = tyoelake*self.elakeindeksi + pension
                 if self.include_kansanelake:
-                    if spouse:
-                        kansanelake = self.ben.laske_kansanelake(age,tyoelake*self.elinaikakerroin/12,0)*12 # ben-modulissa palkat kk-tasolla
-                    else:
-                        kansanelake = self.ben.laske_kansanelake(age,tyoelake*self.elinaikakerroin/12,1)*12 # ben-modulissa palkat kk-tasolla
+                    kansanelake = self.ben.laske_kansanelake(age,tyoelake*self.elinaikakerroin/12,1-has_spouse)*12 # ben-modulissa palkat kk-tasolla
                 else:
                     kansanelake = 0
                     
-                # lykkäys ei vähennä kansaneläkettä
+                # lykk√§ys ei v√§henn√§ kansanel√§kett√§
                 tyoelake += (self.scale_pension(pension,age,scale=scale_acc,unemp_after_ra=unemp_after_ra) - pension)
                 pension=0
                 employment_status = 2
+                
+                #print('kansanel√§ke',kansanelake,'tyoelake',tyoelake)
                 
             time_in_state=self.timestep
             alkanut_ansiosidonnainen=0
             ove_paid=0
         elif age>=self.min_retirementage:
-            if employment_status in set([2,8,9]): # ve, ve+työ, ve+osatyö
+            if employment_status in set([2,8,9]): # ve, ve+ty√∂, ve+osaty√∂
                 tyoelake = self.elakeindeksi * tyoelake
                 kansanelake = kansanelake * self.kelaindeksi
                 employment_status = 8
-            else:
-                # lykkäyskorotus
+            elif employment_status==4:
+                # lykk√§yskorotus
                 tyoelake = tyoelake*self.elakeindeksi + pension
                 if self.include_kansanelake:
-                    if spouse:
-                        kansanelake = self.ben.laske_kansanelake(age,tyoelake*self.elinaikakerroin/12,0)*12 # ben-modulissa palkat kk-tasolla
-                    else:
-                        kansanelake = self.ben.laske_kansanelake(age,tyoelake*self.elinaikakerroin/12,1)*12 # ben-modulissa palkat kk-tasolla
+                    kansanelake = self.ben.laske_kansanelake(age,tyoelake*self.elinaikakerroin/12,1-has_spouse,disability=True)*12 # ben-modulissa palkat kk-tasolla
                 else:
                     kansanelake = 0
-                # lykkäys ei vähennä kansaneläkettä
+                # lykk√§ys ei v√§henn√§ kansanel√§kett√§
+                tyoelake += (self.scale_pension(pension,age,scale=scale_acc,unemp_after_ra=unemp_after_ra) - pension)
+                pension=0
+                employment_status = 8
+            else:
+                # lykk√§yskorotus
+                tyoelake = tyoelake*self.elakeindeksi + pension
+                if self.include_kansanelake:
+                    kansanelake = self.ben.laske_kansanelake(age,tyoelake*self.elinaikakerroin/12,1-has_spouse)*12 # ben-modulissa palkat kk-tasolla
+                else:
+                    kansanelake = 0
+                # lykk√§ys ei v√§henn√§ kansanel√§kett√§
                 tyoelake += (self.scale_pension(pension,age,scale=scale_acc,unemp_after_ra=unemp_after_ra) - pension)
                 pension=0
                 employment_status = 8
@@ -1201,7 +1222,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
             ptwage=0.5*wage
             pension=self.pension_accrual(age,ptwage,pension,state=employment_status)
             ove_paid=0
-        else: # työvoiman ulkopuolella
+        else: # ty√∂voiman ulkopuolella
             time_in_state=0
             employment_status = 2 
             wage=old_wage
@@ -1218,25 +1239,26 @@ class UnemploymentLargeEnv_v4(gym.Env):
             error('failure')
             exit()
             
-        if employment_status in set([2,3,8,9]): # ei eläkettä maksuun
+        if employment_status in set([2,3,8,9]): # ei el√§kett√§ maksuun
             print('Incorrect state',employment_status)
             error('failure')
             exit()
         else:
-            tyoelake = self.scale_pension(self.ove_ratio*pension,age,scale=True,unemp_after_ra=unemp_after_ra)/self.elakeindeksi # ei eläkeindeksi tässä
+            tyoelake = self.scale_pension(self.ove_ratio*pension,age,scale=True,unemp_after_ra=unemp_after_ra)/self.elakeindeksi # ei el√§keindeksi t√§ss√§
             kansanelake = 0
-            pension=(1-self.ove_ratio)*pension # *self.palkkakerroin, tässä ei indeksoida, koska pension_accrual hoitaa tämän
+            pension=(1-self.ove_ratio)*pension # *self.palkkakerroin, t√§ss√§ ei indeksoida, koska pension_accrual hoitaa t√§m√§n
             ove_paid=1
 
         return pension,tyoelake,ove_paid
 
-    def move_to_retirement(self,wage,pension,old_wage,age,kansanelake,tyoelake,employment_status,unemp_after_ra,all_acc=True,scale_acc=True,spouse=0):
+    def move_to_retirement(self,wage,pension,old_wage,age,kansanelake,tyoelake,employment_status,unemp_after_ra,
+        all_acc=True,scale_acc=True,has_spouse=0,is_spouse=False):
         '''
         Moving to retirement
         '''
         if age>=self.max_retirementage:
-            if employment_status in set([2,8,9]): # ve, ve+työ, ve+osatyö
-                # ei lykkäyskorotusta
+            if employment_status in set([2,8,9]): # ve, ve+ty√∂, ve+osaty√∂
+                # ei lykk√§yskorotusta
                 tyoelake = self.elakeindeksi*tyoelake+self.scale_pension(pension,age,scale=False,unemp_after_ra=unemp_after_ra)
                 if self.include_kansanelake:
                     kansanelake = kansanelake * self.kelaindeksi
@@ -1253,14 +1275,14 @@ class UnemploymentLargeEnv_v4(gym.Env):
                 else:
                     kansanelake = 0
                 pension=0
-            else: # ei vielä eläkkeellä
-                # lykkäyskorotus
+            else: # ei viel√§ el√§kkeell√§
+                # lykk√§yskorotus
                 tyoelake = tyoelake*self.elakeindeksi + pension
                 if self.include_kansanelake:
-                    kansanelake = self.ben.laske_kansanelake(age,tyoelake*self.elinaikakerroin/12,1-spouse)*12 # ben-modulissa palkat kk-tasolla
+                    kansanelake = self.ben.laske_kansanelake(age,tyoelake*self.elinaikakerroin/12,1-has_spouse)*12 # ben-modulissa palkat kk-tasolla
                 else:
                     kansanelake = 0
-                # lykkäys ei vähennä kansaneläkettä
+                # lykk√§ys ei v√§henn√§ kansanel√§kett√§
                 tyoelake += (self.scale_pension(pension,age,scale=scale_acc,unemp_after_ra=unemp_after_ra) - pension)
                 pension=0
                 employment_status = 2 
@@ -1270,7 +1292,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
             ove_paid=0
         elif age>=self.min_retirementage:
             if all_acc:
-                if employment_status in set([2,8,9]): # ve, ve+työ, ve+osatyö
+                if employment_status in set([2,8,9]): # ve, ve+ty√∂, ve+osaty√∂
                     tyoelake = self.elakeindeksi*tyoelake
                     kansanelake = kansanelake * self.kelaindeksi
                     pension=pension*self.palkkakerroin
@@ -1281,18 +1303,30 @@ class UnemploymentLargeEnv_v4(gym.Env):
                     pension = pension * self.palkkakerroin
                     tyoelake = self.elakeindeksi * tyoelake
                     kansanelake = kansanelake * self.kelaindeksi
-                else:
-                    # lykkäyskorotus
+                elif employment_status==4: # putki
+                    # lykk√§yskorotus
                     tyoelake = tyoelake * self.elakeindeksi + pension
-                    if self.include_kansanelake:
-                        kansanelake = self.ben.laske_kansanelake(age,tyoelake*self.elinaikakerroin/12,1-spouse)*12 # ben-modulissa palkat kk-tasolla
+                    if self.include_kansanelake: # ei varhennnusv√§hennyst√§ putken tapauksessa
+                        kansanelake = self.ben.laske_kansanelake(age,tyoelake*self.elinaikakerroin/12,1-has_spouse,disability=True)*12 # ben-modulissa palkat kk-tasolla
                     else:
                         kansanelake = 0
-                    # lykkäys ei vähennä kansaneläkettä
+                    # lykk√§ys ei v√§henn√§ kansanel√§kett√§
                     tyoelake += (self.scale_pension(pension,age,scale=scale_acc,unemp_after_ra=unemp_after_ra) - pension)
                     pension=0
                     employment_status = 2 
-            elif employment_status in set([8,9]): # ve, ve+työ, ve+osatyö
+                else:
+                    # lykk√§yskorotus
+                    tyoelake = tyoelake * self.elakeindeksi + pension
+                    if self.include_kansanelake:
+                        kansanelake = self.ben.laske_kansanelake(age,tyoelake*self.elinaikakerroin/12,1-has_spouse)*12 # ben-modulissa palkat kk-tasolla
+                    else:
+                        kansanelake = 0
+                    # lykk√§ys ei v√§henn√§ kansanel√§kett√§
+                    tyoelake += (self.scale_pension(pension,age,scale=scale_acc,unemp_after_ra=unemp_after_ra) - pension)
+                    pension=0
+                    employment_status = 2 
+                    
+            elif employment_status in set([8,9]): # ve, ve+ty√∂, ve+osaty√∂
                 tyoelake = self.elakeindeksi * tyoelake
                 kansanelake = kansanelake * self.kelaindeksi
                 pension = pension * self.palkkakerroin
@@ -1303,21 +1337,23 @@ class UnemploymentLargeEnv_v4(gym.Env):
             time_in_state=self.timestep
             alkanut_ansiosidonnainen=0
             ove_paid=0
-        else: # työvoiman ulkopuolella
+        else: # ty√∂voiman ulkopuolella
+            ove_paid=0
             time_in_state = 0
             employment_status = 2 
             wage = old_wage
             time_in_state += self.timestep
+            print('retired before retirement age!!!!')
 
         return employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid
 
     def move_to_retdisab(self,wage,pension,old_wage,age,time_in_state,kansanelake,tyoelake,unemp_after_ra):   
         '''
-        Siirtymä vanhuuseläkkeelle, jossa ei voi tehdä työtä
+        Siirtym√§ vanhuusel√§kkeelle, jossa ei voi tehd√§ ty√∂t√§
         '''
         
         if age>=self.max_retirementage:
-            # ei mene täsmälleen oikein
+            # ei mene t√§sm√§lleen oikein
             tyoelake = self.elakeindeksi*tyoelake+self.scale_pension(pension,age,scale=False,unemp_after_ra=unemp_after_ra)
             kansanelake = kansanelake * self.kelaindeksi
             pension=0                        
@@ -1336,7 +1372,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
         
     def tyossaoloehto(self,toe,tyoura,age):
         '''
-        täyttyykö työssäoloehto
+        t√§yttyyk√§ ty√∂ss√§oloehto
         '''
         if toe>=self.ansiopvraha_toe: 
             return True
@@ -1350,15 +1386,15 @@ class UnemploymentLargeEnv_v4(gym.Env):
         if porrastus:
             self.comp_unempdays_left=self.comp_unempdays_left_porrastus
             self.paivarahapaivia_jaljella=self.paivarahapaivia_jaljella_porrastus
-            self.comp_toe_wage=self.comp_toe_wage_porrastus
+            self.comp_toe_wage=self.infostate.comp_toe_wage_porrastus
         else:
             self.comp_unempdays_left=self.comp_unempdays_left_nykytila
             self.paivarahapaivia_jaljella=self.paivarahapaivia_jaljella_nykytila
-            self.comp_toe_wage=self.comp_toe_wage_nykytila
+            self.comp_toe_wage=self.infostate.comp_toe_wage_nykytila
     
     def comp_unempdays_left_nykytila(self,kesto,tyoura,age,toe,emp,alkanut_ansiosidonnainen,toe58,old_toe,printti=False):
         '''
-        Nykytilan mukainen jäljellä olevien työttömyyspäivärahapäivien laskenta
+        Nykytilan mukainen j√§ljell√§ olevien ty√∂tt√§myysp√§iv√§rahap√§ivien laskenta
         '''
         if emp in set([2,3,8,9]):
             return 0
@@ -1385,7 +1421,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
 
     def paivarahapaivia_jaljella_nykytila(self,kesto,tyoura,age,toe58,toe):
         '''
-        Onko työttömyyspäivärahapäiviä jäljellä?
+        Onko ty√∂tt√§myysp√§iv√§rahap√§ivi√§ j√§ljell√§?
         '''
         if age>=self.max_unemploymentbenefitage:
             return False
@@ -1476,7 +1512,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
             
     def update_unempwage_basis(self,unempwage_basis,unempwage,use80percent):
         '''
-        Tähän 80% sääntö (jos edellisestä uudelleenmäärittelystä alle vuosi, 80% suojaosa)
+        T√§h√§n 80% s√§√§nt√§ (jos edellisest√§ uudelleenm√§√§rittelyst√§ alle vuosi, 80% suojaosa)
         '''
         if use80percent:
             return max(unempwage_basis*0.8,unempwage)
@@ -1484,11 +1520,12 @@ class UnemploymentLargeEnv_v4(gym.Env):
             return unempwage
 
     def move_to_unemp(self,wage,pension,old_wage,age,kansanelake,tyoelake,toe,toekesto,irtisanottu,tyoura,
-                    used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,alkanut_ansiosidonnainen,toe58,spouse=False):
+                    used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,alkanut_ansiosidonnainen,toe58,
+                    has_spouse,is_spouse):
         '''
-        Siirtymä työttömyysturvalle
+        Siirtym√§ ty√∂tt√§myysturvalle
         '''
-        if age>=self.min_retirementage: # ei uusia työttömiä enää alimman ve-iän jälkeen, vanhat jatkavat
+        if age>=self.min_retirementage: # ei uusia ty√∂tt√§mi√§ en√§√§ alimman ve-i√§n j√§lkeen, vanhat jatkavat
             pinkslip=0
             employment_status=0
             unempwage_basis=0
@@ -1498,20 +1535,20 @@ class UnemploymentLargeEnv_v4(gym.Env):
             
             employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
                 self.move_to_retirement(wage,pension,old_wage,age,kansanelake,tyoelake,employment_status,
-                    unemp_after_ra,all_acc=True,scale_acc=True,spouse=spouse)
+                    unemp_after_ra,all_acc=True,scale_acc=True,has_spouse=has_spouse,is_spouse=is_spouse)
                 
             return employment_status,kansanelake,tyoelake,pension,wage,time_in_state,\
                    used_unemp_benefit,pinkslip,unemp_after_ra,unempwage_basis,\
                    alkanut_ansiosidonnainen,karenssia_jaljella
         else:
-            #if toe>=self.ansiopvraha_toe: # täyttyykö työssäoloehto
+            #if toe>=self.ansiopvraha_toe: # t√§yttyyk√§ ty√∂ss√§oloehto
             tehto=self.tyossaoloehto(toe,tyoura,age)
             if tehto or alkanut_ansiosidonnainen>0:
                 if tehto:
                     kesto=0
                     used_unemp_benefit=0
-                    self.infostate_set_enimmaisaika(age,spouse=spouse) # resetoidaan enimmäisaika
-                    if self.infostat_check_aareset(age,spouse=spouse):
+                    self.infostate.set_enimmaisaika(age,is_spouse=is_spouse) # resetoidaan enimm√§isaika
+                    if self.infostate.check_aareset(age,is_spouse=is_spouse):
                         unempwage_basis=self.update_unempwage_basis(unempwage_basis,unempwage,True)
                     else:
                         unempwage_basis=self.update_unempwage_basis(unempwage_basis,unempwage,False)
@@ -1520,14 +1557,14 @@ class UnemploymentLargeEnv_v4(gym.Env):
                 else:
                     kesto=used_unemp_benefit
                     if self.porrasta_toe:
-                        jaljella=self.paivarahapaivia_jaljella(kesto,tyoura,age,toe58,self.comp_oldtoe(spouse=spouse)) # FIXME! Ei toimi PUOLISO
+                        jaljella=self.paivarahapaivia_jaljella(kesto,tyoura,age,toe58,self.comp_oldtoe(spouse=is_spouse))
                     else:
                         jaljella=self.paivarahapaivia_jaljella(kesto,tyoura,age,toe58,toekesto) # toe ei vaikuta
                     
                 if jaljella:
                     employment_status  = 0 # siirto ansiosidonnaiselle
                     #if alkanut_ansiosidonnainen<1:
-                    if irtisanottu: # or alkanut_ansiosidonnainen>0: # muuten ei oikeutta ansiopäivärahaan karenssi vuoksi
+                    if irtisanottu>0 or alkanut_ansiosidonnainen>0: # or alkanut_ansiosidonnainen>0: # muuten ei oikeutta ansiop√§iv√§rahaan karenssi vuoksi
                         used_unemp_benefit+=self.timestep
                         karenssia_jaljella=0.0
                     else:
@@ -1538,17 +1575,17 @@ class UnemploymentLargeEnv_v4(gym.Env):
                     alkanut_ansiosidonnainen = 1
                 else:
                     if self.include_putki and age>=self.min_tyottputki_ika and tyoura>=self.tyohistoria_tyottputki: 
-                        employment_status = 4 # siirto lisäpäiville
+                        employment_status = 4 # siirto lis√§p√§iville
                         used_unemp_benefit+=self.timestep
                         karenssia_jaljella=0.0
                         alkanut_ansiosidonnainen = 1
                     else:
-                        employment_status = 13 # siirto työmarkkinatuelle
+                        employment_status = 13 # siirto ty√∂markkinatuelle
                         unempwage_basis=0
                         alkanut_ansiosidonnainen = 0
                         karenssia_jaljella=0
             else:
-                employment_status = 13 # siirto työmarkkinatuelle
+                employment_status = 13 # siirto ty√∂markkinatuelle
                 alkanut_ansiosidonnainen = 0
                 unempwage_basis=0
                 if irtisanottu: # muuten ei oikeutta tm-tukeen karenssin vuoksi
@@ -1557,7 +1594,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
                     karenssia_jaljella=0.25 # 90 pv
 
             time_in_state=0                
-            #toe=0 #max(0,toe-self.timestep) # nollataan työssäoloehto
+            #toe=0 #max(0,toe-self.timestep) # nollataan ty√∂ss√§oloehto
             
             if karenssia_jaljella>0:
                 pension=pension*self.palkkakerroin
@@ -1571,7 +1608,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
             #karenssia_jaljella=max(0,karenssia_jaljella-self.timestep) # FIXME!
             #unemp_after_ra ei muutu
             
-            # Tässä ei tehdä karenssia_jaljella -muuttujasta tilamuuttujaa, koska karenssin kesto on lyhyempi kuin aika-askeleen
+            # T√§ss√§ ei tehd√§ karenssia_jaljella -muuttujasta tilamuuttujaa, koska karenssin kesto on lyhyempi kuin aika-askeleen
             # Samoin karenssia ei ole tm-tuessa, koska toimeentulotuki on suurempi
             
             pinkslip=irtisanottu
@@ -1587,7 +1624,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
 
     def move_to_outsider(self,wage,pension,tyoelake,old_wage,age,irtisanottu):
         '''
-        Siirtymä työvoiman ulkopuolelle
+        Siirtym√§ ty√∂voiman ulkopuolelle
         '''
         employment_status = 11 # switch
         time_in_state=0
@@ -1599,21 +1636,21 @@ class UnemploymentLargeEnv_v4(gym.Env):
 
         return employment_status,pension,tyoelake,wage,time_in_state,pinkslip
 
-    def move_to_disab(self,wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,spouse,children_under18):
+    def move_to_disab(self,wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse):
         '''
-        Siirtymä työkyvyttömyyseläkkeelle aktiivista, ei eläkkeeltä
+        Siirtym√§ ty√∂kyvytt√§myysel√§kkeelle aktiivista, ei el√§kkeelt√§
         '''
         employment_status = 3 # tk
         if age<self.min_retirementage:
-            wage5y,realwage=self.infostat_comp_5y_ave_wage(spouse=spouse) 
+            wage5y,realwage=self.infostate.comp_5y_ave_wage(is_spouse=is_spouse) 
             
-            if realwage>self.min_disab_tulevaaika: # oikeus tulevaan aikaan, tosin tässä 5v ajalta laskettuna
+            if realwage>self.min_disab_tulevaaika: # oikeus tulevaan aikaan, tosin t√§ss√§ 5v ajalta laskettuna
                 tyoelake=(tyoelake+self.elinaikakerroin*(pension+self.acc/self.timestep*wage5y*max(0,self.min_retirementage-age)))*self.elakeindeksi
             else:
                 tyoelake=(tyoelake+self.elinaikakerroin*pension)*self.elakeindeksi
             
             if self.include_kansanelake:
-                kansanelake = self.ben.laske_kansanelake(age,tyoelake/12,1-spouse,disability=True,lapsia=children_under18)*12 # ben-modulissa palkat kk-tasolla
+                kansanelake = self.ben.laske_kansanelake(age,tyoelake/12,1-has_spouse,disability=True,lapsia=children_under18)*12 # ben-modulissa palkat kk-tasolla
             else:
                 kansanelake = 0
             
@@ -1622,39 +1659,39 @@ class UnemploymentLargeEnv_v4(gym.Env):
             time_in_state=self.timestep
             wage=0
             #print('move_to_disab at ',age,'ke',kansanelake,'te',tyoelake,'wage5y',wage5y)
-            #wage_reduction=0.60 # vastaa määritelmää
+            #wage_reduction=0.60 # vastaa m√§√§ritelm√§√§
         else:
-            # siirtymä vanhuuseläkkeelle, lykkäyskorotus, ei tulevaa aikaa
+            # siirtym√§ vanhuusel√§kkeelle, lykk√§yskorotus, ei tulevaa aikaa
             tyoelake = tyoelake*self.elakeindeksi + pension
             if self.include_kansanelake:
-                kansanelake = self.ben.laske_kansanelake(age,tyoelake*self.elinaikakerroin/12,1-spouse,lapsia=children_under18)*12 # ben-modulissa palkat kk-tasolla
+                kansanelake = self.ben.laske_kansanelake(age,tyoelake*self.elinaikakerroin/12,1-has_spouse,lapsia=children_under18)*12 # ben-modulissa palkat kk-tasolla
             else:
                 kansanelake = 0
-            # lykkäys ei vähennä kansaneläkettä
+            # lykk√§ys ei v√§henn√§ kansanel√§kett√§
             tyoelake += (self.scale_pension(pension,age,scale=True,unemp_after_ra=unemp_after_ra) - pension)
             pension=0
 
             time_in_state=self.timestep
             alkanut_ansiosidonnainen=0
             ove_paid=0
-            #wage_reduction=0.60 # vastaa määritelmää
+            #wage_reduction=0.60 # vastaa m√§√§ritelm√§√§
 
         return employment_status,pension,kansanelake,tyoelake,wage,time_in_state,ove_paid
         
-    def comp_familypension(self,puoliso,emp_state,puoliso_tila,tyoelake,pension,age,puoliso_tyoelake,puoliso_pension,children_under18,spouse):
+    def comp_familypension(self,puoliso,emp_state,puoliso_tila,tyoelake,pension,age,puoliso_tyoelake,puoliso_pension,children_under18,has_spouse,is_spouse):
         '''
-        Siirtymä työkyvyttömyyseläkkeelle aktiivista, ei eläkkeeltä
+        Siirtym√§ ty√∂kyvytt√§myysel√§kkeelle aktiivista, ei el√§kkeelt√§
         '''
         if puoliso_tila==14:
             return 0
         
-        if puoliso<1:
+        if has_spouse<1:
             return puoliso_tyoelake
             
         if emp_state in set([2,3,8,9]):
             add_pension=0.5*tyoelake
         elif age<self.min_retirementage:
-            wage5y,_=self.infostat_comp_5y_ave_wage(spouse=spouse) 
+            wage5y,_=self.infostate.comp_5y_ave_wage(is_spouse=is_spouse) 
             dis_pension=(tyoelake+self.elinaikakerroin*(pension+self.acc/self.timestep*wage5y*max(0,self.min_retirementage-age)))*self.elakeindeksi
             add_pension=0.5*dis_pension
         else:
@@ -1664,7 +1701,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
         if puoliso_tila in set([2,3,8,9]):
             omaelake=puoliso_tyoelake
         elif age<self.min_retirementage:
-            wage5y,_=self.infostat_comp_5y_ave_wage(spouse=not spouse) 
+            wage5y,_=self.infostate.comp_5y_ave_wage(is_spouse=not is_spouse) 
             omaelake=(tyoelake+self.elinaikakerroin*(pension+self.acc/self.timestep*wage5y*max(0,self.min_retirementage-age)))*self.elakeindeksi
         else:
             omaelake = tyoelake*self.elakeindeksi + self.scale_pension(pension,age,scale=True,unemp_after_ra=0)
@@ -1682,7 +1719,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
 
     def move_to_deceiced(self,pension,old_wage,age):
         '''
-        Siirtymä tilaan kuollut
+        Siirtym√§ tilaan kuollut
         '''
         employment_status = 14 # deceiced
         wage=old_wage
@@ -1700,20 +1737,19 @@ class UnemploymentLargeEnv_v4(gym.Env):
 
     def move_to_kht(self,wage,pension,tyoelake,old_wage,age):
         '''
-        Siirtymä kotihoidontuelle
+        Siirtym√§ kotihoidontuelle
         '''
         employment_status = 7 # kotihoidontuelle
         pension=self.pension_accrual(age,old_wage,pension,state=7)
         tyoelake=tyoelake*self.elakeindeksi
         
-        time_in_state=0
-        time_in_state+=self.timestep
+        time_in_state=self.timestep
 
         return employment_status,pension,tyoelake,wage,time_in_state
 
     def move_to_fatherleave(self,wage,pension,tyoelake,old_wage,age):
         '''
-        Siirtymä isyysvapaalle
+        Siirtym√§ isyysvapaalle
         '''
         
         #self.infostate_add_child(age) # only for the mother
@@ -1728,10 +1764,10 @@ class UnemploymentLargeEnv_v4(gym.Env):
 
     def move_to_motherleave(self,wage,pension,tyoelake,old_wage,age):
         '''
-        Siirtymä äitiysvapaalle
+        Siirtym√§ √§itiysvapaalle
         '''
-        self.infostate_add_child(age)
-        employment_status = 5 # äitiysvapaa
+        self.infostate.add_child(age)
+        employment_status = 5 # √§itiysvapaa
         time_in_state=0
         pension=self.pension_accrual(age,old_wage,pension,state=5)
         tyoelake=tyoelake*self.elakeindeksi
@@ -1743,22 +1779,22 @@ class UnemploymentLargeEnv_v4(gym.Env):
     def stay_unemployed(self,wage,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
                         unempwage_basis,action,age,sattuma,intage,g,alkanut_ansiosidonnainen,
-                        toe58,ove_paid,children_under3,children_under18,spouse_value,spouse):
+                        toe58,ove_paid,children_under3,children_under18,has_spouse,is_spouse):
         '''
-        Pysy tilassa työtön (0)
+        Pysy tilassa ty√∂t√§n (0)
         '''
         time_in_state+=self.timestep
         karenssia_jaljella=0
         
-        if (action == 1 or action == 3) and self.unemp_limit_reemp:
-            if np.random.uniform()>self.unemp_reemp_prob[intage]:
+        if (action == 1 or action == 3 or (action in set([2,4]) and age < self.min_retirementage)) and self.unemp_limit_reemp:
+            if np.random.uniform()<self.unemp_reemp_prob[intage] and self.randomness:
                 action = 0
             
         if age>=self.max_unemploymentbenefitage:
             employment_status,kansanelake,tyoelake,pension,wage,time_in_state,wove_paid\
                 =self.move_to_retirement(wage,pension,0,age,kansanelake,tyoelake,employment_status,
-                    unemp_after_ra,all_acc=True,scale_acc=True,spouse=spouse)
-        elif action == 0 or ((action == 2 or action==4) and age < self.min_retirementage) or (action == 5):
+                    unemp_after_ra,all_acc=True,scale_acc=True,has_spouse=has_spouse,is_spouse=is_spouse)
+        elif action == 0 or action == 5:
             employment_status = 0 # unchanged
                 
             if self.porrasta_toe:
@@ -1774,11 +1810,11 @@ class UnemploymentLargeEnv_v4(gym.Env):
                 
             if not self.paivarahapaivia_jaljella(kesto,tyoura,age,toe58,oldtoe):
                 if self.include_putki and age>=self.min_tyottputki_ika and tyoura>=self.tyohistoria_tyottputki: 
-                    employment_status = 4 # siirto lisäpäiville
+                    employment_status = 4 # siirto lis√§p√§iville
                     pension=self.pension_accrual(age,unempwage_basis,pension,state=4,ove_paid=ove_paid)
                     used_unemp_benefit+=self.timestep
                 else:
-                    employment_status = 13 # siirto työmarkkinatuelle
+                    employment_status = 13 # siirto ty√∂markkinatuelle
                     alkanut_ansiosidonnainen=0
                     pension=self.pension_accrual(age,old_wage,pension,state=13)
             else:
@@ -1791,21 +1827,30 @@ class UnemploymentLargeEnv_v4(gym.Env):
         elif action == 1: # 
             employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
                 self.move_to_work(wage,pension,tyoelake,old_wage,age,time_in_state,tyoura,pinkslip)
+        elif action == 3: # osaty√∂ 50%
+            employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
+                self.move_to_parttime(wage,pension,tyoelake,old_wage,age,tyoura,time_in_state)
         elif action==2:
             if age >= self.min_retirementage: # ve
                 employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
                     self.move_to_retirement(wage,pension,old_wage,age,kansanelake,tyoelake,employment_status,
-                        unemp_after_ra,scale_acc=True,spouse=spouse)
-        elif action == 3: # osatyö 50%
-            employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
-                self.move_to_parttime(wage,pension,tyoelake,old_wage,age,tyoura,time_in_state)
-        elif action == 4: # osatyö 50% + ve
-            employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
-                self.move_to_oa_parttime(wage,pension,old_wage,age,kansanelake,tyoelake,employment_status,
-                        0,scale_acc=True,spouse=spouse)
+                        unemp_after_ra,scale_acc=True,has_spouse=has_spouse,is_spouse=is_spouse)
+            elif children_under3>0:
+                employment_status,pension,tyoelake,wage,time_in_state=self.move_to_kht(wage,pension,tyoelake,old_wage,age)
+            else:
+                employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
+                    self.move_to_parttime(wage,pension,tyoelake,old_wage,age,tyoura,time_in_state)
+        elif action == 4: # osaty√∂ 50% + ve
+            if age >= self.min_retirementage: # ve
+                employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
+                    self.move_to_oa_parttime(wage,pension,old_wage,age,kansanelake,tyoelake,employment_status,
+                            unemp_after_ra,scale_acc=True,has_spouse=has_spouse,is_spouse=is_spouse)
+            else:
+                employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
+                    self.move_to_parttime(wage,pension,tyoelake,old_wage,age,tyoura,time_in_state)
         elif action==11: # tk
             employment_status,pension,kansanelake,tyoelake,wage,time_in_state,ove_paid=\
-                self.move_to_disab(wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,spouse,children_under18)
+                self.move_to_disab(wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse)
             pinkslip=0
         else:
             print('error 17')  
@@ -1817,22 +1862,22 @@ class UnemploymentLargeEnv_v4(gym.Env):
     def stay_tyomarkkinatuki(self,wage,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
                         unempwage_basis,action,age,sattuma,intage,g,alkanut_ansiosidonnainen,
-                        toe58,ove_paid,children_under3,children_under18,spouse_value,spouse):
+                        toe58,ove_paid,children_under3,children_under18,has_spouse,is_spouse):
         '''
-        Pysy tilassa työmarkkinatuki (13)
+        Pysy tilassa ty√∂markkinatuki (13)
         '''
         time_in_state+=self.timestep
         karenssia_jaljella=0
                 
-        if (action == 1 or action == 3) and self.unemp_limit_reemp:
-            if np.random.uniform()>self.unemp_reemp_prob[intage]:
+        if (action == 1 or action == 3 or (action in set([2,4]) and age < self.min_retirementage)) and self.unemp_limit_reemp:
+            if np.random.uniform()<self.unemp_reemp_prob[intage] and self.randomness:
                 action = 0
 
         if age>=self.max_unemploymentbenefitage:
             employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
                 self.move_to_retirement(wage,pension,0,age,kansanelake,tyoelake,employment_status,
-                    unemp_after_ra,all_acc=True,scale_acc=True,spouse=spouse)
-        elif action == 0 or ((action == 2 or action == 4) and age < self.min_retirementage) or (action == 5):
+                    unemp_after_ra,all_acc=True,scale_acc=True,has_spouse=has_spouse,is_spouse=is_spouse)
+        elif action == 0 or action == 5:
             employment_status = 13 # unchanged
                 
             if action == 5 and (not ove_paid) and (age>=self.min_ove_age):
@@ -1847,21 +1892,30 @@ class UnemploymentLargeEnv_v4(gym.Env):
         elif action == 1: # 
             employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
                 self.move_to_work(wage,pension,tyoelake,old_wage,age,time_in_state,tyoura,pinkslip)
+        elif action == 3: # osaty√∂ 50%
+            employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
+                self.move_to_parttime(wage,pension,tyoelake,old_wage,age,tyoura,time_in_state)
         elif action == 2:
             if age >= self.min_retirementage: # ve
                 employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
                     self.move_to_retirement(wage,pension,old_wage,age,kansanelake,tyoelake,employment_status,
-                        unemp_after_ra,scale_acc=True,spouse=spouse)
-        elif action == 3: # osatyö 50%
-            employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
-                self.move_to_parttime(wage,pension,tyoelake,old_wage,age,tyoura,time_in_state)
-        elif action == 4: # osatyö 50% + ve
-            employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
-                self.move_to_oa_parttime(wage,pension,old_wage,age,kansanelake,tyoelake,employment_status,
-                        unemp_after_ra,scale_acc=False,spouse=spouse)
+                        unemp_after_ra,scale_acc=True,has_spouse=has_spouse,is_spouse=is_spouse)
+            elif children_under3>0:
+                employment_status,pension,tyoelake,wage,time_in_state=self.move_to_kht(wage,pension,tyoelake,old_wage,age)
+            else:
+                employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
+                    self.move_to_parttime(wage,pension,tyoelake,old_wage,age,tyoura,time_in_state)
+        elif action == 4: # osaty√∂ 50% + ve
+            if age >= self.min_retirementage: # ve
+                employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
+                    self.move_to_oa_parttime(wage,pension,old_wage,age,kansanelake,tyoelake,employment_status,
+                            unemp_after_ra,scale_acc=False,has_spouse=has_spouse,is_spouse=is_spouse)
+            else:
+                employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
+                    self.move_to_parttime(wage,pension,tyoelake,old_wage,age,tyoura,time_in_state)
         elif action==11: # tk
             employment_status,pension,kansanelake,tyoelake,wage,time_in_state,ove_paid=\
-                self.move_to_disab(wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,spouse,children_under18)
+                self.move_to_disab(wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse)
         else:
             print('error 17')        
                 
@@ -1872,22 +1926,22 @@ class UnemploymentLargeEnv_v4(gym.Env):
     def stay_pipeline(self,wage,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
                         unempwage_basis,action,age,sattuma,intage,g,alkanut_ansiosidonnainen,
-                        toe58,ove_paid,children_under3,children_under18,spouse_value,spouse):
+                        toe58,ove_paid,children_under3,children_under18,has_spouse,is_spouse):
         '''
-        Pysy tilassa työttömyysputki (4)
+        Pysy tilassa ty√∂tt√§myysputki (4)
         '''
         time_in_state+=self.timestep
         karenssia_jaljella=0
 
-        if (action == 1 or action == 3) and self.unemp_limit_reemp:
-            if np.random.uniform()>self.unemp_reemp_prob[intage]:
+        if (action == 1 or action == 3 or (action in set([2,4]) and age < self.min_retirementage)) and self.unemp_limit_reemp:
+            if np.random.uniform()<self.unemp_reemp_prob[intage] and self.randomness:
                 action = 0
         
         if age>=self.max_unemploymentbenefitage:
             employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
                 self.move_to_retirement(wage,pension,0,age,kansanelake,tyoelake,employment_status,
-                    unemp_after_ra,all_acc=True,scale_acc=True,spouse=spouse)
-        elif action == 0 or ((action == 2 or action == 4) and age < self.min_retirementage) or (action == 5):
+                    unemp_after_ra,all_acc=True,scale_acc=True,has_spouse=has_spouse,is_spouse=is_spouse)
+        elif action == 0 or action == 5:
             employment_status  = 4 # unchanged
             pension=self.pension_accrual(age,unempwage_basis,pension,state=4,ove_paid=ove_paid)
                 
@@ -1899,24 +1953,32 @@ class UnemploymentLargeEnv_v4(gym.Env):
             if age >= self.min_retirementage:
                 unemp_after_ra+=self.timestep
                 
-        elif action == 1: # 
+        elif action == 1:
             employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
                 self.move_to_work(wage,pension,tyoelake,old_wage,age,time_in_state,tyoura,pinkslip)
-        elif action==2:
-            employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
-                self.move_to_retirement(wage,pension,old_wage,age,kansanelake,tyoelake,employment_status,
-                    unemp_after_ra,all_acc=True,scale_acc=True,spouse=spouse)
-            pinkslip=0
-        elif action == 3: # 
+        elif action == 3:
             employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
                 self.move_to_parttime(wage,pension,tyoelake,old_wage,age,tyoura,time_in_state)
-        elif action == 4: # osatyö 50% + ve
-            employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
-                self.move_to_oa_parttime(wage,pension,old_wage,age,kansanelake,tyoelake,employment_status,
-                    unemp_after_ra,scale_acc=True,spouse=spouse)
+        elif action==2:
+            if age >= self.min_retirementage: # ve
+                employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
+                    self.move_to_retirement(wage,pension,old_wage,age,kansanelake,tyoelake,employment_status,
+                        unemp_after_ra,all_acc=True,scale_acc=True,has_spouse=has_spouse,is_spouse=is_spouse)
+                pinkslip=0
+            else:
+                employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
+                    self.move_to_work(wage,pension,tyoelake,old_wage,age,time_in_state,tyoura,pinkslip)
+        elif action == 4: # osaty√∂ 50% + ve
+            if age >= self.min_retirementage: # ve
+                employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
+                    self.move_to_oa_parttime(wage,pension,old_wage,age,kansanelake,tyoelake,employment_status,
+                        unemp_after_ra,scale_acc=True,has_spouse=has_spouse,is_spouse=is_spouse)
+            else:
+                employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
+                    self.move_to_parttime(wage,pension,tyoelake,old_wage,age,tyoura,time_in_state)
         elif action==11: # tk
             employment_status,pension,kansanelake,tyoelake,wage,time_in_state,ove_paid=\
-                self.move_to_disab(wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,spouse,children_under18)
+                self.move_to_disab(wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse)
         else:
             print('error 1: ',action)
             
@@ -1927,9 +1989,9 @@ class UnemploymentLargeEnv_v4(gym.Env):
     def stay_employed(self,wage,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
                         unempwage_basis,action,age,sattuma,intage,g,alkanut_ansiosidonnainen,
-                        toe58,ove_paid,children_under3,children_under18,spouse_value,spouse):
+                        toe58,ove_paid,children_under3,children_under18,has_spouse,is_spouse):
         '''
-        Pysy tilassa töissä (1)
+        Pysy tilassa t√∂iss√§ (1)
         '''
         time_in_state+=self.timestep
         karenssia_jaljella=0
@@ -1943,7 +2005,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
         else:
             pinkslip=0
 
-        if action == 0 or ((action == 2 or action == 4) and age < self.min_retirementage) or action == 5:
+        if action == 0 or action == 5:
             employment_status = 1 # unchanged
             
             if action == 5 and (not ove_paid) and (age>=self.min_ove_age):
@@ -1952,25 +2014,35 @@ class UnemploymentLargeEnv_v4(gym.Env):
             tyoelake=tyoelake*self.elakeindeksi
             tyoura+=self.timestep
             pension=self.pension_accrual(age,wage,pension,state=1)
-        elif action == 1: # työttömäksi
+        elif action == 1: # ty√∂tt√∂m√§ksi
             employment_status,kansanelake,tyoelake,pension,wage,time_in_state,\
                 used_unemp_benefit,pinkslip,unemp_after_ra,unempwage_basis,alkanut_ansiosidonnainen,karenssia_jaljella=\
                 self.move_to_unemp(wage,pension,old_wage,age,kansanelake,tyoelake,toe,toekesto,pinkslip,tyoura,
-                    used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,alkanut_ansiosidonnainen,toe58,spouse=spouse)
-        elif action==2:
-            employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
-                self.move_to_retirement(wage,pension,old_wage,age,kansanelake,tyoelake,
-                    employment_status,unemp_after_ra,spouse=spouse,all_acc=True,scale_acc=True) 
-        elif action == 3: # osatyö 50%
+                    used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,alkanut_ansiosidonnainen,toe58,has_spouse,is_spouse)
+        elif action == 3: # osaty√∂ 50%
             employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
                 self.move_to_parttime(wage,pension,tyoelake,old_wage,age,tyoura,0)
-        elif action == 4: # osatyö 50% + ve
-            employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
-                self.move_to_oa_fulltime(wage,pension,old_wage,age,kansanelake,tyoelake,employment_status,
-                    unemp_after_ra,scale_acc=True,spouse=spouse)
-        elif action==11: # tk
+        elif action==2:
+            if age >= self.min_retirementage:
+                employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
+                    self.move_to_retirement(wage,pension,old_wage,age,kansanelake,tyoelake,
+                        employment_status,unemp_after_ra,has_spouse=has_spouse,is_spouse=is_spouse,all_acc=True,scale_acc=True) 
+            else:
+                employment_status,kansanelake,tyoelake,pension,wage,time_in_state,\
+                    used_unemp_benefit,pinkslip,unemp_after_ra,unempwage_basis,alkanut_ansiosidonnainen,karenssia_jaljella=\
+                    self.move_to_unemp(wage,pension,old_wage,age,kansanelake,tyoelake,toe,toekesto,pinkslip,tyoura,
+                        used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,alkanut_ansiosidonnainen,toe58,has_spouse,is_spouse)
+        elif action == 4: # osaty√∂ 50% + ve
+            if age >= self.min_retirementage:
+                employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
+                    self.move_to_oa_parttime(wage,pension,old_wage,age,kansanelake,tyoelake,employment_status,
+                        unemp_after_ra,scale_acc=True,has_spouse=has_spouse,is_spouse=is_spouse)
+            else:
+                employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
+                    self.move_to_parttime(wage,pension,tyoelake,old_wage,age,tyoura,unemp_after_ra,has_spouse=has_spouse,is_spouse=is_spouse)
+        elif action == 11: # tk
             employment_status,pension,kansanelake,tyoelake,wage,time_in_state,ove_paid=\
-                self.move_to_disab(wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,spouse,children_under18)
+                self.move_to_disab(wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse)
         else:
             print('error 12')    
             
@@ -1981,10 +2053,10 @@ class UnemploymentLargeEnv_v4(gym.Env):
     def stay_disabled(self,wage,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
                         unempwage_basis,action,age,sattuma,intage,g,alkanut_ansiosidonnainen,
-                        toe58,ove_paid,children_under3,children_under18,spouse_value,spouse):
+                        toe58,ove_paid,children_under3,children_under18,has_spouse,is_spouse):
             
         '''
-        Pysy tilassa työkyvytön (4)
+        Pysy tilassa ty√∂kyvyt√∂n (4)
         '''
         time_in_state+=self.timestep
         karenssia_jaljella=0
@@ -1994,6 +2066,15 @@ class UnemploymentLargeEnv_v4(gym.Env):
             employment_status = 3 # unchanged
 
         tyoelake=tyoelake*self.elakeindeksi
+        
+        if math.isclose(time_in_state,5.0) and age<55.0:
+            # kertakorotus
+            if age<31:
+                korotus=1.25
+            else:
+                korotus=1.25-0.01*max(0,age-31.0)
+            tyoelake=tyoelake*korotus
+        
         if age>=self.max_retirementage:
             tyoelake = tyoelake+self.scale_pension(pension,age,scale=False)/self.elakeindeksi
             pension=0           
@@ -2010,16 +2091,16 @@ class UnemploymentLargeEnv_v4(gym.Env):
     def stay_retired(self,wage,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
                         unempwage_basis,action,age,sattuma,intage,g,alkanut_ansiosidonnainen,
-                        toe58,ove_paid,children_under3,children_under18,spouse_value,spouse):
+                        toe58,ove_paid,children_under3,children_under18,has_spouse,is_spouse):
         '''
-        Pysy tilassa vanhuuseläke (2)
+        Pysy tilassa vanhuusel√§ke (2)
         '''
         karenssia_jaljella=0
         if age >= self.min_retirementage: # ve
             time_in_state += self.timestep
             
-            if (action == 2 or action == 3) and self.unemp_limit_reemp:
-                if np.random.uniform()>self.unemp_reemp_prob[intage]:
+            if (action in set([1,2,3,4,5])) and self.unemp_limit_reemp:
+                if np.random.uniform()<self.unemp_reemp_prob[intage] and self.randomness:
                     action = 0
 
             if age>=self.max_retirementage:
@@ -2027,26 +2108,26 @@ class UnemploymentLargeEnv_v4(gym.Env):
                 tyoelake = tyoelake*self.elakeindeksi+self.scale_pension(pension,age,scale=False,unemp_after_ra=unemp_after_ra)
                 pension=0           
                 kansanelake = kansanelake * self.kelaindeksi
-            elif action == 0 or action == 1 or action == 5 or action == 4:
+            elif action == 0:
                 employment_status = 2 # unchanged
                 tyoelake = self.elakeindeksi*tyoelake
                 kansanelake = kansanelake * self.kelaindeksi
                 pension=pension*self.palkkakerroin 
-            elif action == 2:
+            elif action == 2 or action == 1 or action == 4:
                 employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
                     self.move_to_oa_parttime(wage,pension,wage,age,kansanelake,tyoelake,employment_status,0,
-                        scale_acc=False,spouse=spouse)
-            elif action == 3:
+                        scale_acc=False,has_spouse=has_spouse,is_spouse=is_spouse)
+            elif action == 3 or action == 5:
                 employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
                     self.move_to_oa_fulltime(wage,pension,wage,age,kansanelake,tyoelake,employment_status,0,
-                        scale_acc=False,spouse=spouse)
+                        scale_acc=False,has_spouse=has_spouse,is_spouse=is_spouse)
             elif action == 11:
                 employment_status,kansanelake,tyoelake,pension,wage,time_in_state,kansanelake,tyoelake=\
                     self.move_to_retdisab(wage,pension,old_wage,age,time_in_state,kansanelake,tyoelake,unemp_after_ra)
             else:
                 print('error 221, action {} age {}'.format(action,age))
         else:
-            # työvoiman ulkopuolella
+            # ty√∂voiman ulkopuolella
             time_in_state+=self.timestep
             if action == 0:
                 employment_status = 2
@@ -2054,20 +2135,20 @@ class UnemploymentLargeEnv_v4(gym.Env):
                 tyoelake = self.elakeindeksi*tyoelake
                 kansanelake = kansanelake * self.kelaindeksi
                 pension=pension*self.palkkakerroin
-            elif action == 1: # työttömäksi
+            elif action == 1: # ty√∂tt√∂m√§ksi
                 employment_status,kansanelake,tyoelake,pension,wage,time_in_state,\
                     used_unemp_benefit,pinkslip,unemp_after_ra,unempwage_basis,alkanut_ansiosidonnainen,karenssia_jaljella=\
                     self.move_to_unemp(wage,pension,old_wage,age,kansanelake,tyoelake,toe,toekesto,0,tyoura,
-                        used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,alkanut_ansiosidonnainen,toe58,spouse=spouse)
-            elif action == 2: # töihin
+                        used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,alkanut_ansiosidonnainen,toe58,has_spouse,is_spouse)
+            elif action == 2: # t√§ihin
                 employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
                     self.move_to_work(wage,pension,tyoelake,wage,age,time_in_state,tyoura,pinkslip)
-            elif action == 3: # osatyö 50%
+            elif action == 3: # osaty√∂ 50%
                 employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
                     self.move_to_parttime(wage,pension,tyoelake,wage,age,tyoura,time_in_state)
             elif action == 11: # tk
                 employment_status,pension,kansanelake,tyoelake,wage,time_in_state,ove_paid=\
-                    self.move_to_disab(wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,spouse,children_under18)
+                    self.move_to_disab(wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse)
             else:
                 print('error 12')
                 
@@ -2078,30 +2159,30 @@ class UnemploymentLargeEnv_v4(gym.Env):
     def stay_motherleave(self,wage,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
                         unempwage_basis,action,age,sattuma,intage,g,alkanut_ansiosidonnainen,
-                        toe58,ove_paid,children_under3,children_under18,spouse_value,spouse):
+                        toe58,ove_paid,children_under3,children_under18,has_spouse,is_spouse):
         '''
-        Pysy tilassa äitiysvapaa (5)
+        Pysy tilassa √§itiysvapaa (5)
         '''
         #exit_prb=np.random.uniform(0,80_000)
         karenssia_jaljella=0
-        if time_in_state>=self.aitiysvapaa_kesto or sattuma[5]<self.aitiysvapaa_pois*self.timestep:
+        if time_in_state>=self.aitiysvapaa_kesto or sattuma[5]<self.aitiysvapaa_pois:
             pinkslip=0
             if action == 0:
                 employment_status,kansanelake,tyoelake,pension,wage,time_in_state,\
                     used_unemp_benefit,pinkslip,unemp_after_ra,unempwage_basis,alkanut_ansiosidonnainen,karenssia_jaljella=\
                     self.move_to_unemp(wage,pension,old_wage,age,kansanelake,tyoelake,toe,toekesto,pinkslip,tyoura,
-                        used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,alkanut_ansiosidonnainen,toe58,spouse=spouse)
-            elif action == 1 or action == 2: # 
+                        used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,alkanut_ansiosidonnainen,toe58,has_spouse,is_spouse)
+            elif action == 1: # 
                 employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
                     self.move_to_work(wage,pension,tyoelake,old_wage,age,time_in_state,tyoura,pinkslip)
-            elif action == 3: # 
+            elif action == 3 or action == 2: # 
                 employment_status,pension,tyoelake,wage,time_in_state=self.move_to_kht(wage,pension,tyoelake,old_wage,age)
             elif action == 4 or action == 5:
                 employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
                     self.move_to_parttime(wage,pension,tyoelake,old_wage,age,tyoura,time_in_state)
             elif action==11: # tk
                 employment_status,pension,kansanelake,tyoelake,wage,time_in_state,ove_paid=\
-                    self.move_to_disab(wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,spouse,children_under18)
+                    self.move_to_disab(wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse)
             else:
                 print('Error 21')
         else:
@@ -2116,7 +2197,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
     def stay_fatherleave(self,wage,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
                         unempwage_basis,action,age,sattuma,intage,g,alkanut_ansiosidonnainen,
-                        toe58,ove_paid,children_under3,children_under18,spouse_value,spouse):
+                        toe58,ove_paid,children_under3,children_under18,has_spouse,is_spouse):
         '''
         Pysy tilassa isyysvapaa (6)
         '''
@@ -2127,19 +2208,19 @@ class UnemploymentLargeEnv_v4(gym.Env):
                 employment_status,kansanelake,tyoelake,pension,wage,time_in_state,\
                     used_unemp_benefit,pinkslip,unemp_after_ra,unempwage_basis,alkanut_ansiosidonnainen,karenssia_jaljella=\
                     self.move_to_unemp(wage,pension,old_wage,age,kansanelake,tyoelake,toe,toekesto,pinkslip,tyoura,
-                        used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,alkanut_ansiosidonnainen,toe58,spouse=spouse)
-            elif action == 1 or action == 2: # 
+                        used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,alkanut_ansiosidonnainen,toe58,has_spouse,is_spouse)
+            elif action == 1: # 
                 # ei vaikutusta palkkaan
                 employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
                     self.move_to_work(wage,pension,tyoelake,old_wage,age,0,tyoura,pinkslip)
-            elif action == 3: # 
+            elif action == 3 or action == 2: # 
                 employment_status,pension,tyoelake,wage,time_in_state=self.move_to_kht(wage,pension,tyoelake,old_wage,age)
             elif action == 4 or action == 5:
                 employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
                     self.move_to_parttime(wage,pension,tyoelake,old_wage,age,tyoura,0)
             elif action==11: # tk
                 employment_status,pension,kansanelake,tyoelake,wage,time_in_state,ove_paid=\
-                    self.move_to_disab(wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,spouse,children_under18)
+                    self.move_to_disab(wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse)
             else:
                 print('Error 23')
         else:
@@ -2151,18 +2232,21 @@ class UnemploymentLargeEnv_v4(gym.Env):
                pinkslip,unemp_after_ra,tyoura,used_unemp_benefit,unempwage_basis,\
                alkanut_ansiosidonnainen,ove_paid,karenssia_jaljella
 
-    def stay_khh(self,wage,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
+    def stay_kht(self,wage,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
                         unempwage_basis,action,age,sattuma,intage,g,alkanut_ansiosidonnainen,
-                        toe58,ove_paid,children_under3,children_under18,spouse_value,spouse):
+                        toe58,ove_paid,children_under3,children_under18,has_spouse,is_spouse):
         '''
         Pysy tilassa kotihoidontuki (0)
         '''
-        time_in_state+=self.timestep
         karenssia_jaljella=0
 
-        if (action == 0) and (time_in_state>self.kht_kesto or children_under3<1): # jos etuus loppuu, siirtymä satunnaisesti
-            s=np.random.uniform()
+        if (action == 0) and (time_in_state>self.kht_kesto or children_under3<1): # jos etuus loppuu, siirtym√§ satunnaisesti
+            if self.randomness:
+                s=np.random.uniform()
+            else:
+                s=0
+                
             if s<1/3:
                 action=1
             elif s<2/3:
@@ -2171,15 +2255,16 @@ class UnemploymentLargeEnv_v4(gym.Env):
                 action=3
                 
         if (action == 2 or action == 5 or action == 3) and self.unemp_limit_reemp:
-            if np.random.uniform()>self.unemp_reemp_prob[intage]:
+            if np.random.uniform()<self.unemp_reemp_prob[intage] and self.randomness:
                 action = 1
 
         if age >= self.min_retirementage: # ve
             employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
                 self.move_to_retirement(wage,pension,old_wage,age,kansanelake,tyoelake,employment_status,
-                    unemp_after_ra,all_acc=True,scale_acc=True,spouse=spouse)
+                    unemp_after_ra,all_acc=True,scale_acc=True,has_spouse=has_spouse,is_spouse=is_spouse)
         elif (action == 0) and ((time_in_state<=self.kht_kesto and children_under3>0) or self.perustulo): # jos perustulo, ei aikarajoitetta
             employment_status  = 7 # stay
+            time_in_state+=self.timestep
             pension=self.pension_accrual(age,wage,pension,state=7)
             tyoelake=tyoelake*self.elakeindeksi
         elif action == 1 or action == 4: # 
@@ -2187,7 +2272,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
             employment_status,kansanelake,tyoelake,pension,wage,time_in_state,\
                 used_unemp_benefit,pinkslip,unemp_after_ra,unempwage_basis,alkanut_ansiosidonnainen,karenssia_jaljella=\
                 self.move_to_unemp(wage,pension,old_wage,age,kansanelake,tyoelake,toe,toekesto,pinkslip,tyoura,
-                    used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,alkanut_ansiosidonnainen,toe58,spouse=spouse)
+                    used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,alkanut_ansiosidonnainen,toe58,has_spouse,is_spouse)
         elif action == 2 or action == 5: # 
             employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
                 self.move_to_work(wage,pension,tyoelake,wage,age,time_in_state,tyoura,pinkslip)
@@ -2196,7 +2281,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
                 self.move_to_parttime(wage,pension,tyoelake,wage,age,tyoura,time_in_state)
         elif action==11: # tk
             employment_status,pension,kansanelake,tyoelake,wage,time_in_state,ove_paid=\
-                self.move_to_disab(wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,spouse,children_under18)
+                self.move_to_disab(wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse)
         else:
             print('Error 25')
             
@@ -2207,7 +2292,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
     def stay_student(self,wage,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
                         unempwage_basis,action,age,sattuma,intage,g,alkanut_ansiosidonnainen,
-                        toe58,ove_paid,children_under3,children_under18,spouse_value,spouse):
+                        toe58,ove_paid,children_under3,children_under18,has_spouse,is_spouse):
         '''
         Pysy tilassa opiskelija (12)
         '''
@@ -2215,9 +2300,9 @@ class UnemploymentLargeEnv_v4(gym.Env):
         pinkslip=0
         karenssia_jaljella=0
         
-        # työllistymisrajoite vain alle 30v
+        # ty√∂llistymisrajoite vain alle 30v
         if (action == 0 or action == 1 or action == 3 or action == 4 or action == 5) and self.unemp_limit_reemp and intage<30:
-            if np.random.uniform()>self.unemp_reemp_prob[intage]:
+            if np.random.uniform()<self.unemp_reemp_prob[intage] and self.randomness:
                 action = 2
         
         if sattuma[5]>=self.student_outrate[intage,g]:
@@ -2226,21 +2311,29 @@ class UnemploymentLargeEnv_v4(gym.Env):
             pension=self.pension_accrual(age,0,pension,state=12)
             tyoelake=tyoelake*self.elakeindeksi
             # opiskelu parantaa tuloja
-        elif action == 0 or action == 1: # 
+        elif action == 0: # 
             employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
                 self.move_to_work(wage,pension,tyoelake,wage,age,0,tyoura,pinkslip)
+        elif action == 1: # 
+            if children_under3>0:
+                employment_status,pension,tyoelake,wage,time_in_state=self.move_to_kht(wage,pension,tyoelake,old_wage,age)
+            else:
+                employment_status,kansanelake,tyoelake,pension,wage,time_in_state,\
+                    used_unemp_benefit,pinkslip,unemp_after_ra,unempwage_basis,alkanut_ansiosidonnainen,karenssia_jaljella=\
+                    self.move_to_unemp(wage,pension,old_wage,age,kansanelake,tyoelake,toe,toekesto,pinkslip,tyoura,
+                        used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,alkanut_ansiosidonnainen,toe58,has_spouse,is_spouse)
         elif action == 2:
             employment_status,kansanelake,tyoelake,pension,wage,time_in_state,\
                 used_unemp_benefit,pinkslip,unemp_after_ra,unempwage_basis,alkanut_ansiosidonnainen,karenssia_jaljella=\
                 self.move_to_unemp(wage,pension,old_wage,age,kansanelake,tyoelake,toe,toekesto,pinkslip,tyoura,
-                    used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,alkanut_ansiosidonnainen,toe58,spouse=spouse)
+                    used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,alkanut_ansiosidonnainen,toe58,has_spouse,is_spouse)
         elif action == 3 or action == 4 or action == 5:
             #wage=self.get_wage(age,wage_reduction)            
             employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
                 self.move_to_parttime(wage,pension,tyoelake,wage,age,tyoura,time_in_state)
         elif action == 11: # tk
             employment_status,pension,kansanelake,tyoelake,wage,time_in_state,ove_paid=\
-                self.move_to_disab(wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,spouse,children_under18)
+                self.move_to_disab(wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse)
         else:
             print('error 29: ',action)
             
@@ -2251,36 +2344,37 @@ class UnemploymentLargeEnv_v4(gym.Env):
     def stay_oa_parttime(self,wage,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
                         unempwage_basis,action,age,sattuma,intage,g,alkanut_ansiosidonnainen,
-                        toe58,ove_paid,children_under3,children_under18,spouse_value,spouse):
+                        toe58,ove_paid,children_under3,children_under18,has_spouse,is_spouse):
         '''
-        Pysy tilassa ve+(osa-aikatyö) (0)
+        Pysy tilassa ve+(osa-aikaty√∂) (0)
         '''
 
-        time_in_state+=self.timestep
         karenssia_jaljella=0
         
         # irtisanominen
-        #if sattuma[1]<self.pinkslip_intensity[g]:
-        #    action=2 # ve:lle
+        if sattuma[1]<self.pinkslip_intensity[g]:
+            action=4 # ve:lle
+            pinkslip=1
 
         if age>=self.max_retirementage:
             employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
                 self.move_to_retirement(wage,pension,0,age,kansanelake,tyoelake,employment_status,
-                    unemp_after_ra,all_acc=True,scale_acc=False,spouse=spouse)
-        elif action == 0 or action == 1: # jatkaa osa-aikatöissä, ei voi saada työttömyyspäivärahaa
+                    unemp_after_ra,all_acc=True,scale_acc=False,has_spouse=has_spouse,is_spouse=is_spouse)
+        elif action == 0: # jatkaa osa-aikat√∂iss√§, ei voi saada ty√∂tt√§myysp√§iv√§rahaa
             employment_status = 8 # unchanged
+            time_in_state+=self.timestep
             parttimewage = 0.5*wage
             pension = self.pension_accrual(age,parttimewage,pension,state=employment_status)
             tyoelake = self.elakeindeksi * tyoelake
             kansanelake = kansanelake * self.kelaindeksi
-        elif action==2 or action==3: # jatkaa täysin töissä, ei voi saada työttömyyspäivärahaa
+        elif action==2 or action==3: # jatkaa t√§ysin t√∂iss√§, ei voi saada ty√∂tt√§myysp√§iv√§rahaa
             employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
                 self.move_to_oa_fulltime(wage,pension,wage,age,kansanelake,tyoelake,employment_status,
-                        0,scale_acc=False,spouse=spouse)
-        elif action == 4 or action == 5: # eläkkeelle, eläkeaikana karttunutta eläkettä ei vielä maksuun
+                        0,scale_acc=False,has_spouse=has_spouse,is_spouse=is_spouse)
+        elif action == 4 or action == 5 or action == 1: # el√§kkeelle, el√§keaikana karttunutta el√§kett√§ ei viel√§ maksuun
             employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
                 self.move_to_retirement(wage,pension,wage,age,kansanelake,tyoelake,employment_status,
-                    0,all_acc=False,scale_acc=False,spouse=spouse)
+                    0,all_acc=False,scale_acc=False,has_spouse=has_spouse,is_spouse=is_spouse)
         elif action == 11:
             # no more working, move to "disab" with no change in paid_pension
             employment_status,kansanelake,tyoelake,pension,wage,time_in_state,kansanelake,tyoelake=\
@@ -2295,34 +2389,36 @@ class UnemploymentLargeEnv_v4(gym.Env):
     def stay_oa_fulltime(self,wage,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
                         unempwage_basis,action,age,sattuma,intage,g,alkanut_ansiosidonnainen,
-                        toe58,ove_paid,children_under3,children_under18,spouse_value,spouse):
+                        toe58,ove_paid,children_under3,children_under18,has_spouse,is_spouse):
         '''
-        Pysy tilassa ve+työ (9)
+        Pysy tilassa ve+ty√∂ (9)
         '''
 
-        time_in_state+=self.timestep        
         karenssia_jaljella=0
         
         # irtisanominen
-        #if sattuma[1]<self.pinkslip_intensity[g]:
-        #    action=2 # ve:lle
+        if sattuma[1]<self.pinkslip_intensity[g]:
+            action=4 # ve:lle
+            pinkslip=1
 
         if age>=self.max_retirementage:
             employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
                 self.move_to_retirement(wage,pension,old_wage,age,kansanelake,tyoelake,employment_status,
-                    unemp_after_ra,all_acc=True,scale_acc=False,spouse=spouse)
-        elif action == 0 or action == 1: # jatkaa töissä, ei voi saada työttömyyspäivärahaa
+                    unemp_after_ra,all_acc=True,scale_acc=False,has_spouse=has_spouse,is_spouse=is_spouse)
+        elif action == 0: # jatkaa t√∂iss√§, ei voi saada ty√∂tt√§myysp√§iv√§rahaa
             employment_status = 9 # unchanged
+            time_in_state+=self.timestep        
             pension=self.pension_accrual(age,wage,pension,state=employment_status)
             tyoelake = tyoelake * self.elakeindeksi
             kansanelake = kansanelake * self.kelaindeksi
-        elif action == 2: # jatkaa osa-aikatöissä, ei voi saada työttömyyspäivärahaa
+        elif action == 2 or action == 5 or action == 1: # jatkaa osa-aikat√∂iss√§, ei voi saada ty√∂tt√§myysp√§iv√§rahaa
             employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
-                self.move_to_oa_parttime(wage,pension,old_wage,age,kansanelake,tyoelake,employment_status,0,scale_acc=False,spouse=spouse)
-        elif action==3 or action == 4 or action == 5: # eläkkeelle, eläkeaikana karttunutta eläkettä ei vielä maksuun
+                self.move_to_oa_parttime(wage,pension,old_wage,age,kansanelake,tyoelake,employment_status,0,
+                    scale_acc=False,has_spouse=has_spouse,is_spouse=is_spouse)
+        elif action==3 or action == 4: # el√§kkeelle, el√§keaikana karttunutta el√§kett√§ ei viel√§ maksuun
             employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
                 self.move_to_retirement(wage,pension,wage,age,kansanelake,tyoelake,employment_status,0,
-                    all_acc=False,scale_acc=False,spouse=spouse)
+                    all_acc=False,scale_acc=False,has_spouse=has_spouse,is_spouse=is_spouse)
         elif action == 11:
             # no more working, move to "disab" with no change in paid_pension
             employment_status,kansanelake,tyoelake,pension,wage,time_in_state,kansanelake,tyoelake=\
@@ -2337,9 +2433,9 @@ class UnemploymentLargeEnv_v4(gym.Env):
     def stay_parttime(self,wage,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
                         unempwage_basis,action,age,sattuma,intage,g,alkanut_ansiosidonnainen,
-                        toe58,ove_paid,children_under3,children_under18,spouse_value,spouse):
+                        toe58,ove_paid,children_under3,children_under18,has_spouse,is_spouse):
         '''
-        Pysy tilassa osa-aikatyö (0)
+        Pysy tilassa osa-aikaty√∂ (0)
         '''
 
         time_in_state+=self.timestep
@@ -2352,11 +2448,11 @@ class UnemploymentLargeEnv_v4(gym.Env):
                 pinkslip=1
             else:
                 action=2 # ve
-                pinkslip=0
+                pinkslip=1
         else:
             pinkslip=0
 
-        if action == 0 or ((action == 2 or action == 4) and age < self.min_retirementage) or (action == 5):
+        if action == 0 or action == 5:
             employment_status = 10 # unchanged
             parttimewage=0.5*wage
             tyoura+=self.timestep
@@ -2366,25 +2462,37 @@ class UnemploymentLargeEnv_v4(gym.Env):
             
             tyoelake=tyoelake*self.elakeindeksi
             pension=self.pension_accrual(age,parttimewage,pension,state=10)
-        elif action == 1: # työttömäksi
+        elif action == 1: # ty√∂tt√∂m√§ksi
             employment_status,kansanelake,tyoelake,pension,wage,time_in_state,\
                 used_unemp_benefit,pinkslip,unemp_after_ra,unempwage_basis,alkanut_ansiosidonnainen,karenssia_jaljella=\
                 self.move_to_unemp(wage,pension,old_wage,age,kansanelake,tyoelake,toe,toekesto,pinkslip,tyoura,
-                    used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,alkanut_ansiosidonnainen,toe58,spouse=spouse)
-        elif action==2:
-            employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
-                self.move_to_retirement(wage,pension,old_wage,age,kansanelake,tyoelake,employment_status,
-                    unemp_after_ra,all_acc=True,scale_acc=True,spouse=spouse)
+                    used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,alkanut_ansiosidonnainen,toe58,has_spouse,is_spouse)
         elif action==3:
             employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
                 self.move_to_work(wage,pension,tyoelake,old_wage,age,0,tyoura,pinkslip)
+        elif action==2:
+            if age >= self.min_retirementage:
+                employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
+                    self.move_to_retirement(wage,pension,old_wage,age,kansanelake,tyoelake,employment_status,
+                        unemp_after_ra,all_acc=True,scale_acc=True,has_spouse=has_spouse,is_spouse=is_spouse)
+            elif children_under3>0:
+                employment_status,pension,tyoelake,wage,time_in_state=self.move_to_kht(wage,pension,tyoelake,old_wage,age)
+            else:
+                employment_status,kansanelake,tyoelake,pension,wage,time_in_state,\
+                    used_unemp_benefit,pinkslip,unemp_after_ra,unempwage_basis,alkanut_ansiosidonnainen,karenssia_jaljella=\
+                    self.move_to_unemp(wage,pension,old_wage,age,kansanelake,tyoelake,toe,toekesto,pinkslip,tyoura,
+                        used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,alkanut_ansiosidonnainen,toe58,has_spouse,is_spouse)
         elif action==4: # move to oa_work
-            employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
-                self.move_to_oa_parttime(wage,pension,wage,age,kansanelake,tyoelake,employment_status,
-                        unemp_after_ra,scale_acc=True,spouse=spouse)
+            if age >= self.min_retirementage:
+                employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
+                    self.move_to_oa_parttime(wage,pension,wage,age,kansanelake,tyoelake,employment_status,
+                        unemp_after_ra,scale_acc=True,has_spouse=has_spouse,is_spouse=is_spouse)
+            else:
+                employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
+                    self.move_to_work(wage,pension,tyoelake,old_wage,age,0,tyoura,pinkslip)
         elif action==11: # tk
             employment_status,pension,kansanelake,tyoelake,wage,time_in_state,ove_paid=\
-                self.move_to_disab(wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,spouse,children_under18)
+                self.move_to_disab(wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse)
         else:
             print('error 12')
             
@@ -2395,20 +2503,20 @@ class UnemploymentLargeEnv_v4(gym.Env):
     def stay_outsider(self,wage,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
                         tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
                         unempwage_basis,action,age,sattuma,intage,g,alkanut_ansiosidonnainen,
-                        toe58,ove_paid,children_under3,children_under18,spouse_value,spouse):
+                        toe58,ove_paid,children_under3,children_under18,has_spouse,is_spouse):
         '''
-        Pysy tilassa työvoiman ulkopuolella (11)
+        Pysy tilassa ty√∂voiman ulkopuolella (11)
         '''
         karenssia_jaljella=0
 
         if (action == 0 or action == 1 or action == 3 or action == 4 or action == 5) and self.unemp_limit_reemp:
-            if np.random.uniform()>self.unemp_reemp_prob[intage]:
+            if np.random.uniform()<self.unemp_reemp_prob[intage] and self.randomness:
                 action = 2
         
         if age>=self.min_retirementage:
             employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
                 self.move_to_retirement(wage,pension,old_wage,age,kansanelake,tyoelake,employment_status,
-                unemp_after_ra,all_acc=True,scale_acc=True,spouse=spouse)
+                    unemp_after_ra,all_acc=True,scale_acc=True,has_spouse=has_spouse,is_spouse=is_spouse)
         elif sattuma[5]>=self.outsider_outrate[intage,g]:
             time_in_state+=self.timestep
             employment_status = 11 # unchanged
@@ -2417,18 +2525,27 @@ class UnemploymentLargeEnv_v4(gym.Env):
         elif action == 0 or action == 1: # 
             employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
                 self.move_to_work(wage,pension,tyoelake,wage,age,time_in_state,tyoura,pinkslip)
+        elif action == 1:
+            if children_under3>0:
+                employment_status,pension,tyoelake,wage,time_in_state=self.move_to_kht(wage,pension,tyoelake,old_wage,age)
+            else:
+                pinkslip=0
+                employment_status,kansanelake,tyoelake,pension,wage,time_in_state,\
+                    used_unemp_benefit,pinkslip,unemp_after_ra,unempwage_basis,alkanut_ansiosidonnainen,karenssia_jaljella=\
+                    self.move_to_unemp(wage,pension,old_wage,age,kansanelake,tyoelake,toe,toekesto,pinkslip,tyoura,
+                        used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,alkanut_ansiosidonnainen,toe58,has_spouse,is_spouse)
         elif action == 2: # 
             pinkslip=0
             employment_status,kansanelake,tyoelake,pension,wage,time_in_state,\
                 used_unemp_benefit,pinkslip,unemp_after_ra,unempwage_basis,alkanut_ansiosidonnainen,karenssia_jaljella=\
                 self.move_to_unemp(wage,pension,old_wage,age,kansanelake,tyoelake,toe,toekesto,pinkslip,tyoura,
-                    used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,alkanut_ansiosidonnainen,toe58,spouse=spouse)
+                    used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,alkanut_ansiosidonnainen,toe58,has_spouse,is_spouse)
         elif action == 3 or action == 4 or action == 5: # 
             employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
                 self.move_to_parttime(wage,pension,tyoelake,wage,age,tyoura,time_in_state)
         elif action == 11: # tk
             employment_status,pension,kansanelake,tyoelake,wage,time_in_state,ove_paid=\
-                self.move_to_disab(wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,spouse,children_under18)
+                self.move_to_disab(wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse)
             pinkslip=0
         else:
             print('error 19: ',action)
@@ -2446,7 +2563,6 @@ class UnemploymentLargeEnv_v4(gym.Env):
         This could be handled better
         '''
         tis=0
-        alive=1
         if empstate==0:
             wage=0
             old_wage=unempwage_basis
@@ -2492,13 +2608,12 @@ class UnemploymentLargeEnv_v4(gym.Env):
             wage=0
             old_wage=unempwage_basis
         elif empstate==14:
-            alive=0
             wage=0
             old_wage=0
         else:
             print('unknown state',empstate)
+            
         puoliso_tis=0
-        puoliso_alive=1
         if puoliso_tila==0:
             puoliso_palkka=0
             puoliso_old_wage=puoliso_unempwage_basis
@@ -2546,7 +2661,6 @@ class UnemploymentLargeEnv_v4(gym.Env):
         elif puoliso_tila==14:
             puoliso_palkka=0
             puoliso_old_wage=0
-            puoliso_alive=1
         else:
             print('unknown state',puoliso_tila)
             
@@ -2558,14 +2672,13 @@ class UnemploymentLargeEnv_v4(gym.Env):
                                 puoliso,puoliso_tila,puoliso_palkka,puoliso_kansanelake,puoliso_tyoelake,puoliso_old_wage,puoliso_time_in_state,
                                 g,p_g,
                                 irtisanottu=pinkslip,karenssia_jaljella=karenssia_jaljella,
-                                puoliso_irtisanottu=puoliso_pinkslip,puoliso_karenssia_jaljella=puoliso_karenssia_jaljella,
-                                alive=alive,puoliso_alive=puoliso_alive)
+                                puoliso_irtisanottu=puoliso_pinkslip,puoliso_karenssia_jaljella=puoliso_karenssia_jaljella)
             
         return netto,benq,netto_omat,netto_puoliso
 
     def pension_accrual(self,age,wage,pension,state=1,ove_paid=0):
         '''
-        Eläkkeen karttumisrutiini
+        El√§kkeen karttumisrutiini
         '''
         if age>=52 and age<63:
             acc=self.acc_over_52
@@ -2614,30 +2727,32 @@ class UnemploymentLargeEnv_v4(gym.Env):
         elif state == 13: # tm-tuki
             pension=pension*self.palkkakerroin # ei karttumaa!
         else: # 2,3,11,12,14 # ei karttumaa
-            pension=pension*self.palkkakerroin # vastainen eläke, ei alkanut, ei karttumaa
+            pension=pension*self.palkkakerroin # vastainen el√§ke, ei alkanut, ei karttumaa
             
         return pension
 
-    def update_wage_reduction_baseline(self,state,wage_reduction,initial_reduction=False):
+    def update_wage_reduction_baseline(self,state,wage_reduction,pinkslip,time_in_state,initial_reduction=False):
         '''
-        Pidetään kirjaa siitä, kuinka paljon palkkaa alennetaan työttömyyden keston suhteen,
-        ja miten siitä palaudutaan
+        Pidet√§√§n kirjaa siit√§, kuinka paljon palkkaa alennetaan ty√∂tt√§myyden keston suhteen,
+        ja miten siit√§ palaudutaan
         '''
-        if state in set([1,10]): # töissä
+        if state in set([1,10]): # t√∂iss√§
             wage_reduction=max(0,wage_reduction-self.salary_const_up)
-        if state in set([8,9]): # ve+töissä
-            wage_reduction=max(0,wage_reduction-self.salary_const_up)
+        if state in set([8,9]): # ve+t√∂iss√§, reduction ei parane en√§√§, vaan j√§√§ el√§kkeellej√§√§ntihetken tasoon
+            wage_reduction=max(0,wage_reduction) #-self.salary_const_up)
         elif state==12: # opiskelee
             wage_reduction=max(0,wage_reduction-self.salary_const_student)
-        elif state in set([0,4,13,11]): # työtön tai työelämän ulkopuolella
+        elif state in set([0,4,13,11]): # ty√∂t√§n tai ty√∂el√§m√§n ulkopuolella
             wage_reduction=min(1.0,wage_reduction+self.salary_const)
-        elif state in set([5,6]): # äitiys-, isyys- tai vanhempainvapaa
+        elif state in set([5,6]): # √§itiys-, isyys- tai vanhempainvapaa
             #wage_reduction+=self.salary_const
             wage_reduction=wage_reduction
         elif state in set([3]):
-            wage_reduction=0.60 # vastaa määritelmää
-        elif state in set([7,2]): # kotihoidontuki tai ve tai tk
+            wage_reduction=0.60 # vastaa m√§√§ritelm√§√§
+        elif state in set([7]): # kotihoidontuki tai ve tai tk
             wage_reduction=min(1.0,wage_reduction+self.salary_const)
+        elif state in set([2]): # kotihoidontuki tai ve tai tk
+            wage_reduction=min(1.0,wage_reduction+self.salary_const_retirement)
         elif state in set([14]): # ei muutosta
             wage_reduction=wage_reduction
         else: # ylivuoto, ei tiloja
@@ -2645,34 +2760,42 @@ class UnemploymentLargeEnv_v4(gym.Env):
         
         return wage_reduction
 
-    def update_wage_reduction_sigma(self,state,wage_reduction,initial_reduction=False):
+    def update_wage_reduction_sigma(self,state,wage_reduction,pinkslip,time_in_state,initial_reduction=False):
         '''
-        Pidetään kirjaa siitä, kuinka paljon palkkaa alennetaan työttömyyden keston suhteen,
-        ja miten siitä palaudutaan
+        Pidet√§√§n kirjaa siit√§, kuinka paljon palkkaa alennetaan ty√∂tt√§myyden keston suhteen,
+        ja miten siit√§ palaudutaan
         
-        Tämä malli ei mene koskaan nollaan.
+        T√§m√§ malli ei mene koskaan nollaan.
+        
+        Irtisanottuja ty√∂tt√∂mi√§ ei reduktio koske ensimm√§isen√§ vuonna
         '''
         
         min_reduction=-0.05
         
         if initial_reduction:
-            wage_reduction=max(0,1.0-(1-self.wage_initial_reduction)*(1-wage_reduction))
+            wage_reduction=max(min_reduction,1.0-(1.0-self.wage_initial_reduction)*(1.0-wage_reduction))
         
-        if state in set([1,10]): # töissä
+        if state in set([1]): # t√∂iss√§
             wage_reduction=max(min_reduction,wage_reduction-self.salary_const_up)
-        if state in set([8,9]): # ve+töissä
-            wage_reduction=max(min_reduction,wage_reduction-self.salary_const_up)
+        elif state in set([10]): # osat√∂iss√§
+            wage_reduction=max(min_reduction,wage_reduction-self.salary_const_up_osaaika)
+        elif state in set([8,9]): # ve+t√∂iss√§, reduction ei parane en√§√§, vaan j√§√§ el√§kkeellej√§√§ntihetken tasoon
+            wage_reduction=max(min_reduction,wage_reduction) #-self.salary_const_up)
         elif state==12: # opiskelee
             wage_reduction=max(min_reduction,wage_reduction-self.salary_const_student)
-        elif state in set([0,4,13,11]): # työtön tai työelämän ulkopuolella
-            wage_reduction=max(min_reduction,1.0-(1-self.salary_const)*(1-wage_reduction))
-        elif state in set([5,6]): # isyys tai vanhempainvapaa, ei vaikutusta
+        elif state in set([11]): # ty√∂t√§n tai ty√∂el√§m√§n ulkopuolella
+            wage_reduction=max(min_reduction,1.0-(1.0-self.salary_const)*(1.0-wage_reduction))
+        elif state in set([0,4,13]): # ty√∂t√∂n tai ty√∂el√§m√§n ulkopuolella
+            if pinkslip<1 or (pinkslip>0 and time_in_state>0.49): # tine_in_state ei ole ihan oikein t√§ss√§
+                wage_reduction=max(min_reduction,1.0-(1.0-self.salary_const)*(1.0-wage_reduction))
+        elif state in set([5,6]): # isyys-, √§itiys- tai vanhempainvapaa, ei vaikutusta
             wage_reduction=wage_reduction
         elif state in set([3]):
-            wage_reduction=0.60 # vastaa määritelmää
-        elif state in set([7,2]): # kotihoidontuki tai ve
-            #wage_reduction=max(0,1.0-((1-self.salary_const)**self.timestep)*(1-wage_reduction))
-            wage_reduction=max(min_reduction,1.0-(1-self.salary_const)*(1-wage_reduction))
+            wage_reduction=0.60 # vastaa m√§√§ritelm√§√§
+        elif state in set([7]): # kotihoidontuki tai ve
+            wage_reduction=max(min_reduction,1.0-(1.0-self.salary_const)*(1.0-wage_reduction))
+        elif state in set([2]): # kotihoidontuki tai ve
+            wage_reduction=max(min_reduction,1.0-(1.0-self.salary_const_retirement)*(1.0-wage_reduction))
         elif state in set([14]): # ei muutosta
             wage_reduction=wage_reduction
         else: # ylivuoto, ei tiloja
@@ -2690,10 +2813,13 @@ class UnemploymentLargeEnv_v4(gym.Env):
         
     def update_family(self,puoliso,age,employment_status,puoliso_tila):
         '''
-        Päivitä puolison/potentiaalisen puolison tila & palkka
-        Päivitä avioliitto/avoliitto
+        P√§ivit√§ puolison/potentiaalisen puolison tila & palkka
+        P√§ivit√§ avioliitto/avoliitto
         '''
-        sattuma = np.random.uniform(size=2)
+        if self.randomness:
+            sattuma = np.random.uniform(size=2)
+        else:
+            sattuma = np.array([0,0])
         
         # update marital status
         intage=int(np.floor(age))
@@ -2713,9 +2839,98 @@ class UnemploymentLargeEnv_v4(gym.Env):
     
         return puoliso
         
+    def move_to_state14(self,age,children_under3,children_under7,children_under18,g,puoliso,prefnoise):
+        #time_in_state+=self.timestep
+        if not self.include_mort:
+            print('mort not included but emp state 14')
+        
+        employment_status,puoliso_tila=14,14
+        
+        wage=0
+        nextwage=0
+        toe=0
+        if self.mortstop:
+            done=True
+        else:
+            age=age+self.timestep
+            done = age >= self.max_age
+            done = bool(done)
+    
+        #print(f'********* employment_status {employment_status} puoliso_tila {puoliso_tila} age {age}')
+        
+        pension,wage,nextwage,time_in_state=0,0,0,0
+        tyoelake_maksussa=0
+        pinkslip,toe,toekesto=0,0,0
+        tyoura=0
+        used_unemp_benefit=0
+        wage_reduction=0
+        unemp_after_ra=0
+        unempwage=0
+        unempwage_basis=0
+        children_under3=0
+        children_under7=0
+        children_under18=0
+        alkanut_ansiosidonnainen=0
+        toe58=0
+        ove_paid=0
+        
+        spouse_wage,puoliso_pension=0,0
+        puoliso_wage_reduction=0
+        puoliso_tyoelake_maksussa=0
+        puoliso_next_wage=0
+        puoliso_used_unemp_benefit=0
+        puoliso_unemp_benefit_left=0
+        puoliso_unemp_after_ra=0
+        puoliso_unempwage=0
+        puoliso_unempwage_basis=0
+        puoliso_alkanut_ansiosidonnainen=0
+        puoliso_toe58=0
+        puoliso_toe=0
+        puoliso_toekesto=0
+        puoliso_tyoura=0
+        puoliso_time_in_state=0
+        puoliso_pinkslip=0
+        puoliso_ove_paid=0
+        kansanelake=0
+        puoliso_kansanelake=0
+                                
+        self.state = self.state_encode(employment_status,g,pension,wage,age,
+                        time_in_state,tyoelake_maksussa,pinkslip,toe,toekesto,tyoura,nextwage,
+                        used_unemp_benefit,wage_reduction,unemp_after_ra,unempwage,unempwage_basis,
+                        children_under3,children_under7,children_under18,
+                        0,alkanut_ansiosidonnainen,toe58,ove_paid,0,
+                        puoliso,puoliso_tila,spouse_wage,puoliso_pension,
+                        puoliso_wage_reduction,puoliso_tyoelake_maksussa,puoliso_next_wage,
+                        puoliso_used_unemp_benefit,puoliso_unemp_benefit_left,
+                        puoliso_unemp_after_ra,puoliso_unempwage,puoliso_unempwage_basis,
+                        puoliso_alkanut_ansiosidonnainen,puoliso_toe58,
+                        puoliso_toe,puoliso_toekesto,puoliso_tyoura,puoliso_time_in_state,puoliso_pinkslip,puoliso_ove_paid,
+                        kansanelake,puoliso_kansanelake,
+                        prefnoise)
+                    
+        if self.plotdebug:
+            self.render()
+                    
+        netto,benq,netto_omat,netto_puoliso=self.get_benefits(14,0,0,0,0,
+                    0,0,0,0,0,0,age,
+                    children_under3,children_under7,children_under18,0,
+                    0,14,0,0,0,0,
+                    0,0,0,0,0,0,0)
+                
+        benq['omat_eq']=0
+        benq['puoliso_eq']=0
+        benq['eq']=0
+    
+        #print('done',done)
+        #print(f'********* employment_status {employment_status} puoliso_tila {puoliso_tila} age {age}')
+                    
+        reward=0
+        equivalent=0
+        return np.array(self.state), reward, done, benq
+            
     def step(self, action, dynprog=False, debug=False):
         '''
-        Open AI interfacen mukainen step-funktio, joka tekee askeleen eteenpäin
+        Open AI interfacen mukainen step-funktio, joka tekee askeleen eteenp√§in
         toiminnon action mukaan 
 
         Keskeinen funktio simuloinnissa
@@ -2726,6 +2941,9 @@ class UnemploymentLargeEnv_v4(gym.Env):
 
         emp_action=int(action[0])
         spouse_action=int(action[1])
+
+        if self.plotdebug and False:
+            print(f'act {emp_action} s_act {spouse_action}')
 
         employment_status,g,pension,old_wage,age,time_in_state,paid_pension,pinkslip,toe,\
             toekesto,tyoura,used_unemp_benefit,wage_reduction,unemp_after_ra,unempwage,\
@@ -2761,19 +2979,19 @@ class UnemploymentLargeEnv_v4(gym.Env):
             else:
                 puoliso=0
             
-            # siirtymät
+            # siirtym√§t
             move_prob=self.disability_intensity[intage,g]+self.birth_intensity[intage,g]\
                 +self.student_inrate[intage,g]+self.outsider_inrate[intage,g]
 
             if sattuma[0]<move_prob:
                 s2=self.birth_intensity[intage,g]
                 s1=s2+self.disability_intensity[intage,g]
-                s3=s2+self.student_inrate[intage,g]
+                s3=s1+self.student_inrate[intage,g]
                 #s4=s3+self.outsider_inrate[intage,g]
             
                 if sattuma[2]<s2/move_prob: # vanhempainvapaa
-                    if self.infostat_can_have_children(age) and not (employment_status==14 or puoliso_tila==14): 
-                        # lasten väli vähintään vuosi, ei työkyvyttömyyseläkkeellä
+                    if self.infostate.can_have_children(age) and not (employment_status==14 or puoliso_tila==14): 
+                        # lasten v√§li v√§hint√§√§n vuosi, ei ty√∂kyvytt√§myysel√§kkeell√§
                         if g>2: # naiset
                             if employment_status!=3:
                                 employment_status,pension,tyoelake_maksussa,wage,time_in_state,pinkslip=\
@@ -2781,43 +2999,48 @@ class UnemploymentLargeEnv_v4(gym.Env):
                                 pinkslip=0
                                 karenssia_jaljella=0
                                 moved=True
-                                wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)
-                            if sattuma[4]<0.39 and puoliso_tila!=3: # orig 0.5
-                                puoliso_tila,puoliso_pension,puoliso_tyoelake_maksussa,spouse_wage,puoliso_time_in_state,puoliso_pinkslip=\
-                                    self.move_to_fatherleave(spouse_wage,puoliso_pension,puoliso_tyoelake_maksussa,puoliso_old_wage,age)
-                                puoliso_karenssia_jaljella=0
-                                spouse_moved=True
-                                puoliso_wage_reduction=self.update_wage_reduction(puoliso_tila,puoliso_wage_reduction)
+                                wage_reduction=self.update_wage_reduction(employment_status,wage_reduction,pinkslip,time_in_state)
+                                if sattuma[4]<0.39 and puoliso_tila!=3: # orig 0.5
+                                    puoliso_tila,puoliso_pension,puoliso_tyoelake_maksussa,spouse_wage,puoliso_time_in_state,puoliso_pinkslip=\
+                                        self.move_to_fatherleave(spouse_wage,puoliso_pension,puoliso_tyoelake_maksussa,puoliso_old_wage,age)
+                                    puoliso_karenssia_jaljella=0
+                                    puoliso_pinkslip=0
+                                    spouse_moved=True
+                                    puoliso_wage_reduction=self.update_wage_reduction(puoliso_tila,puoliso_wage_reduction,puoliso_pinkslip,puoliso_time_in_state)
                         else: # miehet
-                            # ikä valittu äidin iän mukaan. oikeastaan tämä ei mene ihan oikein miehille
+                            # ik√§ valittu √§idin i√§n mukaan. oikeastaan t√§m√§ ei mene ihan oikein miehille
                             if puoliso_tila!=3:
                                 puoliso_tila,puoliso_pension,tyoelake_maksussa,spouse_wage,puoliso_time_in_state,puoliso_pinkslip=\
                                     self.move_to_motherleave(spouse_wage,puoliso_pension,puoliso_tyoelake_maksussa,puoliso_old_wage,age)
                                 puoliso_karenssia_jaljella=0
-                                puoliso_wage_reduction=self.update_wage_reduction(puoliso_tila,puoliso_wage_reduction)
+                                puoliso_pinkslip=0
+                                puoliso_wage_reduction=self.update_wage_reduction(puoliso_tila,puoliso_wage_reduction,puoliso_pinkslip,puoliso_time_in_state)
                                 spouse_moved=True
-                            if sattuma[4]<0.39 and employment_status!=3: # orig 0.5
-                                employment_status,pension,tyoelake_maksussa,wage,time_in_state,pinkslip=\
-                                    self.move_to_fatherleave(wage,pension,tyoelake_maksussa,old_wage,age)
-                                karenssia_jaljella=0
-                                wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)
-                                moved=True
+                                if sattuma[4]<0.39 and employment_status!=3: # orig 0.5
+                                    employment_status,pension,tyoelake_maksussa,wage,time_in_state,pinkslip=\
+                                        self.move_to_fatherleave(wage,pension,tyoelake_maksussa,old_wage,age)
+                                    karenssia_jaljella=0
+                                    pinkslip=0
+                                    wage_reduction=self.update_wage_reduction(employment_status,wage_reduction,pinkslip,time_in_state)
+                                    moved=True
                 elif sattuma[2]<s1/move_prob: # age<self.min_retirementage and 
                     if not employment_status==14:
                         emp_action=11 # disability
                 elif sattuma[2]<s3/move_prob:
-                    if employment_status not in set([2,3,5,6,7,8,9,11,12,14]): # and False:
+                    if employment_status in set([0,1,4,10,13]): # not in set([2,3,5,6,7,8,9,11,12,14]):
                         employment_status,pension,tyoelake_maksussa,wage,time_in_state,pinkslip=\
                             self.move_to_student(wage,pension,tyoelake_maksussa,old_wage,age,time_in_state,tyoura,pinkslip)
                         karenssia_jaljella=0
-                        wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)
+                        pinkslip=0
+                        wage_reduction=self.update_wage_reduction(employment_status,wage_reduction,pinkslip,time_in_state)
                         moved=True
                 else:
-                    if employment_status not in set([2,3,5,6,7,8,9,11,12,14]):
+                    if employment_status in set([0,1,4,10,13]): # not in set([2,3,5,6,7,8,9,11,12,14]):
                         employment_status,pension,tyoelake_maksussa,wage,time_in_state,pinkslip=\
                             self.move_to_outsider(wage,pension,tyoelake_maksussa,old_wage,age,pinkslip)
                         karenssia_jaljella=0
-                        wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)
+                        pinkslip=0
+                        wage_reduction=self.update_wage_reduction(employment_status,wage_reduction,pinkslip,time_in_state)
                         moved=True
                         
             move_prob=self.disability_intensity[intage,spouse_g]+self.student_inrate[intage,spouse_g]+self.outsider_inrate[intage,spouse_g]
@@ -2831,191 +3054,105 @@ class UnemploymentLargeEnv_v4(gym.Env):
                 if sattuma2[2]<s1/move_prob: # age<self.min_retirementage and 
                     spouse_action=11 # disability
                 elif sattuma2[2]<s3/move_prob:
-                    if puoliso_tila not in set([2,3,5,6,7,8,9,11,12,14]): # and False:
+                    if puoliso_tila in set([0,1,4,10,13]): # not in et([2,3,5,6,7,8,9,11,12,14]):
                         puoliso_tila,puoliso_pension,puoliso_tyoelake_maksussa,spouse_wage,puoliso_time_in_state,puoliso_pinkslip=\
                             self.move_to_student(spouse_wage,puoliso_pension,puoliso_tyoelake_maksussa,puoliso_old_wage,
                                 age,puoliso_time_in_state,puoliso_tyoura,puoliso_pinkslip)
                         puoliso_karenssia_jaljella=0
-                        puoliso_wage_reduction=self.update_wage_reduction(puoliso_tila,puoliso_wage_reduction)
+                        puoliso_pinkslip=0
+                        puoliso_wage_reduction=self.update_wage_reduction(puoliso_tila,puoliso_wage_reduction,puoliso_pinkslip,puoliso_time_in_state)
                         puoliso_moved=True
                 else:
-                    if puoliso_tila not in set([2,3,5,6,7,8,9,11,12,14]):
+                    if puoliso_tila in set([0,1,4,10,13]): # not in set([2,3,5,6,7,8,9,11,12,14]):
                         puoliso_tila,puoliso_pension,puoliso_tyoelake_maksussa,spouse_wage,puoliso_time_in_state,puoliso_pinkslip=\
                             self.move_to_outsider(spouse_wage,puoliso_pension,puoliso_tyoelake_maksussa,puoliso_old_wage,age,puoliso_pinkslip)
                         puoliso_karenssia_jaljella=0
-                        puoliso_wage_reduction=self.update_wage_reduction(puoliso_tila,puoliso_wage_reduction)
+                        puoliso_pinkslip=0
+                        puoliso_wage_reduction=self.update_wage_reduction(puoliso_tila,puoliso_wage_reduction,puoliso_pinkslip,puoliso_time_in_state)
                         puoliso_moved=True
                         
-                        
-            # voi aiheuttaa epästabiilisuutta
+            # voi aiheuttaa ep√§stabiilisuutta
             if sattuma[3]<self.mort_intensity[intage,g] and self.include_mort and employment_status!=14: 
                 if puoliso>0: # avo- tai avioliitossa
-                    # huomioi vain maksussa olevan puolison eläkkeen. Ei taida olla oikein.
+                    # huomioi vain maksussa olevan puolison el√§kkeen. Ei taida olla oikein.
                     puoliso_tyoelake_maksussa=self.comp_familypension(puoliso,employment_status,
                         puoliso_tila,tyoelake_maksussa,pension,age,puoliso_tyoelake_maksussa,
-                        puoliso_pension,children_under18,spouse=False)
+                        puoliso_pension,children_under18,puoliso,False)
                 #self.plotdebug=True
                 employment_status,pension,wage,time_in_state,puoliso,tyoelake_maksussa=\
                     self.move_to_deceiced(pension,old_wage,age)
                 
             if sattuma2[3]<self.mort_intensity[intage,spouse_g] and self.include_mort and puoliso_tila!=14:
                 if puoliso>0: # avo- tai avioliitossa
-                    # huomioi vain maksussa olevan puolison eläkkeen. Ei taida olla oikein.
+                    # huomioi vain maksussa olevan puolison el√§kkeen. Ei taida olla oikein.
                     tyoelake_maksussa=self.comp_familypension(puoliso,puoliso_tila,employment_status,
                         puoliso_tyoelake_maksussa,puoliso_pension,age,tyoelake_maksussa,
-                        pension,children_under18,spouse=True)
+                        pension,children_under18,puoliso,True)
                 #self.plotdebug=True
                 puoliso_tila,puoliso_pension,spouse_wage,puoliso_time_in_state,puoliso,puoliso_tyoelake_maksussa=\
                     self.move_to_deceiced(puoliso_pension,puoliso_old_wage,age)
                 
         else:
-            # tn ei ole koskaan alle rajan, jos tämä on 1
+            # tn ei ole koskaan alle rajan, jos t√§m√§ on 1
             sattuma = np.ones(7)
             sattuma2 = np.ones(7)
             
         if employment_status==14 and puoliso_tila==14: # both deceiced
-            #time_in_state+=self.timestep
-            if not self.include_mort:
-                print('mort not included but emp state 14')
-                
-            wage=old_wage
-            nextwage=wage
-            toe=0
-            if self.mortstop:
-                done=True
-            else:
-                age=age+self.timestep
-                done = age >= self.max_age
-                done = bool(done)
-            
-            #print(f'********* employment_status {employment_status} puoliso_tila {puoliso_tila} age {age}')
-                
-            pension=0
-            wage=0
-            time_in_state=0
-            tyoelake_maksussa=0
-            pinkslip=0
-            toe=0
-            toekesto=0
-            tyoura=0
-            nextwage=0
-            used_unemp_benefit=0
-            wage_reduction=0
-            unemp_after_ra=0
-            unempwage=0
-            unempwage_basis=0
-            children_under3=0
-            children_under7=0
-            children_under18=0
-            alkanut_ansiosidonnainen=0
-            toe58=0
-            ove_paid=0
-            spouse_wage=0
-            puoliso_pension=0
-            puoliso_wage_reduction=0
-            puoliso_tyoelake_maksussa=0
-            puoliso_next_wage=0
-            puoliso_used_unemp_benefit=0
-            puoliso_unemp_benefit_left=0
-            puoliso_unemp_after_ra=0
-            puoliso_unempwage=0
-            puoliso_unempwage_basis=0
-            puoliso_alkanut_ansiosidonnainen=0
-            puoliso_toe58=0
-            puoliso_toe=0
-            puoliso_toekesto=0
-            puoliso_tyoura=0
-            puoliso_time_in_state=0
-            puoliso_pinkslip=0
-            puoliso_ove_paid=0
-            kansanelake=0
-            puoliso_kansanelake=0
-                                        
-            self.state = self.state_encode(employment_status,g,pension,wage,age,
-                            time_in_state,tyoelake_maksussa,pinkslip,toe,toekesto,tyoura,nextwage,
-                            used_unemp_benefit,wage_reduction,unemp_after_ra,unempwage,unempwage_basis,
-                            children_under3,children_under7,children_under18,
-                            0,alkanut_ansiosidonnainen,toe58,ove_paid,0,
-                            puoliso,puoliso_tila,spouse_wage,puoliso_pension,
-                            puoliso_wage_reduction,puoliso_tyoelake_maksussa,puoliso_next_wage,
-                            puoliso_used_unemp_benefit,puoliso_unemp_benefit_left,
-                            puoliso_unemp_after_ra,puoliso_unempwage,puoliso_unempwage_basis,
-                            puoliso_alkanut_ansiosidonnainen,puoliso_toe58,
-                            puoliso_toe,puoliso_toekesto,puoliso_tyoura,puoliso_time_in_state,puoliso_pinkslip,puoliso_ove_paid,
-                            kansanelake,puoliso_kansanelake,
-                            prefnoise)
-                            
-            if self.plotdebug:
-                self.render()
-                            
-            netto,benq,netto_omat,netto_puoliso=self.get_benefits(14,0,0,0,0,
-                        0,0,0,0,0,0,age,
-                        children_under3,children_under7,children_under18,0,
-                        0,14,0,0,0,0,
-                        0,0,0,0,0,0,0)
-                        
-            benq['omat_eq']=0
-            benq['puoliso_eq']=0
-            benq['eq']=0
-            
-            #print('done',done)
-            #print(f'********* employment_status {employment_status} puoliso_tila {puoliso_tila} age {age}')
-                            
-            reward=0
-            equivalent=0
-            return np.array(self.state), reward, done, benq
+            return self.move_to_state14(age,children_under3,children_under7,children_under18,g,puoliso,prefnoise)
         else:
             karenssia_jaljella,puoliso_karenssia_jaljella=0,0
             if age>=self.max_retirementage and employment_status not in set([2,3,14]):
                 employment_status,kansanelake,tyoelake_maksussa,pension,wage,time_in_state,ove_paid\
                     =self.move_to_retirement(wage,pension,0,age,kansanelake,tyoelake_maksussa,
-                        employment_status,unemp_after_ra,all_acc=True,scale_acc=True,spouse=puoliso)
-                wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)
+                        employment_status,unemp_after_ra,all_acc=True,scale_acc=True,has_spouse=puoliso,is_spouse=False)
+                pinkslip=0
+                wage_reduction=self.update_wage_reduction(employment_status,wage_reduction,pinkslip,time_in_state)
                 karenssia_jaljella=0
                 moved=True
             
             if age>=self.max_retirementage and puoliso_tila not in set([2,3,14]):
                 puoliso_tila,puoliso_kansanelake,puoliso_tyoelake_maksussa,puoliso_pension,spouse_wage,puoliso_time_in_state,puoliso_ove_paid\
                     =self.move_to_retirement(spouse_wage,puoliso_pension,0,age,puoliso_kansanelake,puoliso_tyoelake_maksussa,puoliso_tila,\
-                        puoliso_unemp_after_ra,all_acc=True,scale_acc=True,spouse=puoliso)
-                puoliso_wage_reduction=self.update_wage_reduction(puoliso_tila,puoliso_wage_reduction)
+                        puoliso_unemp_after_ra,all_acc=True,scale_acc=True,has_spouse=puoliso,is_spouse=True)
+                puoliso_pinkslip=0
+                puoliso_wage_reduction=self.update_wage_reduction(puoliso_tila,puoliso_wage_reduction,puoliso_pinkslip,puoliso_time_in_state)
                 puoliso_karenssia_jaljella=0
                 puoliso_pinkslip=0
                 spouse_moved=True
                         
             if (not moved) and employment_status != 14:
-                # hoidetaan tilasiirtymät ja -pysymiset alirutiineilla, joita kutsutaan mäppäämällä tila funktioksi,
+                # hoidetaan tilasiirtym√§t ja -pysymiset alirutiineilla, joita kutsutaan m√§pp√§√§m√§ll√§ tila funktioksi,
                 # jota sitten kutsutaan
-                spouse_value=False
+                is_spouse=False
                 employment_status,kansanelake,tyoelake_maksussa,pension,wage,time_in_state,pinkslip,\
                 unemp_after_ra,tyoura,used_unemp_benefit,unempwage_basis,alkanut_ansiosidonnainen,ove_paid,karenssia_jaljella\
                     = self.map_stays[employment_status](wage,employment_status,kansanelake,tyoelake_maksussa,pension,time_in_state,toe,toekesto,
                                    tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,unempwage_basis,
                                    emp_action,age,sattuma,intage,g,alkanut_ansiosidonnainen,toe58,ove_paid,children_under3,children_under18,puoliso,
-                                   spouse_value)
-                wage_reduction=self.update_wage_reduction(employment_status,wage_reduction)
+                                   is_spouse)
+                wage_reduction=self.update_wage_reduction(employment_status,wage_reduction,pinkslip,time_in_state)
 
             if (not spouse_moved) and puoliso_tila != 14:
-                # hoidetaan tilasiirtymät ja -pysymiset alirutiineilla, joita kutsutaan mäppäämällä tila funktioksi,
+                # hoidetaan tilasiirtym√§t ja -pysymiset alirutiineilla, joita kutsutaan m√§pp√§√§m√§ll√§ tila funktioksi,
                 # jota sitten kutsutaan
-                spouse_value=True
+                is_spouse=True
                 puoliso_tila,puoliso_kansanelake,puoliso_tyoelake_maksussa,puoliso_pension,spouse_wage,puoliso_time_in_state,puoliso_pinkslip,\
                 puoliso_unemp_after_ra,puoliso_tyoura,puoliso_used_unemp_benefit,puoliso_unempwage_basis,puoliso_alkanut_ansiosidonnainen,puoliso_ove_paid,\
                 puoliso_karenssia_jaljella\
                     = self.map_stays[puoliso_tila](spouse_wage,puoliso_tila,puoliso_kansanelake,puoliso_tyoelake_maksussa,puoliso_pension,puoliso_time_in_state,puoliso_toe,puoliso_toekesto,
                                    puoliso_tyoura,puoliso_used_unemp_benefit,puoliso_pinkslip,puoliso_unemp_after_ra,puoliso_old_wage,puoliso_unempwage,puoliso_unempwage_basis,
                                    spouse_action,age,sattuma2,intage,spouse_g,puoliso_alkanut_ansiosidonnainen,puoliso_toe58,puoliso_ove_paid,children_under3,children_under18,puoliso,
-                                   spouse_value)
-                puoliso_wage_reduction=self.update_wage_reduction(puoliso_tila,puoliso_wage_reduction)
+                                   is_spouse)
+                puoliso_wage_reduction=self.update_wage_reduction(puoliso_tila,puoliso_wage_reduction,puoliso_pinkslip,puoliso_time_in_state)
                 
             netto,benq,netto_omat,netto_puoliso=self.get_benefits(employment_status,wage,kansanelake,tyoelake_maksussa,pension,
                         time_in_state,pinkslip,old_wage,unempwage,unempwage_basis,karenssia_jaljella,age,
                         children_under3,children_under7,children_under18,ove_paid,
                         puoliso,puoliso_tila,spouse_wage,puoliso_kansanelake,puoliso_tyoelake_maksussa,puoliso_old_wage,
                         puoliso_pinkslip,puoliso_karenssia_jaljella,puoliso_time_in_state,puoliso_unempwage,puoliso_unempwage_basis,
-                        g,p_g)
+                        g,spouse_g)
 
-        #self.check_q(benq,10)
+        #check_q(benq,10)
         
         # after this, preparing for the next step
         age=age+self.timestep
@@ -3028,26 +3165,26 @@ class UnemploymentLargeEnv_v4(gym.Env):
         
         work={1,10}
         retired={2,8,9}
-        self.update_infostate(t,int(employment_status),wage,unempwage_basis,spouse=False)
-        toe,toekesto,unempwage,children_under3,children_under7,children_under18=self.comp_infostats(age,spouse=False)
+        self.update_infostate(t,int(employment_status),wage,unempwage_basis,is_spouse=False)
+        toe,toekesto,unempwage,children_under3,children_under7,children_under18=self.comp_infostats(age,is_spouse=False)
         if employment_status in work and self.tyossaoloehto(toe,tyoura,age):
             used_unemp_benefit=0
             alkanut_ansiosidonnainen=0
             #if alkanut_ansiosidonnainen>0:
-            #    if not self.infostat_check_aareset(age):
+            #    if not self.infostate_check_aareset(age):
             #        alkanut_ansiosidonnainen=0
         elif employment_status in retired:
             alkanut_ansiosidonnainen=0
         if alkanut_ansiosidonnainen<1 or age>self.max_unemploymentbenefitage:
             unempwage_basis=0
             
-        self.update_infostate(t,int(puoliso_tila),spouse_wage,puoliso_unempwage_basis,spouse=True)
-        puoliso_toe,puoliso_toekesto,puoliso_unempwage,_,_,_=self.comp_infostats(age,spouse=True)
+        self.update_infostate(t,int(puoliso_tila),spouse_wage,puoliso_unempwage_basis,is_spouse=True)
+        puoliso_toe,puoliso_toekesto,puoliso_unempwage,_,_,_=self.comp_infostats(age,is_spouse=True)
         if puoliso_tila in work and self.tyossaoloehto(puoliso_toe,puoliso_tyoura,age):
             puoliso_used_unemp_benefit=0
             puoliso_alkanut_ansiosidonnainen=0
             #if alkanut_ansiosidonnainen>0:
-            #    if not self.infostat_check_aareset(age):
+            #    if not self.infostate_check_aareset(age):
             #        alkanut_ansiosidonnainen=0
         elif puoliso_tila in retired:
             puoliso_alkanut_ansiosidonnainen=0
@@ -3093,15 +3230,15 @@ class UnemploymentLargeEnv_v4(gym.Env):
         elif self.steps_beyond_done is None:
             self.steps_beyond_done = 0
             
-            paid_pension += self.elinaikakerroin*pension # ei ihan oikein! lykkäyskorotus puuttuu, optimoijan pitäisi huomata, joten ei vaikutusta?
-            pension=0
-            puoliso_paid_pension += self.elinaikakerroin*puoliso_pension # ei ihan oikein! lykkäyskorotus puuttuu, optimoijan pitäisi huomata, joten ei vaikutusta?
-            puoliso_pension=0
+            paid_pension += self.elinaikakerroin*pension # ei ihan oikein! lykk√§yskorotus puuttuu, optimoijan pit√§isi huomata, joten ei vaikutusta?
+            pension=0.0
+            puoliso_paid_pension += self.elinaikakerroin*puoliso_pension # ei ihan oikein! lykk√§yskorotus puuttuu, optimoijan pit√§isi huomata, joten ei vaikutusta?
+            puoliso_pension=0.0
             
             netto,benq,netto_omat,netto_puoliso=self.get_benefits(employment_status,wage,kansanelake,tyoelake_maksussa,pension,time_in_state,pinkslip,old_wage,
                 unempwage,unempwage_basis,karenssia_jaljella,age,children_under3,children_under7,children_under18,ove_paid,
                 puoliso,puoliso_tila,spouse_wage,puoliso_kansanelake,puoliso_tyoelake_maksussa,puoliso_old_wage,puoliso_pinkslip,puoliso_karenssia_jaljella,
-                puoliso_time_in_state,puoliso_unempwage,puoliso_unempwage_basis,g,p_g,'')
+                puoliso_time_in_state,puoliso_unempwage,puoliso_unempwage_basis,g,spouse_g)
 
             if employment_status in set([2,3,8,9]): # retired
                 if self.include_npv_mort:
@@ -3113,7 +3250,6 @@ class UnemploymentLargeEnv_v4(gym.Env):
                 reward_omat *= npv_gpension # discounting with pension index & gamma
             else:
                 # giving up the pension
-                omat_equivalent = 0.0
                 reward_omat,omat_equivalent=0.0,0.0
                 npv,npv0,npv_pension,npv_gpension=0.0,0.0,0.0,0.0
                 
@@ -3127,13 +3263,14 @@ class UnemploymentLargeEnv_v4(gym.Env):
                 reward_puoliso *= p_npv_gpension
             else:
                 # giving up the pension
-                spouse_equivalent = 0.0
                 reward_puoliso,spouse_equivalent=0.0,0.0
                 p_npv,p_npv0,p_npv_pension,p_npv_gpension=0.0,0.0,0.0,0.0
-                
+            
             benq['omat_eq']=omat_equivalent
             benq['puoliso_eq']=spouse_equivalent
-            benq=self.scale_q(npv,npv0,npv_pension,npv_gpension,p_npv,p_npv0,p_npv_pension,p_npv_gpension,benq,age)
+            
+            # updates benq directly
+            self.scale_q(npv,npv0,npv_pension,npv_gpension,p_npv,p_npv0,p_npv_pension,p_npv_gpension,benq,age)
             
             # total reward is
             reward=reward_omat+reward_puoliso
@@ -3159,7 +3296,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
         else:
             next_wage=self.get_wage(age,wage_reduction)
             
-        #self.check_q(benq,99)
+        #check_q(benq,99)
         
         if puoliso_tila in set([3,14]):
             puoliso_next_wage=0
@@ -3185,27 +3322,24 @@ class UnemploymentLargeEnv_v4(gym.Env):
 
         return np.array(self.state), reward, done, benq
         
-    def check_q(self,q,num=-1):
-        for person in set(['omat_','puoliso_']):
-            d1=q[person+'verot']
-            d2=q[person+'valtionvero']+q[person+'kunnallisvero']+q[person+'ptel']+q[person+'tyotvakmaksu']+\
-                q[person+'ylevero']+q[person+'sairausvakuutusmaksu']
-            
-            if np.abs(d2-d1)>1e-6:
-                print(f'check_q {num}: {person} {d2-d1}')
-        
     def scale_q(self,npv,npv0,npv_pension,npv_gpension,p_npv,p_npv0,p_npv_pension,p_npv_gpension,benq,age):
         '''
         Scaling the incomes etc by a discounted nominal present value
         '''
         omat='omat_'
         puoliso='puoliso_'
+        
+#         print('omat npv:',npv0)
+#         print(type(npv0))
+#         print('puoliso npv:',npv_pension)
+#         print(type(npv_pension))
 
         v_pens={omat: npv_pension, puoliso: p_npv_pension}
         v0_pens={omat: npv0, puoliso: p_npv0}
         for alku in set([omat,puoliso]):
             p1=v_pens[alku]
             p2=v0_pens[alku]
+            #print(p1,p2)
             benq[alku+'verot']*=p1
             benq[alku+'etuustulo_brutto']*=p1
             benq[alku+'ylevero']*=p1
@@ -3213,12 +3347,12 @@ class UnemploymentLargeEnv_v4(gym.Env):
             benq[alku+'valtionvero']*=p1
             benq[alku+'kunnallisvero']*=p1
             benq[alku+'asumistuki']*=p1
-            benq[alku+'tyotvakmaksu']*=p1 # tätä ei oikeastaan tarvita, mutta ei haittaa
-            benq[alku+'sairausvakuutusmaksu']*=p1 # sairaanhoitomaksu maksetaan myös eläketulosta
+            benq[alku+'tyotvakmaksu']*=p1 # t√§t√§ ei oikeastaan tarvita, mutta ei haittaa
+            benq[alku+'sairausvakuutusmaksu']*=p1 # sairaanhoitomaksu maksetaan my√∂s el√§ketulosta
             benq[alku+'elake_maksussa']*=p1
             benq[alku+'tyoelake']*=p1
-            benq[alku+'kansanelake']*=p1 # p.o. kelaindeksillä
-            benq[alku+'takuuelake']*=p1 # p.o. kelaindeksillä
+            benq[alku+'kansanelake']*=p1 # p.o. kelaindeksill√§
+            benq[alku+'takuuelake']*=p1 # p.o. kelaindeksill√§
             benq[alku+'kokoelake']*=p1
             benq[alku+'perustulo']*=p1
             benq[alku+'toimeentulotuki']*=p1
@@ -3226,6 +3360,9 @@ class UnemploymentLargeEnv_v4(gym.Env):
             benq[alku+'etuustulo_netto']*=p1
             benq[alku+'eq']*=p1
             benq[alku+'multiplier']=p2
+
+        #for alku in set([omat,puoliso]):
+        #    print(alku,benq[alku+'multiplier'])
 
         benq['verot']=benq[omat+'verot']+benq[puoliso+'verot']
         benq['etuustulo_brutto']=benq[omat+'etuustulo_brutto']+benq[puoliso+'etuustulo_brutto']
@@ -3248,69 +3385,74 @@ class UnemploymentLargeEnv_v4(gym.Env):
         benq['eq']=benq[omat+'eq']+benq[puoliso+'eq']
         benq['multiplier']=(benq[omat+'multiplier']+benq[puoliso+'multiplier'])/2
 
-        return benq             
-
 #  Perussetti, tuottaa korkean elastisuuden
 
     def get_mortstate(self):
         return 14
 
     def log_utility_default_params(self):
-        # paljonko työstä poissaolo vaikuttaa palkkaan
+        # paljonko ty√∂st√§ poissaolo vaikuttaa palkkaan
     
         if self.include_mort:
-            self.salary_const=0.045*self.timestep # 0.04 työttömyydestä palkka alenee tämän verran vuodessa
-            self.salary_const_up=0.03*self.timestep # 0.04 työssäolo palauttaa ansioita tämän verran vuodessa
-            self.salary_const_student=0.04*self.timestep # 0.05 opiskelu pienentää leikkausta tämän verran vuodessa
-            self.wage_initial_reduction=0.015 # työttömäksi siirtymisestä tuleva alennus tuleviin palkkoihin
+            self.salary_const=0.038*self.timestep # 0.04 ty√∂tt√§myydest√§ palkka alenee t√§m√§n verran vuodessa
+            self.salary_const_retirement=0.10*self.timestep # vanhuusel√§kkeell√§ muutos nopeampaa
+            self.salary_const_up=0.03*self.timestep # 0.04 ty√∂ss√§olo palauttaa ansioita t√§m√§n verran vuodessa
+            self.salary_const_up_osaaika=0.025*self.timestep # 0.04 osa-aikainen ty√∂ss√§olo palauttaa ansioita t√§m√§n verran vuodessa
+            self.salary_const_student=0.03*self.timestep # 0.05 opiskelu pienent√§√§ leikkausta t√§m√§n verran vuodessa
+            self.wage_initial_reduction=0.015 # ty√∂tt√∂m√§ksi siirtymisest√§ tuleva alennus tuleviin palkkoihin, NOT USED!
             
-            self.max_mu_age=self.min_retirementage # 
+            self.max_mu_age=self.min_retirementage+6.0 # 
             
-            self.men_kappa_fulltime=0.645 # vapaa-ajan menetyksestä rangaistus miehille
-            self.men_mu_scale=0.047 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-            self.men_mu_age=self.min_retirementage-10.0 #5.5 # P.O. 60??
-            self.men_kappa_osaaika_young=0.47 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
-            self.men_kappa_osaaika_middle=0.70 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
-            self.men_kappa_osaaika_old=0.48 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
-            self.men_kappa_osaaika_pension=0.48
-            self.men_kappa_hoitovapaa=0.07 # hyöty hoitovapaalla olosta
+            self.men_kappa_fulltime=0.740 # vapaa-ajan menetyksest√§ rangaistus miehille
+            self.men_mu_scale_kokoaika=0.08 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+            self.men_mu_scale_osaaika=0.060 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+            self.men_mu_age=self.min_retirementage-5.5 #5.5 # P.O. 60??
+            self.men_kappa_osaaika_young=0.52 # vapaa-ajan menetyksest√§ rangaistus miehille osa-aikaty√∂n teosta, suhteessa kokoaikaan
+            self.men_kappa_osaaika_middle=0.66 # vapaa-ajan menetyksest√§ rangaistus miehille osa-aikaty√∂n teosta, suhteessa kokoaikaan
+            #self.men_kappa_osaaika_old=0.62 # vapaa-ajan menetyksest√§ rangaistus miehille osa-aikaty√∂n teosta, suhteessa kokoaikaan
+            self.men_kappa_osaaika_old=self.men_kappa_osaaika_middle
+            self.men_kappa_osaaika_pension=0.70
+            self.men_kappa_hoitovapaa=0.03 # hy√§ty hoitovapaalla olosta
             self.men_kappa_ve=0.00 
-            self.men_kappa_pinkslip_young=0.20
+            self.men_kappa_pinkslip_young=0.05
             self.men_kappa_pinkslip_middle=0.20
             self.men_kappa_pinkslip_elderly=0.20
             
-            self.women_kappa_fulltime=0.600 # vapaa-ajan menetyksestä rangaistus naisille
-            self.women_mu_scale=0.085 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
-            self.women_mu_age=self.min_retirementage-5.0 #4.0 # 61 #5 P.O. 60??
-            self.women_kappa_osaaika_young=0.47
-            self.women_kappa_osaaika_middle=0.41
-            self.women_kappa_osaaika_old=0.48
-            self.women_kappa_osaaika_pension=0.48
-            self.women_kappa_hoitovapaa=0.16 # 0.08
+            self.women_kappa_fulltime=0.605 # vapaa-ajan menetyksest√§ rangaistus naisille
+            self.women_mu_scale_kokoaika=0.060 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
+            self.women_mu_scale_osaaika=0.040 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
+            self.women_mu_age=self.min_retirementage-1.5 #4.0 # 61 #5 P.O. 60??
+            self.women_kappa_osaaika_young=0.35
+            self.women_kappa_osaaika_middle=0.47
+            #self.women_kappa_osaaika_old=0.48
+            self.women_kappa_osaaika_old=self.women_kappa_osaaika_middle
+            self.women_kappa_osaaika_pension=0.65
+            self.women_kappa_hoitovapaa=0.20
             self.women_kappa_ve=0.00 
-            self.women_kappa_pinkslip_young=0.20
+            self.women_kappa_pinkslip_young=0.10
             self.women_kappa_pinkslip_middle=0.25
-            self.women_kappa_pinkslip_elderly=0.25
+            self.women_kappa_pinkslip_elderly=0.20
         else:
-            self.salary_const=0.045*self.timestep # työttömyydestä palkka alenee tämän verran vuodessa
-            self.salary_const_up=0.04*self.timestep # työssäolo palauttaa ansioita tämän verran vuodessa
-            self.salary_const_student=0.05*self.timestep # opiskelu pienentää leikkausta tämän verran vuodessa
-            self.wage_initial_reduction=0.015 # työttömäksi siirtymisestä tuleva alennus tuleviin palkkoihin
+            self.salary_const=0.045*self.timestep # ty√∂tt√§myydest√§ palkka alenee t√§m√§n verran vuodessa
+            self.salary_const_retirement=0.10*self.timestep # vanhuusel√§kkeell√§ muutos nopeampaa
+            self.salary_const_up=0.04*self.timestep # ty√∂ss√§olo palauttaa ansioita t√§m√§n verran vuodessa
+            self.salary_const_student=0.05*self.timestep # opiskelu pienent√§√§ leikkausta t√§m√§n verran vuodessa
+            self.wage_initial_reduction=0.015 # ty√∂tt√∂m√§ksi siirtymisest√§ tuleva alennus tuleviin palkkoihin, NOT USED!
             
-            self.men_kappa_fulltime=0.640 # 0.675 #0.682 # 0.670 # vapaa-ajan menetyksestä rangaistus miehille
+            self.men_kappa_fulltime=0.640 # 0.675 #0.682 # 0.670 # vapaa-ajan menetyksest√§ rangaistus miehille
             self.men_mu_scale=0.055 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
             self.men_mu_age=self.min_retirementage-4.0 # P.O. 60??
-            self.men_kappa_osaaika_young=0.55 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
-            self.men_kappa_osaaika_middle=0.62 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
-            self.men_kappa_osaaika_old=0.40 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan, alle 35v
+            self.men_kappa_osaaika_young=0.55 # vapaa-ajan menetyksest√§ rangaistus miehille osa-aikaty√∂n teosta, suhteessa kokoaikaan
+            self.men_kappa_osaaika_middle=0.62 # vapaa-ajan menetyksest√§ rangaistus miehille osa-aikaty√∂n teosta, suhteessa kokoaikaan
+            self.men_kappa_osaaika_old=0.40 # vapaa-ajan menetyksest√§ rangaistus miehille osa-aikaty√∂n teosta, suhteessa kokoaikaan, alle 35v
             self.men_kappa_osaaika_pension=0.30
-            self.men_kappa_hoitovapaa=0.30 # hyöty hoitovapaalla olosta
-            self.men_kappa_ve=0.00 # 0.03 # ehkä 0.10?
+            self.men_kappa_hoitovapaa=0.30 # hy√§ty hoitovapaalla olosta
+            self.men_kappa_ve=0.00 # 0.03 # ehk√§ 0.10?
             self.men_kappa_pinkslip_young=0.01
             self.men_kappa_pinkslip_middle=0.20
             self.men_kappa_pinkslip_elderly=0.05
             
-            self.women_kappa_fulltime=0.640 # 0.605 # 0.640 # 0.620 # 0.610 # vapaa-ajan menetyksestä rangaistus naisille
+            self.women_kappa_fulltime=0.640 # 0.605 # 0.640 # 0.620 # 0.610 # vapaa-ajan menetyksest√§ rangaistus naisille
             self.women_mu_scale=0.065 # 0.25 # how much penalty is associated with work increase with age after mu_age
             self.women_mu_age=self.min_retirementage-3.5 # 61 #5 P.O. 60??
             self.women_kappa_osaaika_young=0.45
@@ -3318,10 +3460,153 @@ class UnemploymentLargeEnv_v4(gym.Env):
             self.women_kappa_osaaika_old=0.30
             self.women_kappa_osaaika_pension=0.30
             self.women_kappa_hoitovapaa=0.70 # 0.08
-            self.women_kappa_ve=0.00 # 0.03 # ehkä 0.10?
+            self.women_kappa_ve=0.00 # 0.03 # ehk√§ 0.10?
             self.women_kappa_pinkslip_young=0.10
             self.women_kappa_pinkslip_middle=0.27
             self.women_kappa_pinkslip_elderly=0.25
+
+    def log_get_kappa(self,age,g,employment_state,pinkslip):
+        # kappa tells how much person values free-time
+        if g<3: # miehet
+            kappa_kokoaika=self.men_kappa_fulltime
+            mu_scale_kokoaika=self.men_mu_scale_kokoaika
+            mu_scale_osaaika=self.men_mu_scale_osaaika
+            mu_age=self.men_mu_age
+            # lognormaali
+            #if self.include_preferencenoise:
+            #    kappa_kokoaika += prefnoise
+        
+            if age<28: # ik√§√§ntyneet preferoivat osa-aikaty√∂t√§
+                kappa_osaaika=self.men_kappa_osaaika_young
+            elif age<58: # ik√§√§ntyneet preferoivat osa-aikaty√∂t√§
+                kappa_osaaika=self.men_kappa_osaaika_middle
+            else:
+                kappa_osaaika=self.men_kappa_osaaika_old
+
+            kappa_osaaika_pension=self.men_kappa_osaaika_pension
+                
+            kappa_hoitovapaa=self.men_kappa_hoitovapaa
+            kappa_ve=self.men_kappa_ve
+            if age>50:
+                kappa_pinkslip=self.men_kappa_pinkslip_elderly
+            elif age>28:
+                kappa_pinkslip=self.men_kappa_pinkslip_middle
+            else:
+                kappa_pinkslip=self.men_kappa_pinkslip_young
+        else: # naiset
+            kappa_kokoaika=self.women_kappa_fulltime
+            mu_scale_kokoaika=self.women_mu_scale_kokoaika
+            mu_scale_osaaika=self.women_mu_scale_osaaika
+            mu_age=self.women_mu_age
+            # lognormaali
+            #if self.include_preferencenoise:
+            #    kappa_kokoaika += prefnoise
+        
+            if age<28: # ik√§√§ntyneet preferoivat osa-aikaty√∂t√§
+                kappa_osaaika=self.women_kappa_osaaika_young
+            elif age<58: # ik√§√§ntyneet preferoivat osa-aikaty√∂t√§
+                kappa_osaaika=self.women_kappa_osaaika_middle
+            else:
+                kappa_osaaika=self.women_kappa_osaaika_old
+                
+            kappa_osaaika_pension=self.women_kappa_osaaika_pension
+                
+            kappa_hoitovapaa=self.women_kappa_hoitovapaa
+            kappa_ve=self.women_kappa_ve
+            if age>50:
+                kappa_pinkslip=self.women_kappa_pinkslip_elderly
+            elif age>28:
+                kappa_pinkslip=self.women_kappa_pinkslip_middle
+            else:
+                kappa_pinkslip=self.women_kappa_pinkslip_young
+                
+        if pinkslip>0: # irtisanottu
+            kappa_pinkslip = 0 # irtisanotuille ei vaikutuksia
+        
+        kappa_osaaika = kappa_osaaika*kappa_kokoaika
+        if age>mu_age:
+            mage=max(0,min(self.max_mu_age,age)-mu_age)
+            kappa_osaaika += mu_scale_osaaika*mage
+            kappa_kokoaika += mu_scale_kokoaika*mage
+            
+            #print(age,kappa_osaaika,mu_scale_osaaika*mage,kappa_kokoaika,mu_scale_kokoaika*mage)
+        
+        if employment_state in set([1,9]):
+            kappa= -kappa_kokoaika
+        elif employment_state in set([10]):
+            kappa= -kappa_osaaika
+        elif employment_state in set([8]):
+            kappa= -kappa_osaaika #_pension*kappa_kokoaika
+        elif employment_state in set([0,4]):
+            kappa= -kappa_pinkslip
+        elif employment_state in set([13]):
+            if self.perustulo:
+                kappa= 0
+            else:
+                kappa= -kappa_pinkslip
+        elif employment_state == 2:
+            kappa=kappa_ve
+        elif employment_state == 7:
+            kappa=kappa_hoitovapaa
+        elif employment_state == 11:
+            kappa=0
+        elif employment_state == 12:
+            kappa=0
+        else: # states 3, 5, 6, 7, 14
+            kappa=0  
+            
+        return kappa  
+                    
+    def log_utility(self,income,employment_state,age,g=0,pinkslip=0,prefnoise=0,spouse=0,debug=False):
+        '''
+        Log-utiliteettifunktio muokattuna l√§hteest√§ M√§√§tt√§nen, 2013 & Hakola & M√§√§tt√§nen, 2005
+
+        Tulot _income_ ovat vuositasolla, jotta askelpituuden muutos ei vaikuta vapaa-aika-vakioihin
+        T√§m√§ versio on parametrisoitu optimoijaa varten
+        '''
+        
+        if employment_state==14:
+            return 0,0
+
+        kappa=self.log_get_kappa(age,g,employment_state,pinkslip)
+
+        # hy√§ty/score
+        if self.include_preferencenoise:
+            # normaali
+            u=np.log(prefnoise*income/self.inflationfactor)+kappa
+            equ=(income/self.inflationfactor)*np.exp(kappa)
+        else:
+            u=np.log(income/self.inflationfactor)+kappa
+            equ=(income/self.inflationfactor)*np.exp(kappa)
+
+        if u is np.inf and debug:
+            print(f'inf: state {employment_state} spouse {spouse} sp_state {spouse_empstate} netto {income}')
+
+        if income<1 and debug:
+            print(f'inf: state {employment_state} spouse {spouse} sp_state {spouse_empstate} netto {income}')
+            
+        return u/20,equ # tulot ovat vuositasolla, mutta skaalataan hy√§ty
+
+    def get_spousewage_step(self,age,reduction):
+        '''
+        palkka age-ik√§iselle time_in_state-v√§hennyksell√§ ty√∂llistymispalkkaan, step-kohtaisesti, ei vuosikohtaisesti
+        '''
+        intage=self.map_age(age)
+        if age<self.max_age and age>=self.min_age-1:
+            return np.maximum(self.min_salary,self.spousesalary[intage])*max(0,(1-reduction))
+        else:
+            return 0
+
+    def get_wage_step(self,age,reduction):
+        '''
+        palkka age-ik√§iselle time_in_state-v√§hennyksell√§ ty√∂llistymispalkkaan, step-kohtaisesti, ei vuosikohtaisesti
+        '''
+        intage=self.map_age(age)
+        if age<self.max_age and age>=self.min_age-1:
+            return np.maximum(self.min_salary,self.salary[intage])*max(0,(1-reduction))
+        else:
+            return 0
+            
 
     def set_parameters(self,**kwargs):
         if 'kwargs' in kwargs:
@@ -3489,142 +3774,6 @@ class UnemploymentLargeEnv_v4(gym.Env):
                 if value is not None:
                     self.kappa_pinkslip=value
                     
-    def log_get_kappa(self,age,g,employment_state,pinkslip):
-        # kappa tells how much person values free-time
-        if g<3: # miehet
-            kappa_kokoaika=self.men_kappa_fulltime
-            mu_scale=self.men_mu_scale
-            mu_age=self.men_mu_age
-            # lognormaali
-            #if self.include_preferencenoise:
-            #    kappa_kokoaika += prefnoise
-        
-            if age<28: # ikääntyneet preferoivat osa-aikatyötä
-                kappa_osaaika=self.men_kappa_osaaika_young
-            elif age<50: # ikääntyneet preferoivat osa-aikatyötä
-                kappa_osaaika=self.men_kappa_osaaika_middle
-            else:
-                kappa_osaaika=self.men_kappa_osaaika_old
-
-            kappa_osaaika_pension=self.men_kappa_osaaika_pension*kappa_kokoaika
-                
-            kappa_hoitovapaa=self.men_kappa_hoitovapaa
-            kappa_ve=self.men_kappa_ve
-            if age>50:
-                kappa_pinkslip=self.men_kappa_pinkslip_elderly
-            elif age>28:
-                kappa_pinkslip=self.men_kappa_pinkslip_middle
-            else:
-                kappa_pinkslip=self.men_kappa_pinkslip_young
-        else: # naiset
-            kappa_kokoaika=self.women_kappa_fulltime
-            mu_scale=self.women_mu_scale
-            mu_age=self.women_mu_age
-            # lognormaali
-            #if self.include_preferencenoise:
-            #    kappa_kokoaika += prefnoise
-        
-            if age<28: # ikääntyneet preferoivat osa-aikatyötä
-                kappa_osaaika=self.women_kappa_osaaika_young
-            elif age<50: # ikääntyneet preferoivat osa-aikatyötä
-                kappa_osaaika=self.women_kappa_osaaika_middle
-            else:
-                kappa_osaaika=self.women_kappa_osaaika_old
-                
-            kappa_osaaika_pension=self.women_kappa_osaaika_pension
-                
-            kappa_hoitovapaa=self.women_kappa_hoitovapaa
-            kappa_ve=self.women_kappa_ve
-            if age>50:
-                kappa_pinkslip=self.women_kappa_pinkslip_elderly
-            elif age>28:
-                kappa_pinkslip=self.women_kappa_pinkslip_middle
-            else:
-                kappa_pinkslip=self.women_kappa_pinkslip_young
-                
-        if pinkslip>0: # irtisanottu
-            kappa_pinkslip = 0 # irtisanotuille ei vaikutuksia
-        
-        if age>mu_age:
-            mage=min(self.max_mu_age,age)
-            kappa_kokoaika += mu_scale*max(0,mage-mu_age)
-        
-        if employment_state in set([1,9]):
-            kappa= -kappa_kokoaika
-        elif employment_state in set([10]):
-            kappa= -kappa_osaaika*kappa_kokoaika
-        elif employment_state in set([8]):
-            kappa= -kappa_osaaika_pension*kappa_kokoaika
-        elif employment_state in set([0,4]):
-            kappa= -kappa_pinkslip
-        elif employment_state in set([13]):
-            if self.perustulo:
-                kappa= 0
-            else:
-                kappa= -kappa_pinkslip
-        elif employment_state == 2:
-            kappa=kappa_ve
-        elif employment_state == 7:
-            kappa=kappa_hoitovapaa
-        elif employment_state == 11:
-            kappa=0
-        elif employment_state == 12:
-            kappa=0
-        else: # states 3, 5, 6, 7, 14
-            kappa=0  
-            
-        return kappa  
-                    
-    def log_utility(self,income,employment_state,age,g=0,pinkslip=0,prefnoise=0,spouse=0,debug=False):
-        '''
-        Log-utiliteettifunktio muokattuna lähteestä Määttänen, 2013 & Hakola & Määttänen, 2005
-
-        Tulot _income_ ovat vuositasolla, jotta askelpituuden muutos ei vaikuta vapaa-aika-vakioihin
-        Tämä versio on parametrisoitu optimoijaa varten
-        '''
-        
-        if employment_state==14:
-            return 0,0
-
-        kappa=self.log_get_kappa(age,g,employment_state,pinkslip)
-
-        # hyöty/score
-        if self.include_preferencenoise:
-            # normaali
-            u=np.log(prefnoise*(income)/self.inflationfactor)+kappa
-            equ=(income/self.inflationfactor)*np.exp(kappa)
-        else:
-            u=np.log(income/self.inflationfactor)+kappa
-            equ=(income/self.inflationfactor)*np.exp(kappa)
-
-        if u is np.inf and debug:
-            print(f'inf: state {employment_state} spouse {spouse} sp_state {spouse_empstate} netto {income}')
-
-        if income<1 and debug:
-            print(f'inf: state {employment_state} spouse {spouse} sp_state {spouse_empstate} netto {income}')
-            
-        return u/10,equ # tulot ovat vuositasolla, mutta skaalataan hyöty
-
-    def get_spousewage_step(self,age,reduction):
-        '''
-        palkka age-ikäiselle time_in_state-vähennyksellä työllistymispalkkaan, step-kohtaisesti, ei vuosikohtaisesti
-        '''
-        intage=self.map_age(age)
-        if age<self.max_age and age>=self.min_age-1:
-            return np.maximum(self.min_salary,self.spousesalary[intage])*max(0,(1-reduction))
-        else:
-            return 0
-
-    def get_wage_step(self,age,reduction):
-        '''
-        palkka age-ikäiselle time_in_state-vähennyksellä työllistymispalkkaan, step-kohtaisesti, ei vuosikohtaisesti
-        '''
-        intage=self.map_age(age)
-        if age<self.max_age and age>=self.min_age-1:
-            return np.maximum(self.min_salary,self.salary[intage])*max(0,(1-reduction))
-        else:
-            return 0
-
     def map_age(self,age,start_zero=False):
         if start_zero:
             return int((age)*self.inv_timestep)
@@ -3633,26 +3782,26 @@ class UnemploymentLargeEnv_v4(gym.Env):
     
     def wage_process_TK_v3(self,w,a0=3300*12,a1=3300*12,g=1):
         '''
-        Palkkaprosessi muokattu lähteestä Määttänen, 2013 
+        Palkkaprosessi muokattu l√§hteest√§ M√§√§tt√§nen, 2013 
         '''
         group_sigmas=np.array([0.05,0.07,0.10])*np.sqrt(self.timestep)
         sigma=group_sigmas[g]
         eps=np.random.normal(loc=0,scale=sigma,size=1)[0]
         c1=0.89**self.timestep
         if w>0:
-             # pidetään keskiarvo/a1 samana kuin w/a0
+             # pidet√§√§n keskiarvo/a1 samana kuin w/a0
             wt=a1*np.exp(c1*np.log(w/a0)+eps-0.5*sigma*sigma)
         else:
             wt=a1*np.exp(eps)
 
-        # täysiaikainen vuositulo vähintään self.min_salary
+        # t√§ysiaikainen vuositulo v√§hint√§√§n self.min_salary
         wt=np.maximum(self.min_salary,wt)
 
         return wt
 
 #     def compute_salary_TK_v3(self,group=1,debug=False,initial_salary=None):
 #         '''
-#         Alussa ajettava funktio, joka tekee palkat yhtä episodia varten
+#         Alussa ajettava funktio, joka tekee palkat yht√§ episodia varten
 #         '''
 #         n_time = int(np.round((self.max_age-self.min_age)*self.inv_timestep))+2
 #         self.salary=np.zeros(n_time)
@@ -3713,7 +3862,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
                 
     def compute_salary_v4(self,group=1,debug=False,initial_salary=None,spouse=False):
         '''
-        Alussa ajettava funktio, joka tekee palkat yhtä episodia varten
+        Alussa ajettava funktio, joka tekee palkat yht√§ episodia varten
         '''
         n_time = int(np.round((self.max_age-self.min_age)*self.inv_timestep))+2
         salary=np.zeros(n_time)
@@ -3784,7 +3933,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
         '''
         Tilan koodaus neuroverkkoa varten. Arvot skaalataan ja tilat one-hot-enkoodataan
 
-        Käytetään, jos kuolleisuus ei mukana
+        K√§ytet√§√§n, jos kuolleisuus ei mukana
         '''
         if self.include_preferencenoise:
             d=np.zeros(self.n_empl+self.n_groups+self.n_empl+48)
@@ -3804,16 +3953,16 @@ class UnemploymentLargeEnv_v4(gym.Env):
         d[states:states2]=self.group_encoding[g,:]
 
         if self.log_transform:
-            d[states2]=np.log(pension/20_000+self.eps) # vastainen eläke
+            d[states2]=np.log(pension/20_000+self.eps) # vastainen el√§ke
             d[states2+1]=np.log(old_wage/40_000+self.eps)
-            d[states2+4]=np.log(tyoelake_maksussa/20_000+self.eps) # alkanut eläke
+            d[states2+4]=np.log(tyoelake_maksussa/20_000+self.eps) # alkanut el√§ke
             d[states2+10]=np.log(next_wage/40_000+self.eps)
             d[states2+14]=np.log(unempwage/40_000+self.eps)
             d[states2+15]=np.log(unempwage_basis/40_000+self.eps)
         else:
-            d[states2]=(pension-40_000)/40_000 # vastainen eläke
+            d[states2]=(pension-40_000)/40_000 # vastainen el√§ke
             d[states2+1]=(old_wage-40_000)/40_000
-            d[states2+4]=(tyoelake_maksussa-40_000)/40_000 # alkanut eläke
+            d[states2+4]=(tyoelake_maksussa-40_000)/40_000 # alkanut el√§ke
             d[states2+10]=(next_wage-40_000)/40_000
             d[states2+14]=(unempwage-40_000)/40_000
             d[states2+15]=(unempwage_basis-40_000)/40_000
@@ -3826,7 +3975,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
             retaged=0
 
         d[states2+5]=pink # irtisanottu vai ei 
-        d[states2+6]=toe-14/12 # työssäoloehto
+        d[states2+6]=toe-14/12 # ty√∂ss√§oloehto
         d[states2+7]=(tyohist-10)/20 # tyohistoria: 300/400 pv
         d[states2+8]=(self.min_retirementage-age)/43
         d[states2+9]=unemp_benefit_left-1 #retaged
@@ -3852,7 +4001,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
         d[states3]=(puoliso_old_wage-40_000)/40_000
         d[states3+1]=(puoliso_pension-40_000)/40_000
         d[states3+2]=puoliso_wage_reduction
-        d[states3+3]=(puoliso_tyoelake_maksussa-40_000)/40_000 # alkanut eläke
+        d[states3+3]=(puoliso_tyoelake_maksussa-40_000)/40_000 # alkanut el√§ke
         d[states3+4]=(puoliso_next_wage-40_000)/40_000
         d[states3+5]=puoliso_used_unemp_benefit-1
         d[states3+6]=puoliso_unemp_benefit_left-1
@@ -3893,8 +4042,10 @@ class UnemploymentLargeEnv_v4(gym.Env):
         '''
         Tilan dekoodaus laskentaa varten
 
-        Käytetään, jos aina
+        K√§ytet√§√§n, jos aina
         '''
+        
+        print(vec)
 
         emp=-1
         for k in range(self.n_empl):
@@ -3937,9 +4088,9 @@ class UnemploymentLargeEnv_v4(gym.Env):
         time_in_state=vec[pos+3]*10+10
         #if self.include300:
         pink=int(vec[pos+5]) # irtisanottu vai ei 
-        toe=vec[pos+6]+14/12 # työssäoloehto, kesto
-        tyohist=vec[pos+7]*20+10 # työhistoria
-        used_unemp_benefit=vec[pos+11]+1 # käytetty työttömyyspäivärahapäivien määrä
+        toe=vec[pos+6]+14/12 # ty√∂ss√§oloehto, kesto
+        tyohist=vec[pos+7]*20+10 # ty√∂historia
+        used_unemp_benefit=vec[pos+11]+1 # k√§ytetty ty√∂tt√§myysp√§iv√§rahap√§ivien m√§√§r√§
         wage_reduction=vec[pos+12]
         unemp_after_ra=vec[pos+13]*2+1
         unemp_left=vec[pos+9]+1
@@ -4009,12 +4160,12 @@ class UnemploymentLargeEnv_v4(gym.Env):
                puoliso_toe,puoliso_toekesto,puoliso_tyoura,puoliso_time_in_state,puoliso_pinkslip,puoliso_ove_paid,\
                kansanelake,puoliso_kansanelake,tyoelake_maksussa,puoliso_tyoelake_maksussa,next_wage
                               
-    def random_init_state(self):
-        emp=random.randint(0,3)
+    def random_init_state(self,minage=18,maxage=70):
+        emp=random.randint(0,14)
         g=np.random.randint(0,6)
         pension=np.random.uniform(0,80_000)
         old_wage=np.random.uniform(0,80_000)
-        age=np.random.randint(0,60)
+        age=np.random.randint(minage/self.timestep,maxage/self.timestep-1)*self.timestep
         time_in_state=np.random.uniform(0,30)
         pink=np.random.randint(2)
         toe=np.random.uniform(0,3)
@@ -4036,8 +4187,8 @@ class UnemploymentLargeEnv_v4(gym.Env):
         kassanjasenyys=np.random.randint(0,2)
         toekesto=np.random.uniform(0,3)
         puoliso=np.random.randint(0,2)
-        puoliso_tila=np.random.randint(0,3)
-        puoliso_wage_reduction=np.random.uniform(0,50000)
+        puoliso_tila=np.random.randint(0,14)
+        puoliso_wage_reduction=np.random.uniform(0,1.0)
         puoliso_pension=np.random.uniform(0,50000)
         puoliso_old_wage=np.random.uniform(0,50000)
         puoliso_next_wage=np.random.uniform(0,50000)
@@ -4054,25 +4205,36 @@ class UnemploymentLargeEnv_v4(gym.Env):
         puoliso_time_in_state=np.random.uniform(0,40)
         puoliso_pinkslip=np.random.randint(0,2)
         puoliso_ove_paid=np.random.randint(0,2)
-        kansanelake=np.random.uniform(0,50000)
-        puoliso_kansanelake=np.random.uniform(0,50000)
+        kansanelake=np.random.uniform(0,10000)
+        puoliso_kansanelake=np.random.uniform(0,10000)
         tyoelake_maksussa=np.random.uniform(0,50000)
         puoliso_tyoelake_maksussa=np.random.uniform(0,50000)
         paid_pension=kansanelake+tyoelake_maksussa
         puoliso_paid_pension=puoliso_kansanelake+puoliso_tyoelake_maksussa
-    
+        
+        if age<63.5:
+            if puoliso_tila in set([2,8,9]):
+                puoliso_tila=0
+            if emp in set([2,8,9]):
+                emp=0
+            kansanelake=0
+            puoliso_kansanelake=0
+            tyoelake_maksussa=0
+            puoliso_tyoelake_maksussa=0
+        
         vec=self.state_encode(emp,g,pension,old_wage,age,time_in_state,tyoelake_maksussa,pink,
-                            toe,toekesto,tyohist,next_wage,used_unemp_benefit,wage_reduction,
-                            unemp_after_ra,unempwage,unempwage_basis,children_under3,
-                            children_under7,children_under18,unemp_benefit_left,alkanut_ansiosidonnainen,
-                            toe58,ove_paid,kassanjasenyys,puoliso,puoliso_tila,puoliso_old_wage,puoliso_pension,
-                            puoliso_wage_reduction,puoliso_tyoelake_maksussa,puoliso_next_wage,
-                            puoliso_used_unemp_benefit,puoliso_unemp_benefit_left,
-                            puoliso_unemp_after_ra,puoliso_unempwage,puoliso_unempwage_basis,
-                            puoliso_alkanut_ansiosidonnainen,puoliso_toe58,
-                            puoliso_toe,puoliso_toekesto,puoliso_tyoura,puoliso_time_in_state,
-                            puoliso_pinkslip,puoliso_ove_paid,kansanelake,puoliso_kansanelake,
-                            prefnoise)
+                toe,toekesto,tyohist,next_wage,used_unemp_benefit,wage_reduction,
+                unemp_after_ra,unempwage,unempwage_basis,
+                children_under3,children_under7,children_under18,
+                unemp_benefit_left,alkanut_ansiosidonnainen,toe58,ove_paid,kassanjasenyys,
+                puoliso,puoliso_tila,puoliso_old_wage,puoliso_pension,
+                puoliso_wage_reduction,puoliso_tyoelake_maksussa,puoliso_next_wage,
+                puoliso_used_unemp_benefit,puoliso_unemp_benefit_left,
+                puoliso_unemp_after_ra,puoliso_unempwage,puoliso_unempwage_basis,
+                puoliso_alkanut_ansiosidonnainen,puoliso_toe58,
+                puoliso_toe,puoliso_toekesto,puoliso_tyoura,puoliso_time_in_state,
+                puoliso_pinkslip,puoliso_ove_paid,kansanelake,puoliso_kansanelake,
+                prefnoise)
                             
         return vec
         
@@ -4082,7 +4244,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
             g=np.random.randint(0,6)
             pension=np.random.uniform(0,80_000)
             old_wage=np.random.uniform(0,80_000)
-            age=np.random.randint(0,60)
+            age=np.random.randint(0,70)
             time_in_state=np.random.uniform(0,30)
             pink=np.random.randint(2)
             toe=np.random.uniform(0,3)
@@ -4178,7 +4340,6 @@ class UnemploymentLargeEnv_v4(gym.Env):
                                 kansanelake2,puoliso_kansanelake2,tyoelake_maksussa2,puoliso_tyoelake_maksussa2,
                                 next_wage2)
         
-    
     def check_state(self,emp,g,pension,old_wage,age,time_in_state,paid_pension,pink,
                     toe,tyohist,next_wage,used_unemp_benefit,wage_reduction,
                     unemp_after_ra,unempwage,unempwage_basis,
@@ -4422,7 +4583,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
         '''
         Open AI-interfacen mukainen reset-funktio, joka nollaa laskennan alkutilaan
         '''
-        self.init_state()
+        self.infostate.reset()
         self.steps_beyond_done = None
 
         if self.mortplot:
@@ -4568,13 +4729,13 @@ class UnemploymentLargeEnv_v4(gym.Env):
             elif employment_state==3:
                 wage5y=next_wage
                 tyoelake_maksussa=pension
-                # takuueläke voidaan huomioida jo tässä
+                # takuuel√§ke voidaan huomioida jo t√§ss√§
                 kansanelake = self.ben.laske_kansanelake(age,tyoelake_maksussa/12,1-puoliso,disability=True)*12 # ben-modulissa palkat kk-tasolla
                 pension=0
             elif employment_state==2:
                 wage5y=next_wage
                 tyoelake_maksussa=pension
-                # takuueläke voidaan huomioida jo tässä
+                # takuuel√§ke voidaan huomioida jo t√§ss√§
                 kansanelake = self.ben.laske_kansanelake(age,tyoelake_maksussa/12,1-puoliso)*12 # ben-modulissa palkat kk-tasolla
                 pension=0
         else:        
@@ -4606,13 +4767,13 @@ class UnemploymentLargeEnv_v4(gym.Env):
             elif employment_state==3:
                 wage5y=next_wage
                 tyoelake_maksussa=np.random.uniform(low=0.0,high=30_000)
-                # takuueläke voidaan huomioida jo tässä
+                # takuuel√§ke voidaan huomioida jo t√§ss√§
                 kansanelake = self.ben.laske_kansanelake(age,tyoelake_maksussa/12,1-puoliso,disability=True)*12 # ben-modulissa palkat kk-tasolla
                 pension=0
             elif employment_state==2:
                 wage5y=next_wage
                 tyoelake_maksussa=np.random.uniform(low=0.0,high=40_000)
-                # takuueläke voidaan huomioida jo tässä
+                # takuuel√§ke voidaan huomioida jo t√§ss√§
                 kansanelake = self.ben.laske_kansanelake(age,tyoelake_maksussa/12,1-puoliso)*12 # ben-modulissa palkat kk-tasolla
                 pension=0
            
@@ -4661,8 +4822,8 @@ class UnemploymentLargeEnv_v4(gym.Env):
         # tarvitseeko alkutilassa laskea muita tietoja uusiksi? ei kait
 
         if self.plotdebug:
-            print('emp {} g {} old_wage {} next_wage {} age {} kassanjäsen {}'.format(employment_state,group,old_wage,next_wage,age,kassanjasenyys))
-            print('emp {} g {} old_wage {} next_wage {} age {} kassanjäsen {}'.format(puoliso_tila,spouse_g,puoliso_old_wage,puoliso_next_wage,age,kassanjasenyys))
+            print('emp {} g {} old_wage {} next_wage {} age {} kassanj√§sen {}'.format(employment_state,group,old_wage,next_wage,age,kassanjasenyys))
+            print('emp {} g {} old_wage {} next_wage {} age {} kassanj√§sen {}'.format(puoliso_tila,spouse_g,puoliso_old_wage,puoliso_next_wage,age,kassanjasenyys))
 
         if self.include_preferencenoise:
             # lognormaali
@@ -4689,7 +4850,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
                                        kansanelake,puoliso_kansanelake,
                                        prefnoise)
 
-    def render(self,mode='human',close=False,done=False,reward=None,netto=None,render_omat=True,render_puoliso=True,benq=None,netto_omat=None,netto_puoliso=None):
+    def render(self,mode='human',close=False,done=False,reward=None,netto=None,render_omat=True,render_puoliso=False,benq=None,netto_omat=None,netto_puoliso=None):
         '''
         Tulostus-rutiini
         '''
@@ -4726,10 +4887,14 @@ class UnemploymentLargeEnv_v4(gym.Env):
             m='*'
         else:
             m=''
+            
+        kappa=self.log_get_kappa(age,g,emp,pink)
 
-        out=f'{m}s{onpuoliso} {emp:d} g {g:d} w {wage:.0f} nw {next_wage:.0f} a {age:.2f} tis {time_in_state:.2f} pen {pension:.0f} paid_e {tyoelake_maksussa:.0f} paid_k {kansanelake:.0f}'+\
-            f' irti {pink:d} toe {toe:.2f}{kassassa} tk{toekesto:.2f} ura {tyohist:.2f} ueb {used_unemp_benefit:.2f} red {wage_red:.2f} uew {unempwage:.0f}'+\
-            f' (b {unempwage_basis:.0f}) c3 {c3:.0f} c7 {c7:.0f} c18 {c18:.0f} uleft {unemp_left:.2f} aa {oikeus:.0f} 58 {toe58:.0f} ove {ove_paid:.0f}'
+        out=f'{m}s{onpuoliso} {emp:d} g {g:d} a {age:.2f} w {wage:.0f} nw {next_wage:.0f} tis {time_in_state:.2f}'+\
+            f' pen {pension:.0f} paid_e {tyoelake_maksussa:.0f} paid_k {kansanelake:.0f} ueb {used_unemp_benefit:.2f}'+\
+            f' toe {toe:.2f}{kassassa} tk{toekesto:.2f} ura {tyohist:.2f} red {wage_red:.2f} uew {unempwage:.0f}'+\
+            f' (b {unempwage_basis:.0f}) uleft {unemp_left:.2f} aa {oikeus:.0f} 58 {toe58:.0f} ove {ove_paid:.0f}'+\
+            f' pink {pink:d} c{c3:.0f}/{c7:.0f}/{c18:.0f} k {kappa:.2f}'
             
         if reward is not None:
             out+=f' r {reward:.4f}'
@@ -4744,11 +4909,13 @@ class UnemploymentLargeEnv_v4(gym.Env):
         else:
             m=''
 
-        puoliso=f'{m}ps{onpuoliso} {puoliso_tila:d} g {spouse_g:d} w {puoliso_old_wage:.0f} nw {puoliso_next_wage:.0f} a {age:.2f} red {puoliso_wage_reduction:.2f}'+\
+        kappa=self.log_get_kappa(age,spouse_g,puoliso_tila,puoliso_pink)
+
+        puoliso=f'{m}ps{onpuoliso} {puoliso_tila:d} g {spouse_g:d} a {age:.2f} w {puoliso_old_wage:.0f} nw {puoliso_next_wage:.0f} tis {puoliso_time_in_state:.2f}'+\
                 f' pen {puoliso_pension:.0f} paid_e {puoliso_tyoelake_maksussa:.0f} paid_k {puoliso_kansanelake:.0f} ueb {puoliso_used_unemp_benefit:.2f}'+\
-                f' uleft {puoliso_unemp_benefit_left:.2f} puar {puoliso_unemp_after_ra:.2f} uew {puoliso_unempwage:.0f} (b {puoliso_unempwage_basis:.0f})'+\
-                f' aa {puoliso_alkanut_ansiosidonnainen:d} 58 {puoliso_toe58:d} toe {puoliso_toe:.2f}{kassassa} tk {puoliso_toekesto:.2f}'+\
-                f' pink {puoliso_pink:d} ura {puoliso_tyohist:.2f}'
+                f' toe {puoliso_toe:.2f}{kassassa} tk {puoliso_toekesto:.2f} ura {puoliso_tyohist:.2f} red {puoliso_wage_reduction:.2f} uew {puoliso_unempwage:.0f} (b {puoliso_unempwage_basis:.0f})'+\
+                f' uleft {puoliso_unemp_benefit_left:.2f} 58 {puoliso_toe58:d} aa {puoliso_alkanut_ansiosidonnainen:d}'+\
+                f' pink {puoliso_pink:d} k {kappa:.2f}'
                 
         #if benq is not None:
         #    print('omat',benq['omat_kokoelake'],'puoliso',benq['puoliso_kokoelake'])
@@ -4766,7 +4933,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
 
     def close(self):
         '''
-        Ei käytössä
+        Ei k√§yt√§ss√§
         '''
         if self.viewer:
             self.viewer.close()
@@ -4777,19 +4944,19 @@ class UnemploymentLargeEnv_v4(gym.Env):
         Rajat tiloille
         '''
         if self.log_transform:
-            pension_min=np.log(0/20_000+self.eps) # vastainen eläke
-            pension_max=np.log(200_000/20_000+self.eps) # vastainen eläke
+            pension_min=np.log(0/20_000+self.eps) # vastainen el√§ke
+            pension_max=np.log(200_000/20_000+self.eps) # vastainen el√§ke
             wage_max=np.log(500_000/40_000+self.eps)
             wage_min=np.log(0/40_000+self.eps)
-            paid_pension_max=np.log(200_00/20_000+self.eps) # alkanut eläke
-            paid_pension_min=np.log(0/20_000+self.eps) # alkanut eläke
+            paid_pension_max=np.log(200_00/20_000+self.eps) # alkanut el√§ke
+            paid_pension_min=np.log(0/20_000+self.eps) # alkanut el√§ke
         else:
-            pension_max=(200_000-40_000)/40_000 # vastainen eläke
-            pension_min=(0-40_000)/40_000 # vastainen eläke
+            pension_max=(200_000-40_000)/40_000 # vastainen el√§ke
+            pension_min=(0-40_000)/40_000 # vastainen el√§ke
             wage_max=(300_000-40_000)/40_000
             wage_min=(0-40_000)/40_000
-            paid_pension_min=(0-40_000)/40_000 # alkanut eläke
-            paid_pension_max=(200_000-40_000)/40_000 # alkanut eläke
+            paid_pension_min=(0-40_000)/40_000 # alkanut el√§ke
+            paid_pension_max=(200_000-40_000)/40_000 # alkanut el√§ke
 
         age_max=(self.max_age-(self.max_age+self.min_age)/2)/20
         age_min=(self.min_age-(self.max_age+self.min_age)/2)/20
@@ -4797,8 +4964,8 @@ class UnemploymentLargeEnv_v4(gym.Env):
         tis_min=-10/10
         pink_min=0 # irtisanottu vai ei 
         pink_max=1 # irtisanottu vai ei 
-        toe_min=0-self.max_toe*0.5 # työssäoloehto
-        toe_max=self.max_toe-self.max_toe*0.5 # työssäoloehto
+        toe_min=0-self.max_toe*0.5 # ty√∂ss√§oloehto
+        toe_max=self.max_toe-self.max_toe*0.5 # ty√∂ss√§oloehto
         thist_min=-10/20 # tyohistoria: 300/400 pv
         thist_max=(self.max_age-self.min_age-10)/20 # tyohistoria: 300/400 pv
         out_max=100
@@ -4867,7 +5034,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
             child_min,
             child_min,
             state_min,
-            pension_min, # ove määrä
+            pension_min, # ove m√§√§r√§
             state_min,
             state_min,
             state_min,
@@ -4951,7 +5118,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
             child_max,
             child_max,
             state_max,
-            pension_max, # ove määrä
+            pension_max, # ove m√§√§r√§
             state_max,
             state_max,
             state_max,
@@ -5019,7 +5186,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
 
     def unempright_left(self,emp,tis,bu,ika,tyohistoria):
         '''
-        Tilastointia varten lasketaan jäljellä olevat ansiosidonnaiset työttömyysturvapäivät
+        Tilastointia varten lasketaan j√§ljell√§ olevat ansiosidonnaiset ty√∂tt√§myysturvap√§iv√§t
         '''
         if ika>=self.minage_500 and tyohistoria>=self.tyohistoria_vaatimus500:
             kesto=self.apvkesto500 #ansiopvraha_kesto500
@@ -5036,455 +5203,6 @@ class UnemploymentLargeEnv_v4(gym.Env):
         else:
             return kesto-bu
             
-    def init_inforate(self):
-        self.kassanjasenyys_joinrate,self.kassanjasenyys_rate=self.rates.infostat_kassanjasenyys_rate()
-            
-    def init_infostate(self,lapsia=0,lasten_iat=np.zeros(15),lapsia_paivakodissa=0,age=18,spouse=False):
-        '''
-        Alustaa infostate-dictorionaryn
-        Siihen talletetaan tieto aiemmista tiloista, joiden avulla lasketaan statistiikkoja
-        '''
-        self.infostate={}
-        states,latest,enimaika,palkka,voc_unempbasis=self.infostat_vocabulary(spouse=False)
-
-        self.infostate[states]=np.zeros(self.n_time)-1
-        self.infostate[palkka]=np.zeros(self.n_time)-1
-        self.infostate[voc_unempbasis]=np.zeros(self.n_time)-1
-        self.infostate[latest]=0
-        self.infostate['children_n']=0
-        self.infostate['children_date']=np.zeros(15)
-        self.infostate[enimaika]=0
-        
-        states,latest,enimaika,palkka,voc_unempbasis=self.infostat_vocabulary(spouse=True)
-        self.infostate[states]=np.zeros(self.n_time)-1
-        self.infostate[palkka]=np.zeros(self.n_time)-1
-        self.infostate[voc_unempbasis]=np.zeros(self.n_time)-1
-        self.infostate[latest]=0
-        self.infostate[enimaika]=0
-        sattuma = np.random.uniform(size=1)
-        t=int((age-self.min_age)/self.timestep)
-        
-        #print('age {} sattuma {} rate {}'.format(age,sattuma,self.kassanjasenyys_rate[t]))
-        
-        if sattuma<self.kassanjasenyys_rate[t]:
-            self.infostate['kassanjasen']=1
-        else:
-            self.infostate['kassanjasen']=0
-        
-    def infostate_add_child(self,age):
-        if self.infostate['children_n']<14:
-            self.infostate['children_date'][self.infostate['children_n']]=age
-            self.infostate['children_n']=self.infostate['children_n']+1
-            
-    def infostate_set_enimmaisaika(self,age,spouse=False):
-        states,latest,enimaika,palkka,voc_unempbasis=self.infostat_vocabulary(spouse=spouse)
-        t=int((age-self.min_age)/self.timestep)
-        self.infostate[enimaika]=t
-        
-    def update_infostate(self,t,state,wage,unempbasis,spouse=False):
-        states,latest,enimaika,palkka,voc_unempbasis=self.infostat_vocabulary(spouse=spouse)
-    
-        self.infostate[states][t]=state
-        self.infostate[latest]=int(t)
-        self.infostate[voc_unempbasis][t]=unempbasis
-        if state==1:
-            self.infostate[palkka][t]=wage
-        elif state==10:
-            self.infostate[palkka][t]=wage*0.5
-        elif state in set([5,6]):
-            self.infostate[palkka][t]=wage
-        else:
-            self.infostate[palkka][t]=0
-        
-    def render_infostate(self):
-        print('states {}'.format(self.infostate['states']))
-        
-    def get_kassanjasenyys(self):
-        return self.infostate['kassanjasen']
-
-    def set_kassanjasenyys(self,value):
-        self.infostate['kassanjasen']=value
-
-    def infostat_kassanjasenyys_update(self,age):
-        if self.infostate['kassanjasen']<1:
-            sattuma = np.random.uniform(size=1)
-            intage=self.map_age(age)
-            if sattuma<self.kassanjasenyys_joinrate[intage]:
-                self.infostate['kassanjasen']=1
-        
-    def comp_toe_wage_nykytila(self,spouse=False):
-        states,latest,enimaika,palkka,voc_unempbasis=self.infostat_vocabulary(spouse=spouse)
-        lstate=int(self.infostate[states][self.infostate[latest]])
-        toes=0
-        wage=0
-        n_toe=int(np.floor(self.max_toe/self.timestep))
-        emp_states={1,10}
-        unemp_states={0,4}
-        family_states={5,6,7}
-        ret_states={2,3,8,9}
-        
-        if self.infostate['kassanjasen']>0:
-            if lstate not in ret_states:
-                if lstate in family_states:
-                    # laskee, onko ollut riittävä toe ansiosidonnaiseen, ei onko päiviä jäljellä
-                    t2=self.infostate[latest]
-                    nt=0
-                    while nt<n_toe and t2>=0:
-                        emps=self.infostate[states][t2]
-                        if emps in family_states:
-                            pass
-                        elif emps in emp_states:
-                            w=self.infostate[palkka][t2]
-                            if w>self.min_toewage:
-                                toes+=self.timestep
-                                wage+=w*self.timestep
-                            elif self.include_halftoe and w>self.min_halftoewage and emps==10:
-                                toes+=0.5*self.timestep
-                                wage+=w*self.timestep
-                            nt=nt+1
-                        elif emps in unemp_states:
-                            nt=nt+1
-                        else:
-                            nt=nt+1
-                        t2=t2-1
-                else:
-                    # laskee, onko toe täyttynyt viimeisimmän ansiosidonnaisen alkamisen jälkeen
-                    t2=self.infostate[latest]
-                    nt=0
-                    t0=self.infostate[enimaika]
-                    while nt<n_toe and t2>=t0:
-                        emps=self.infostate[states][t2]
-                        if emps in family_states:
-                            pass
-                        elif emps in emp_states:
-                            w=self.infostate[palkka][t2]
-                            if w>self.min_toewage:
-                                toes+=self.timestep
-                                wage+=w*self.timestep
-                            elif self.include_halftoe and w>self.min_halftoewage and emps==10:
-                                toes+=0.5*self.timestep
-                                wage+=w*self.timestep
-                            nt=nt+1
-                        elif emps in unemp_states:
-                            nt=nt+1
-                        else:
-                            nt=nt+1
-                        t2=t2-1
-                if toes>=self.ansiopvraha_toe and toes>0:
-                    wage=wage/toes
-                else:
-                    wage=0
-        else:
-            wage=0
-            toes=0
-            
-        toekesto=toes
-            
-        return toes,toekesto,wage
-        
-    def comp_toe_wage_porrastus(self,spouse=False):
-        states,latest,enimaika,palkka,voc_unempbasis=self.infostat_vocabulary(spouse=spouse)
-        lstate=int(self.infostate[states][self.infostate[latest]])
-        toes=0
-        toekesto=0
-        wage=0
-        n_toe=int(np.floor(self.max_toe/self.timestep))
-        emp_states={1,10}
-        unemp_states={0,4}
-        family_states={5,6,7}
-        ret_states={2,3,8,9}
-        
-        
-        if self.infostate['kassanjasen']>0 and lstate not in ret_states:
-            # laskee, onko toe täyttynyt viimeisimmän ansiosidonnaisen alkamisen jälkeen
-            t2=self.infostate[latest]
-            nt=0
-            t0=self.infostate[enimaika]
-            while nt<n_toe and t2>=t0:
-                emps=self.infostate[states][t2]
-                if emps in family_states:
-                    pass
-                elif emps in emp_states:
-                    w=self.infostate[palkka][t2]
-                    if w>self.min_toewage:
-                        toes+=self.timestep
-                    elif self.include_halftoe and w>self.min_halftoewage and emps==10:
-                        toes+=0.5*self.timestep
-                    nt=nt+1
-                #elif emps in unemp_states:
-                #    nt=nt+1
-                else:
-                    nt=nt+1
-                t2=t2-1
-        
-            # laskee, onko ollut riittävä toe ansiosidonnaiseen, ei onko päiviä jäljellä
-            t2=self.infostate[latest]
-            nt=0
-            while nt<n_toe and t2>=0:
-                emps=self.infostate[states][t2]
-                if emps in family_states:
-                    pass
-                elif emps in emp_states:
-                    w=self.infostate[palkka][t2]
-                    if w>self.min_toewage:
-                        toekesto+=self.timestep
-                        wage+=w*self.timestep
-                    elif self.include_halftoe and w>self.min_halftoewage and emps==10:
-                        toekesto+=0.5*self.timestep
-                        wage+=w*self.timestep
-                    nt=nt+1
-                elif emps in unemp_states:
-                    nt=nt+1
-                else:
-                    nt=nt+1
-                t2=t2-1
-                
-            if toekesto>=self.ansiopvraha_toe and toekesto>0:
-                wage=wage/toekesto
-            else:
-                wage=0
-        
-            if lstate in family_states:
-                toes=toekesto
-        else:
-            wage=0
-            toes=0
-            toekesto=0
-            
-        return toes,toekesto,wage        
-        
-    def comp_infostats(self,age,spouse=False):
-        # laske työssäoloehto tarkasti
-        # laske työttömyysturvaan vaikuttavat lasten määrät
-        
-        self.infostat_kassanjasenyys_update(age)
-        
-        toes,toekesto,wage=self.comp_toe_wage(spouse=spouse)
-                
-        #print('toes',toes)
-        
-        #start_t=max(self.infostate['latest']-n_toe,self.infostate['enimmaisaika_alkaa'])
-        #print('-->',start_t,self.infostate['latest'],self.infostate['states'][start_t:self.infostate['latest']],
-        #    self.infostate['wage'][start_t:self.infostate['latest']],toes)
-        
-        children_under18=0
-        children_under7=0
-        children_under3=0
-        for k in range(self.infostate['children_n']):
-            c_age=age-self.infostate['children_date'][k]
-            if c_age<18:
-                children_under18=children_under18+1
-                if c_age<7:
-                    children_under7=children_under7+1
-                    if c_age<3:
-                        children_under3=children_under3+1
-
-        return toes,toekesto,wage,children_under3,children_under7,children_under18
-
-    def infostat_comp_5y_ave_wage(self,spouse=False):
-        emp_states={1,10}
-        unemp_states={0,4}
-        family_states={5,6}
-        
-        states,latest,enimaika,voc_wage,voc_unempbasis=self.infostat_vocabulary(spouse=spouse)
-        #print(states,latest,enimaika,voc_wage,voc_unempbasis)
-    
-        lstate=int(self.infostate[latest])
-        n=int(np.ceil(5/self.timestep))
-        wage=0
-        truewage=0
-        for x in range(lstate-n,lstate):
-            if x<0:
-                pass
-            else:
-                empstate=self.infostate[states][x]
-                if empstate in emp_states:
-                    value=self.infostate[voc_wage][x]
-                    w=value
-                elif empstate in family_states:
-                    value=self.infostate[voc_wage][x]
-                    w=0
-                elif empstate in unemp_states:
-                    value=self.infostate[voc_unempbasis][x]
-                    w=0
-                elif empstate in set([7,12,13]):
-                    value=self.disabbasis_tmtuki
-                    w=0
-                else:
-                    value=0
-                    w=0
-                    
-                if self.plottkdebug:
-                    print(f'{empstate}: {value:.2f}')
-                    
-                wage += value*self.timestep/5
-                truewage += w*self.timestep
-
-        return wage,truewage
-
-    def infostat_can_have_children(self,age):
-        children_under1=0
-        for k in range(self.infostate['children_n']):
-            c_age=age-self.infostate['children_date'][k]
-            if c_age<1.01:
-                children_under1=1
-                break
-
-        if children_under1>0:
-            return False
-        else:
-            return True
-
-    def infostat_vocabulary(self,spouse=False):
-        if spouse:
-            states='spouse_states'
-            latest='spouse_latest'
-            enimaika='spouse_enimmaisaika_alkaa'
-            palkka='spouse_wage'
-            unempbasis='spouse_unempbasis'
-        else:
-            states='states'
-            latest='latest'
-            enimaika='enimmaisaika_alkaa'
-            palkka='wage'
-            unempbasis='unempbasis'
-            
-        return states,latest,enimaika,palkka,unempbasis
-
-    def infostat_check_aareset(self,age,spouse=False):
-        states,latest,enimaika,palkka,voc_unempbasis=self.infostat_vocabulary(spouse=spouse)
-    
-        t=int((age-self.min_age)/self.timestep)
-        ed_t=self.infostate[enimaika]
-        if (t-ed_t)<1.0/self.timestep:
-            return True
-        else:
-            return False
-        
-    def setup_state_encoding(self):
-        self.state_encoding=np.zeros((self.n_empl,self.n_empl))
-        for s in range(self.n_empl):
-            self.state_encoding[s,s]=1
-        self.group_encoding=np.zeros((self.n_groups,self.n_groups))
-        for s in range(self.n_groups):
-            self.group_encoding[s,s]=1
-        self.spousestate_encoding=np.zeros((self.n_spouseempl,self.n_spouseempl))
-        for s in range(self.n_spouseempl):
-            self.spousestate_encoding[s,s]=1
-
-    def print_q(self,a):
-        '''
-        pretty printer for dict
-        '''
-        for x in a.keys():
-            if a[x]>0 or a[x]<0:
-                print('{}:{:.2f} '.format(x,a[x]),end='')
-                
-        print('')
-        
-    def comp_oldtoe(self,printti=False,spouse=False):
-        '''
-        laske työttömyysjaksoa edeltävä työssäoloehto tarkasti
-        '''
-        toes=0
-        n_toe=int(np.floor(self.max_toe/self.timestep))
-        emp_states={1,10}
-        unemp_states={0,4,13}
-        family_states={5,6,7}
-        ret_states={2,3,8,9}
-        wage=0
-        
-        states,latest,enimaika,palkka,voc_unempbasis=self.infostat_vocabulary(spouse=spouse)
-        
-        lstate=int(self.infostate[states][self.infostate[latest]])
-        
-        #if lstate!=0:
-        #    return 0
-        
-        nt=0
-        t2=max(0,self.infostate[enimaika]-1)
-        emp_states={1,10}
-        unemp_states={0,4}
-        family_states={5,6,7}
-        while nt<n_toe:
-            emps=self.infostate[states][t2]
-            if printti:
-                print('emps {} t2 {} toes {}'.format(emps,t2,toes))
-            if emps in family_states:
-                pass
-            elif emps in emp_states:
-                if self.infostate[palkka][t2]>self.min_toewage:
-                    toes+=self.timestep
-                elif self.include_halftoe and self.infostate[palkka][t2]>=self.min_halftoewage and emps==10:
-                    toes+=0.5*self.timestep
-                nt=nt+1
-            elif emps in unemp_states:
-                nt=nt+1
-            else:
-                nt=nt+1
-            t2=t2-1
-
-        return toes
-
-    def check_toe58_v1(self,age,toe,tyoura,toe58):
-        if age<self.minage_500:
-            return 0
-        elif self.tyossaoloehto(toe,tyoura,age) and tyoura>=self.tyohistoria_vaatimus500:
-            return 1
-        else:
-            return 0
-
-    def check_toe58(self,age,toe,tyoura,toe58,spouse=False):
-        '''
-        laske työttömyysjaksoa edeltävä työssäoloehto tarkasti
-        '''
-        states,latest,enimaika,palkka,voc_unempbasis=self.infostat_vocabulary(spouse=spouse)
-        
-        toes=0
-        n_toe=int(np.floor(self.max_toe/self.timestep))
-        emp_states={1,10}
-        unemp_states={0,4}
-        family_states={5,6,7}
-        ret_states={2,3,8,9}
-        lstate=int(self.infostate[states][self.infostate[latest]])
-        
-        if age<self.minage_500 or lstate in ret_states:
-            return 0
-
-        t=self.map_age(age)
-        t58=self.map_age(58)
-        
-        #if lstate!=0:
-        #    return 0
-        
-        nt=0
-        if lstate in unemp_states:
-            t2=max(0,self.infostate[enimaika]-1)
-        else:
-            t2=max(0,self.infostate[latest])
-        
-        while nt<n_toe and nt<t-t58:
-            emps=self.infostate[states][t2]
-            if emps in family_states:
-                pass
-            elif emps in emp_states:
-                if self.infostate[palkka][t2]>self.min_toewage:
-                    toes+=self.timestep
-                elif self.include_halftoe and self.infostate[palkka][t2]>=self.min_halftoewage and emps==10:
-                    toes+=0.5*self.timestep
-                nt=nt+1
-            elif emps in unemp_states:
-                nt=nt+1
-            else:
-                nt=nt+1
-            t2=t2-1
-
-        if self.tyossaoloehto(toes,tyoura,age) and tyoura>=self.tyohistoria_vaatimus500:
-            return 1
-        else:
-            return 0
-
-        
     def swap_spouses(self,vec):
         employment_status,g,pension,wage,age,time_in_state,paid_pension,pinkslip,toe,\
             toekesto,tyoura,used_unemp_benefit,wage_reduction,unemp_after_ra,unempwage,\
@@ -5514,14 +5232,16 @@ class UnemploymentLargeEnv_v4(gym.Env):
             pinkslip,ove_paid,puoliso_kansanelake,kansanelake,
             prefnoise)
                                 
-    def test_swap(self):
+    def test_swap(self,minage=18,maxage=70):
         self.reset_exploration_go=True
         self.reset_exploration_ratio=0.4
         self.randomness=False
+        self.silent=True
         
         for k in range(100):
             self.reset()
-            vec0=self.random_init_state()
+            self.steps_beyond_done=None
+            vec0=self.random_init_state(minage=minage,maxage=maxage)
             self.state=vec0
             action0=random.randint(0,4)
             action1=random.randint(0,4)
@@ -5532,25 +5252,28 @@ class UnemploymentLargeEnv_v4(gym.Env):
             a=np.array([action1,action0])
 
             self.state=vec1
+            self.steps_beyond_done=None
             _,r1,_,q1=self.step(a)
             
-            #self.check_state_vec(vec0,vec1)
-            
+            if not math.isclose(r0,r1):
+                self.render()
+                print('!!!! ERROR:')
             print(r0,r1)
             vec2=self.swap_spouses(vec1)
             self.check_state_vec(vec0,vec2)
             self.pretty_print(q0,q1)
             
             print('\n----------')
-    
-    def pretty_print(self,q,q2):
-        import copy
-        for key in q:
-            if q[key]>0 or q[key]<0:
-                key2=copy.copy(key)
-                if 'omat_' in key:
-                    key2=key.replace('omat_','puoliso_')
-                if 'puoliso_' in key:
-                    key2=key.replace('puoliso_','omat_')
-                if not math.isclose(q[key],q2[key2]):
-                    print(key,': {:.2f} vs {:.2f}, {} {}'.format(q[key],q2[key2],key,key2))
+        
+    def setup_state_encoding(self):
+        self.state_encoding=np.zeros((self.n_empl,self.n_empl))
+        for s in range(self.n_empl):
+            self.state_encoding[s,s]=1
+        self.group_encoding=np.zeros((self.n_groups,self.n_groups))
+        for s in range(self.n_groups):
+            self.group_encoding[s,s]=1
+        self.spousestate_encoding=np.zeros((self.n_spouseempl,self.n_spouseempl))
+        for s in range(self.n_spouseempl):
+            self.spousestate_encoding[s,s]=1
+
+
