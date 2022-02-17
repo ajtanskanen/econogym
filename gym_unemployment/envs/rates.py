@@ -682,7 +682,7 @@ class Rates():
         reemployment probability in 3 months
         '''
         reemp=np.zeros(100)
-        reemp[0:25]=0.36
+        reemp[0:25]=0.40
         reemp[25:50]=0.50
         reemp[50:100]=0.45
         

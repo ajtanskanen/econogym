@@ -396,6 +396,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
         prob_3m=self.rates.get_reemp_prob() # 0.5
         prob_1y=1-(1-prob_3m)**(1./0.25)
         self.unemp_reemp_prob=1-(1-prob_1y)**self.timestep # kolmessa kuukaudessa
+        print('unemp_reemp_prob',self.unemp_reemp_prob)
         
         #self.disability_intensity=self.rates.get_eff_disab_rate()
         self.disability_intensity=self.rates.get_eff_disab_rate_v2()
@@ -1785,8 +1786,9 @@ class UnemploymentLargeEnv_v4(gym.Env):
         time_in_state+=self.timestep
         karenssia_jaljella=0
         
+        # if the aim is to be employed, there is a definite age-dependent probability that a person is reemployed
         if (action == 1 or action == 3 or (action in set([2,4]) and age < self.min_retirementage)) and self.unemp_limit_reemp:
-            if np.random.uniform()<self.unemp_reemp_prob[intage] and self.randomness:
+            if sattuma[7]>self.unemp_reemp_prob[intage] and self.randomness:
                 action = 0
             
         if age>=self.max_unemploymentbenefitage:
@@ -1869,7 +1871,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
         karenssia_jaljella=0
                 
         if (action == 1 or action == 3 or (action in set([2,4]) and age < self.min_retirementage)) and self.unemp_limit_reemp:
-            if np.random.uniform()<self.unemp_reemp_prob[intage] and self.randomness:
+            if sattuma[7]>self.unemp_reemp_prob[intage] and self.randomness:
                 action = 0
 
         if age>=self.max_unemploymentbenefitage:
@@ -1933,7 +1935,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
         karenssia_jaljella=0
 
         if (action == 1 or action == 3 or (action in set([2,4]) and age < self.min_retirementage)) and self.unemp_limit_reemp:
-            if np.random.uniform()<self.unemp_reemp_prob[intage] and self.randomness:
+            if sattuma[7]>self.unemp_reemp_prob[intage] and self.randomness:
                 action = 0
         
         if age>=self.max_unemploymentbenefitage:
@@ -2099,7 +2101,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
             time_in_state += self.timestep
             
             if (action in set([1,2,3,4,5])) and self.unemp_limit_reemp:
-                if np.random.uniform()<self.unemp_reemp_prob[intage] and self.randomness:
+                if sattuma[7]>self.unemp_reemp_prob[intage] and self.randomness:
                     action = 0
 
             if age>=self.max_retirementage:
@@ -2242,7 +2244,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
 
         if (action == 0) and (time_in_state>self.kht_kesto or children_under3<1): # jos etuus loppuu, siirtymä satunnaisesti
             if self.randomness:
-                s=np.random.uniform()
+                s=sattuma[5] #np.random.uniform()
             else:
                 s=0
                 
@@ -2254,7 +2256,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
                 action=3
                 
         if (action == 2 or action == 5 or action == 3) and self.unemp_limit_reemp:
-            if np.random.uniform()<self.unemp_reemp_prob[intage] and self.randomness:
+            if sattuma[7]>self.unemp_reemp_prob[intage] and self.randomness:
                 action = 1
 
         if age >= self.min_retirementage: # ve
@@ -2301,7 +2303,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
         
         # työllistymisrajoite vain alle 30v
         if (action == 0 or action == 1 or action == 3 or action == 4 or action == 5) and self.unemp_limit_reemp and intage<30:
-            if np.random.uniform()<self.unemp_reemp_prob[intage] and self.randomness:
+            if sattuma[7]>self.unemp_reemp_prob[intage] and self.randomness:
                 action = 2
         
         if sattuma[5]>=self.student_outrate[intage,g]:
@@ -2508,10 +2510,6 @@ class UnemploymentLargeEnv_v4(gym.Env):
         '''
         karenssia_jaljella=0
 
-        if (action == 0 or action == 1 or action == 3 or action == 4 or action == 5) and self.unemp_limit_reemp:
-            if np.random.uniform()<self.unemp_reemp_prob[intage] and self.randomness:
-                action = 2
-        
         if age>=self.min_retirementage:
             employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
                 self.move_to_retirement(wage,pension,old_wage,age,kansanelake,tyoelake,employment_status,
@@ -2521,33 +2519,38 @@ class UnemploymentLargeEnv_v4(gym.Env):
             employment_status = 11 # unchanged
             pension = pension * self.palkkakerroin
             tyoelake = tyoelake * self.elakeindeksi
-        elif action == 0 or action == 1: # 
-            employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
-                self.move_to_work(wage,pension,tyoelake,wage,age,time_in_state,tyoura,pinkslip)
-        elif action == 1:
-            if children_under3>0:
-                employment_status,pension,tyoelake,wage,time_in_state=self.move_to_kht(wage,pension,tyoelake,old_wage,age)
-            else:
+        else:
+            if (action in set ([0,1,3,4,5])) and self.unemp_limit_reemp:
+                if sattuma[7]>self.unemp_reemp_prob[intage] and self.randomness:
+                    action = 2
+        
+            if action == 0 or action == 1: # 
+                employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
+                    self.move_to_work(wage,pension,tyoelake,wage,age,time_in_state,tyoura,pinkslip)
+            elif action == 1:
+                if children_under3>0:
+                    employment_status,pension,tyoelake,wage,time_in_state=self.move_to_kht(wage,pension,tyoelake,old_wage,age)
+                else:
+                    pinkslip=0
+                    employment_status,kansanelake,tyoelake,pension,wage,time_in_state,\
+                        used_unemp_benefit,pinkslip,unemp_after_ra,unempwage_basis,alkanut_ansiosidonnainen,karenssia_jaljella=\
+                        self.move_to_unemp(wage,pension,old_wage,age,kansanelake,tyoelake,toe,toekesto,pinkslip,tyoura,
+                            used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,alkanut_ansiosidonnainen,toe58,has_spouse,is_spouse)
+            elif action == 2: # 
                 pinkslip=0
                 employment_status,kansanelake,tyoelake,pension,wage,time_in_state,\
                     used_unemp_benefit,pinkslip,unemp_after_ra,unempwage_basis,alkanut_ansiosidonnainen,karenssia_jaljella=\
                     self.move_to_unemp(wage,pension,old_wage,age,kansanelake,tyoelake,toe,toekesto,pinkslip,tyoura,
                         used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,alkanut_ansiosidonnainen,toe58,has_spouse,is_spouse)
-        elif action == 2: # 
-            pinkslip=0
-            employment_status,kansanelake,tyoelake,pension,wage,time_in_state,\
-                used_unemp_benefit,pinkslip,unemp_after_ra,unempwage_basis,alkanut_ansiosidonnainen,karenssia_jaljella=\
-                self.move_to_unemp(wage,pension,old_wage,age,kansanelake,tyoelake,toe,toekesto,pinkslip,tyoura,
-                    used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,alkanut_ansiosidonnainen,toe58,has_spouse,is_spouse)
-        elif action == 3 or action == 4 or action == 5: # 
-            employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
-                self.move_to_parttime(wage,pension,tyoelake,wage,age,tyoura,time_in_state)
-        elif action == 11: # tk
-            employment_status,pension,kansanelake,tyoelake,wage,time_in_state,ove_paid=\
-                self.move_to_disab(wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse)
-            pinkslip=0
-        else:
-            print('error 19: ',action)
+            elif action == 3 or action == 4 or action == 5: # 
+                employment_status,pension,tyoelake,wage,time_in_state,tyoura,pinkslip=\
+                    self.move_to_parttime(wage,pension,tyoelake,wage,age,tyoura,time_in_state)
+            elif action == 11: # tk
+                employment_status,pension,kansanelake,tyoelake,wage,time_in_state,ove_paid=\
+                    self.move_to_disab(wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse)
+                pinkslip=0
+            else:
+                print('error 19: ',action)
 
         return employment_status,kansanelake,tyoelake,pension,wage,time_in_state,\
                pinkslip,unemp_after_ra,tyoura,used_unemp_benefit,unempwage_basis,\
@@ -2810,25 +2813,25 @@ class UnemploymentLargeEnv_v4(gym.Env):
             
         return palkka
         
-    def update_family(self,puoliso,age,employment_status,puoliso_tila):
+    def update_family(self,puoliso,age,employment_status,puoliso_tila,sattuma):
         '''
         Päivitä puolison/potentiaalisen puolison tila & palkka
         Päivitä avioliitto/avoliitto
         '''
-        if self.randomness:
-            sattuma = np.random.uniform(size=2)
-        else:
-            sattuma = np.array([0,0])
+        #if self.randomness:
+        #    sattuma = np.random.uniform(size=2)
+        #else:
+        #    sattuma = np.array([0,0])
         
         # update marital status
         intage=int(np.floor(age))
         if puoliso>0:
-            if self.divorce_rate[intage]>sattuma[0]:
+            if self.divorce_rate[intage]>sattuma[6]:
                 puoliso=0
             else:
                 puoliso=1
         else:
-            if self.marriage_rate[intage]>sattuma[0]:
+            if self.marriage_rate[intage]>sattuma[6]:
                 puoliso=1
             else:
                 puoliso=0
@@ -2970,11 +2973,11 @@ class UnemploymentLargeEnv_v4(gym.Env):
         prevstatepuol=puoliso_tila
         if self.randomness:
             # kaikki satunnaisuus kerralla
-            sattuma = np.random.uniform(size=7)
-            sattuma2 = np.random.uniform(size=7)
+            sattuma = np.random.uniform(size=8)
+            sattuma2 = np.random.uniform(size=8)
             
             if self.include_spouses:
-                puoliso=self.update_family(puoliso,age,employment_status,puoliso_tila)
+                puoliso=self.update_family(puoliso,age,employment_status,puoliso_tila,sattuma)
             else:
                 puoliso=0
             
