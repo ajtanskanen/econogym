@@ -24,10 +24,14 @@ Ty{\"o}llisyysvaikutuksien arviointia teko{\"a}lyll{\"a}: Unelmoivatko robotit a
 A more realistic environment with 15 states. This is the version used in article Tanskanen (2020b)
 Includes fixes to version v1.
 
-### v3 - the latest
+### v3 - the last model with single individuals
 
-A more realistic environment with 15 states. This is the version used that will be used in future articles.
-Includes fixes to versions v1 and v3. This is the one that should be used.
+A more realistic environment with 15 states. Includes fixes to versions v1 and v2.
+
+### v4 - couples
+
+A still more realistic environment with 16 states. It this version, couples are implemented.
+Both partners in a couple make their decisions individually. This is the one that should be used.
 
 ## Rewards
 
@@ -71,24 +75,30 @@ command
 in the parent directory of gym_unemployment, where you can find setup.py file.
 
 
+The model is written in Python 3.
+
 ## References
 
-	@misc{econogym,
+	@misc{lifecycle_rl_,
 	  author = {Antti J. Tanskanen},
-	  title = {Suomen sosiaaliturva ja verotus Gym-ympäristönä},
-	  year = {2019a},
+	  title = {Elinkaarimalli},
+	  year = {2019},
 	  publisher = {GitHub},
 	  journal = {GitHub repository},
-	  howpublished = {\url{https://github.com/ajtanskanen/econogym}},
+	  howpublished = {\url{https://github.com/ajtanskanen/lifecycle_rl}},
 	}
-	
-The library is described in articles
 
-    @article{tanskanen2020deep,
-      title={Deep reinforced learning enables solving discrete-choice life cycle models to analyze social security reforms},
+Description of the lifecycle model can be found from articles 
+<a href='https://www.taloustieteellinenyhdistys.fi/wp-content/uploads/2020/06/KAK_2_2020_WEB-94-123.pdf'>Tanskanen (2020) and 
+<a href='https://www.sciencedirect.com/science/article/pii/S2590291122000171'>Tanskanen (2022)</a>.
+
+    @article{tanskanen2022deep,
+      title={Deep reinforced learning enables solving rich discrete-choice life cycle models to analyze social security reforms},
       author={Tanskanen, Antti J},
-      journal={arXiv preprint arXiv:2010.13471},
-      year={2020}
+      journal={Social Sciences & Humanities Open},
+      volume={5},
+      pages={100263},
+      year={2022}
     }
     
     @article{tanskanen2020tyollisyysvaikutuksien,
