@@ -13,3 +13,4 @@ from gym_unemployment.envs.unemployment_porrastus_v1 import UnemploymentStepsLar
 from gym_unemployment.envs.test_environment import TestEnv
 from gym_unemployment.envs.savings_v0 import SavingsEnv_v0
 from gym_unemployment.envs.rates import Rates
+from gym_unemployment.envs.wages_v1 import Wages_v1

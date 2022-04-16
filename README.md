@@ -21,7 +21,7 @@ Ty{\"o}llisyysvaikutuksien arviointia teko{\"a}lyll{\"a}: Unelmoivatko robotit a
 
 ### v2 - improved
 
-A more realistic environment with 15 states. This is the version used in article Tanskanen (2020b)
+A version of the model with 15 states. This is the version used in article Tanskanen (2020)
 Includes fixes to version v1.
 
 ### v3 - the last model with single individuals
@@ -89,7 +89,7 @@ The model is written in Python 3.
 	}
 
 Description of the lifecycle model can be found from articles 
-<a href='https://www.taloustieteellinenyhdistys.fi/wp-content/uploads/2020/06/KAK_2_2020_WEB-94-123.pdf'>Tanskanen (2020) and 
+<a href='https://www.taloustieteellinenyhdistys.fi/wp-content/uploads/2020/06/KAK_2_2020_WEB-94-123.pdf'>Tanskanen (2020)</a> and 
 <a href='https://www.sciencedirect.com/science/article/pii/S2590291122000171'>Tanskanen (2022)</a>.
 
     @article{tanskanen2022deep,
