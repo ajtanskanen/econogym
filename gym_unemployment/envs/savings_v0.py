@@ -733,7 +733,7 @@ class SavingsEnv_v0(gym.Env):
             self.viewer = None
             
     def map_save_action(self,sav_act):
-        s=(sav_act-self.mid_sav_act)*100
+        s=(sav_act-self.mid_sav_act)/100
         
         return s
         
@@ -742,16 +742,15 @@ class SavingsEnv_v0(gym.Env):
         savings=savings+interest
         
         if sav_action>0:
-            #sav_action=min(sav_action,netto)
-            netto-=sav_action
-            savings+=sav_action
-        else:
-            if (savings>self.max_debt and empstate!=2) or (savings>0 and empstate==2):
-                netto-=sav_action-interest
-                savings+=sav_action-interest
-            else:
-                netto=netto+interest
-                savings=savings-interest
+            save=sav_action*netto
+            save=min(save,0.9*netto)
+            netto-=save
+            savings+=save
+        elif savings<0:
+            save=sav_action*netto
+            if (savings+save>self.max_debt and empstate!=2) or (savings>0 and empstate==2):
+                netto+=-save
+                savings+=save
         
         return netto,savings
 
@@ -925,6 +924,8 @@ class SavingsEnv_v0(gym.Env):
         else:
             print('Unknown employment_status {s} of type {t}'.format(s=employment_status,t=type(employment_status)))
         
+        age=age+self.timestep
+
         done = age >= self.max_age
         done = bool(done)
         
@@ -1028,6 +1029,12 @@ class SavingsEnv_v0(gym.Env):
         d[states+6]=(savings-20_000)/20_000
         
         return d
+        
+    def get_mortstate(self):
+        return -1
+
+    def get_minimal(self):
+        return True
 
     def state_decode(self,vec):
         emp=-1

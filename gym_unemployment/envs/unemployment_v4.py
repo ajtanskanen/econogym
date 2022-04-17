@@ -428,7 +428,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
         
         self.disability_intensity,self.svpaivaraha_disabilityrate=self.rates.get_eff_disab_rate_v4()
         self.pinkslip_intensity=self.rates.get_pinkslip_rate()*self.timestep
-        self.birth_intensity=self.rates.get_birth_rate_v2(symmetric=True)
+        self.birth_intensity=self.rates.get_birth_rate_v2(symmetric=False)
         self.mort_intensity=self.rates.get_mort_rate()
         self.student_inrate,self.student_outrate=self.rates.get_student_rate_v2() # myös armeijassa olevat tässä
         self.outsider_inrate,self.outsider_outrate=self.rates.get_outsider_rate()
@@ -3762,7 +3762,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
             
             self.max_mu_age=self.min_retirementage+6.0 # 
             
-            self.men_kappa_fulltime=0.740 # vapaa-ajan menetyksestä rangaistus miehille
+            self.men_kappa_fulltime=0.736 # vapaa-ajan menetyksestä rangaistus miehille
             self.men_mu_scale_kokoaika=0.0515 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
             self.men_mu_scale_osaaika=0.0350 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
             self.men_mu_age=self.min_retirementage-8.75 #5.5 # P.O. 60??
@@ -3777,16 +3777,16 @@ class UnemploymentLargeEnv_v4(gym.Env):
             self.men_kappa_pinkslip_middle=0.20
             self.men_kappa_pinkslip_elderly=0.15
             
-            self.women_kappa_fulltime=0.585 # vapaa-ajan menetyksestä rangaistus naisille
+            self.women_kappa_fulltime=0.581 # vapaa-ajan menetyksestä rangaistus naisille
             self.women_mu_scale_kokoaika=0.0515 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
             self.women_mu_scale_osaaika=0.0350 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
             self.women_mu_age=self.min_retirementage-4.5 #4.0 # 61 #5 P.O. 60??
-            self.women_kappa_osaaika_young=0.380
+            self.women_kappa_osaaika_young=0.376
             self.women_kappa_osaaika_middle=0.400
             #self.women_kappa_osaaika_old=0.48
             self.women_kappa_osaaika_old=0.400 # self.women_kappa_osaaika_middle
             self.women_kappa_osaaika_pension=0.55
-            self.women_kappa_hoitovapaa=0.280 # 0.27
+            self.women_kappa_hoitovapaa=0.270 # 0.27
             self.women_kappa_ve=0.25
             self.women_kappa_pinkslip_young=0.35
             self.women_kappa_pinkslip_middle=0.20
@@ -5967,3 +5967,8 @@ class UnemploymentLargeEnv_v4(gym.Env):
             self.pretty_print(q0,q1)
             
             print('\n----------')
+
+    def get_minimal(self):
+        return False
+
+

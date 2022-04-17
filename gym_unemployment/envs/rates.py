@@ -553,7 +553,7 @@ class Rates():
             dfactor=np.array([0.8,1.0,1.25,0.8,1.0,1.25])
         else:
             #dfactor=np.array([0.75,1.0,1.375,0.6,1.0,1.6])
-            dfactor=np.array([0.75,1.0,0.,0.6,1.0,0.])
+            dfactor=np.array([0.6,1.05,0.,0.75,1.05,0.])
             dfactor[2]=self.get_w(0,dfactor[0],dfactor[1])
             dfactor[5]=self.get_w(1,dfactor[3],dfactor[4])
             
