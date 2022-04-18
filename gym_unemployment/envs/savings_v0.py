@@ -60,6 +60,82 @@ class SavingsEnv_v0(gym.Env):
     def __init__(self,**kwargs):
         super().__init__()
         
+        self.setup_default_params()
+                
+        # sets parameters based on kwargs
+        self.set_parameters(**kwargs)
+
+        #if self.train:
+        #    self.partial_npv=True
+        #    print('partial')
+        #else:
+        self.partial_npv=False
+         
+        # ei skaalata!
+        #self.ansiopvraha_kesto400=self.ansiopvraha_kesto400/(12*21.5)
+
+        self.r=(1+self.tuotto)/self.reaalinen_palkkojenkasvu # reaalituotto 10 %
+        self.salary_const=0.05*self.timestep
+        self.gamma=self.gamma_discount**self.timestep
+        
+        self.parttime_income=0.5
+        
+        if not self.silent:
+            print('minimal model')
+        self.n_age=self.max_age-self.min_age+1
+        
+        #if self.min_retirementage>self.max_unemp_age:
+        self.max_unemp_age=self.min_retirementage 
+    
+        if self.include_pt:
+            self.n_empl=6 # states of employment, 0,1,2,3
+            self.n_actions=4
+        else:
+            self.n_empl=5 # states of employment, 0,1,2
+            self.n_actions=3
+
+        self.setup_state_encoding()
+
+        self.n_savings=21 # -20,...,-4,-3,-2,-1,0,1,2,3,4,...,20
+        self.mid_sav_act=np.floor(self.n_savings/2)
+            
+        self.salary=np.zeros(self.max_age+1)
+        
+        self.pinkslip_intensity=0.05*self.timestep # todennäköisyys tulla irtisanotuksi vuodessa, skaalaa!
+        self.mort_intensity=self.get_mort_rate()*self.timestep # todennäköisyys , skaalaa!
+        self.npv,self.npv0,self.npv_pension,self.npv_savings=self.comp_npv()
+        #print(self.npv,self.npv0,self.npv_pension,self.npv_savings)
+        
+        self.state_limits()        
+
+        self.action_space = spaces.MultiDiscrete([self.n_actions,self.n_savings])
+        self.observation_space = spaces.Box(self.low, self.high, dtype=np.float32)
+
+        self.seed()
+        self.viewer = None
+        self.state = None
+        
+        #if self.wage_without_tis:
+        self.get_wage=self.get_wage_without_tis
+        #else:
+        #    self.get_wage=self.get_wage_with_tis
+        
+        self.steps_beyond_done = None
+        
+        if self.perustulo:
+            self.ben = fin_benefits.BasicIncomeBenefits(**kwargs)
+        else:
+            self.ben = fin_benefits.Benefits(**kwargs)
+
+        self.setup_salaries()
+        
+        if not self.silent:
+            self.explain()
+        
+        if self.plotdebug:
+            self.unit_test_code_decode()
+            
+    def setup_default_params(self):
         self.version=0
         
         self.elinaikakerroin=0.95
@@ -67,13 +143,14 @@ class SavingsEnv_v0(gym.Env):
         self.unemp_wageshock=0.95
         
         self.timestep=1.0
-        gamma_discount=0.92 # discounting
+        self.gamma_discount=0.92 # discounting
         #self.gamma=gamma**self.timestep # discounting
-        reaalinen_palkkojenkasvu=1.016
-        self.palkkakerroin=(0.8*1+0.2*1.0/reaalinen_palkkojenkasvu)**self.timestep
-        self.elakeindeksi=(0.2*1+0.8*1.0/reaalinen_palkkojenkasvu)**self.timestep
-        self.kelaindeksi=(1.0/reaalinen_palkkojenkasvu)**self.timestep
-        self.r=1.05/reaalinen_palkkojenkasvu # reaalituotto 5 %
+        self.reaalinen_palkkojenkasvu=1.016
+        self.palkkakerroin=(0.8*1+0.2*1.0/self.reaalinen_palkkojenkasvu)**self.timestep
+        self.elakeindeksi=(0.2*1+0.8*1.0/self.reaalinen_palkkojenkasvu)**self.timestep
+        self.kelaindeksi=(1.0/self.reaalinen_palkkojenkasvu)**self.timestep
+        
+        self.tuotto=0.10 # 10 % tuotto
 
         # karttumaprosentit
         self.acc=0.015*self.timestep
@@ -86,7 +163,7 @@ class SavingsEnv_v0(gym.Env):
         self.max_age=90
         self.min_age=18
         
-        self.max_debt=-20_000
+        self.max_debt=-10_000
             
         self.min_retirementage=65
         self.max_retirementage=70       
@@ -111,7 +188,9 @@ class SavingsEnv_v0(gym.Env):
         self.scale_additional_unemp_benefit=0
         self.include_pt=False
         self.perustulo=False # onko Kelan perustulo laskelmissa
+        self.silent=False
         
+    def set_parameters(self,**kwargs):
         if 'kwargs' in kwargs:
             kwarg=kwargs['kwargs']
         else:
@@ -123,13 +202,16 @@ class SavingsEnv_v0(gym.Env):
                     self.timestep==value
             elif key=='gamma':
                 if value is not None:
-                    gamma_discount=value
+                    self.gamma_discount=value
             elif key=='train':
                 if value is not None:
                     self.train=value
             elif key=='perustulo':
                 if value is not None:
                     self.perustulo=value
+            elif key=='r':
+                if value is not None:
+                    self.tuotto=value
             elif key=='reset_exploration_go':
                 if value is not None:
                     self.reset_exploration_go=value
@@ -181,77 +263,14 @@ class SavingsEnv_v0(gym.Env):
             elif key=='year':
                 if value is not None:
                     self.year=value
+            elif key=='silent':
+                if value is not None:
+                    self.silent=value
             elif key=='scale_additional_tyel_accrual':
                 if value is not None:
                     self.scale_additional_tyel_accrual=value
-
-        #if self.train:
-        #    self.partial_npv=True
-        #    print('partial')
-        #else:
-        self.partial_npv=False
-         
-        # ei skaalata!
-        #self.ansiopvraha_kesto400=self.ansiopvraha_kesto400/(12*21.5)
-
-        self.salary_const=0.05*self.timestep
-        self.gamma=gamma_discount**self.timestep
-        
-        self.parttime_income=0.5
-        
-        print('minimal model')
-        self.n_age=self.max_age-self.min_age+1
-        
-        #if self.min_retirementage>self.max_unemp_age:
-        self.max_unemp_age=self.min_retirementage 
-    
-        if self.include_pt:
-            self.n_empl=6 # states of employment, 0,1,2,3
-            self.n_actions=4
-        else:
-            self.n_empl=5 # states of employment, 0,1,2
-            self.n_actions=3
-
-        self.setup_state_encoding()
-
-        self.n_savings=41 # -20,...,-4,-3,-2,-1,0,1,2,3,4,...,20
-        self.mid_sav_act=np.floor(self.n_savings/2)
+                    
             
-        self.salary=np.zeros(self.max_age+1)
-        
-        self.pinkslip_intensity=0.05*self.timestep # todennäköisyys tulla irtisanotuksi vuodessa, skaalaa!
-        self.mort_intensity=self.get_mort_rate()*self.timestep # todennäköisyys , skaalaa!
-        self.npv,self.npv0,self.npv_pension,self.npv_savings=self.comp_npv()
-        #print(self.npv,self.npv0,self.npv_pension,self.npv_savings)
-        
-        self.state_limits()        
-
-        self.action_space = spaces.MultiDiscrete([self.n_actions,self.n_savings])
-        self.observation_space = spaces.Box(self.low, self.high, dtype=np.float32)
-
-        self.seed()
-        self.viewer = None
-        self.state = None
-        
-        #if self.wage_without_tis:
-        self.get_wage=self.get_wage_without_tis
-        #else:
-        #    self.get_wage=self.get_wage_with_tis
-        
-        self.steps_beyond_done = None
-        
-        if self.perustulo:
-            self.ben = fin_benefits.BasicIncomeBenefits(**kwargs)
-        else:
-            self.ben = fin_benefits.Benefits(**kwargs)
-
-        self.setup_salaries()
-        
-        self.explain()
-        
-        if self.plotdebug:
-            self.unit_test_code_decode()
-        
     def get_n_states(self):
         '''
         Palauta parametrien arvoja
@@ -516,12 +535,12 @@ class SavingsEnv_v0(gym.Env):
     def log_utility(self,income,employment_state,age):
         # kappa tells how much person values free-time
         kappa_fulltime=0.75
-        kappa_parttime=0.30
+        kappa_parttime=0.40
         kappa_retirement=0.10
         mu_age=58+(self.min_retirementage-63.5)
         
         if age>mu_age:
-            mu=0.05 #45
+            mu=0.025 #45
             kappa_fulltime += mu*max(0,min(6,age-mu_age))
             kappa_parttime += mu*max(0,min(6,age-mu_age))
             #kappa_fulltime *= (1+mu*max(0,min(68,age)-mu_age))
@@ -733,26 +752,54 @@ class SavingsEnv_v0(gym.Env):
             self.viewer = None
             
     def map_save_action(self,sav_act):
-        s=(sav_act-self.mid_sav_act)/100
+        if sav_act>0:
+            s=(sav_act-self.mid_sav_act)/100*2
+        else:
+            s=(sav_act-self.mid_sav_act)/self.mid_sav_act
         
         return s
         
-    def update_savings(self,netto,savings,sav_action,empstate):
+    def update_savings(self,netto,savings,sav_action,empstate,age):
         interest=savings*(self.r-1.0)
         savings=savings+interest
         
+        if savings<0:
+            payback = -0.20*savings # lyhennys vähintään  20 % vuodessa
+        else:
+            payback = 0
+
         if sav_action>0:
-            save=sav_action*netto
-            save=min(save,0.9*netto)
+            save=min(0.9*netto,payback+sav_action*netto)
             netto-=save
             savings+=save
-        elif savings<0:
+            mod_sav_act=sav_action
+        elif sav_action<0:
             save=sav_action*netto
-            if (savings+save>self.max_debt and empstate!=2) or (savings>0 and empstate==2):
-                netto+=-save
+            if savings+save>self.max_debt and empstate!=2 and age<self.min_retirementage:
+                save += payback
+                save = min(save,0.9*netto)
+                netto +=-save
                 savings+=save
-        
-        return netto,savings
+                mod_sav_act=sav_action
+            elif savings>0 and empstate==2:
+                save = sav_action*savings
+                netto += -save
+                savings+=save
+                mod_sav_act=sav_action
+            else:
+                save=min(0.9*netto,payback)
+                netto-=save
+                savings+=save
+                mod_sav_act=0
+        else:
+            save=min(0.9*netto,payback)
+            netto-=save
+            savings+=save
+            mod_sav_act=0
+            
+        #print(f'netto {netto} savings {savings} mod_sav_act {mod_sav_act}')
+                    
+        return netto,savings,mod_sav_act
 
     def step(self, action, randomness=True, dynprog=False):
         '''
@@ -789,31 +836,24 @@ class SavingsEnv_v0(gym.Env):
                 employment_status = 0 # unchanged
                 pension=self.pension_accrual(age,old_wage,pension,state=employment_status)
                 netto=self.comp_benefits(0,old_wage,0,employment_status,age)
-                netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
                 next_wage=self.get_wage_raw(next_age,wage,employment_status)
                 employment_status  = 3 # switch to tm-tuki
             elif emp_action == 1: # 
                 employment_status  = 1 # switch to fulltime work
                 pension=self.pension_accrual(age,wage,pension,state=employment_status)
                 netto=self.comp_benefits(wage,0,0,employment_status,age)
-                netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
                 next_wage=self.get_wage_raw(next_age,wage,employment_status)
             elif emp_action == 3: # 
                 employment_status  = 4 # switch to parttime work
                 pension_accrual(age,self.parttime_income*wage,pension,state=employment_status)
                 netto=self.comp_benefits(self.parttime_income*wage,0,0,employment_status,age)
-                netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
-                if not dynprog:
-                    next_wage=self.get_wage_raw(next_age,wage,employment_status)
-                else:
-                    next_wage=0
+                next_wage=self.get_wage_raw(next_age,wage,employment_status)
             elif emp_action == 2:
                 if age>=self.min_retirementage: # ve
                     pension=self.scale_pension(pension,age,emp=0)
                     employment_status  = 2 
                     pension=self.ben.laske_kokonaiselake(age,pension/12,include_kansanelake=True,include_takuuelake=True)*12
                     netto=self.comp_benefits(0,0,pension,employment_status,age)
-                    netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
                     next_wage=0
                 else:
                     print('error 99')
@@ -824,19 +864,16 @@ class SavingsEnv_v0(gym.Env):
                 employment_status = 3 # unchanged
                 pension=self.pension_accrual(age,old_wage,pension,state=employment_status)
                 netto=self.comp_benefits(0,old_wage,0,employment_status,age)
-                netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
                 next_wage=self.get_wage_raw(next_age,wage,employment_status)
             elif emp_action == 1: # 
                 employment_status  = 1 # switch to fulltime work
                 pension=self.pension_accrual(age,wage,pension,state=employment_status)
                 netto=self.comp_benefits(wage,0,0,employment_status,age)
-                netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
                 next_wage=self.get_wage_raw(next_age,wage,employment_status)
             elif emp_action == 3: # 
                 employment_status  = 4 # switch to parttime work
                 pension=self.pension_accrual(age,self.parttime_income*wage,pension,state=employment_status)
                 netto=self.comp_benefits(self.parttime_income*wage,0,employment_status,age)
-                netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
                 next_wage=self.get_wage_raw(next_age,wage,employment_status)
             elif emp_action == 2:
                 if age>=self.min_retirementage: # ve
@@ -844,7 +881,6 @@ class SavingsEnv_v0(gym.Env):
                     employment_status  = 2 
                     pension=self.ben.laske_kokonaiselake(age,pension/12,include_kansanelake=True,include_takuuelake=True)*12
                     netto=self.comp_benefits(0,0,pension,employment_status,age)
-                    netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
                     next_wage=0
                 else:
                     print('error 99')
@@ -855,22 +891,16 @@ class SavingsEnv_v0(gym.Env):
                 employment_status  = 1 # unchanged
                 pension=self.pension_accrual(age,wage,pension,state=employment_status)
                 netto=self.comp_benefits(wage,0,0,employment_status,age)
-                netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
                 next_wage=self.get_wage_raw(next_age,wage,employment_status)
             elif emp_action == 1: # työttömäksi
                 employment_status = 0 # switch
                 pension=self.pension_accrual(age,old_wage,pension,state=employment_status)
                 netto=self.comp_benefits(0,old_wage,0,employment_status,age)
-                netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
-                if not dynprog:
-                    next_wage=self.get_wage_raw(next_age,wage,employment_status)
-                else:
-                    next_wage=0
+                next_wage=self.get_wage_raw(next_age,wage,employment_status)
             elif emp_action == 3: # 
                 employment_status = 4 # switch to parttime work
                 pension=self.pension_accrual(age,self.parttime_income*wage,pension,state=employment_status)
                 netto=self.comp_benefits(self.parttime_income*wage,0,0,employment_status,age)
-                netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
                 next_wage=self.get_wage_raw(next_age,wage,employment_status)
             elif emp_action==2:
                 if age>=self.min_retirementage: # ve
@@ -878,7 +908,6 @@ class SavingsEnv_v0(gym.Env):
                     pension=self.scale_pension(pension,age,emp=1)
                     pension=self.ben.laske_kokonaiselake(age,pension/12,include_kansanelake=True,include_takuuelake=True)*12
                     netto=self.comp_benefits(0,0,pension,employment_status,age)
-                    netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
                     next_wage=0
                 else:
                     print('error 13')
@@ -889,19 +918,16 @@ class SavingsEnv_v0(gym.Env):
                 employment_status  = 3 # unchanged
                 pension=self.pension_accrual(age,self.parttime_income*wage,pension,state=3)
                 netto=self.comp_benefits(self.parttime_income*wage,0,0,employment_status,age)
-                netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
                 next_wage=self.get_wage_raw(next_age,wage,employment_status)
             elif emp_action == 1: # työttömäksi
                 employment_status = 0 # switch
                 pension=self.pension_accrual(age,self.parttime_income*old_wage,pension,state=employment_status)
                 netto=self.comp_benefits(0,self.parttime_income*old_wage,0,employment_status,age)
-                netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
                 next_wage=self.get_wage_raw(next_age,wage,employment_status)
             elif emp_action == 3: # 
                 employment_status  = 1 # switch to fulltime
                 pension=self.pension_accrual(age,wage,pension,state=employment_status)
                 netto=self.comp_benefits(wage,0,0,employment_status,age)
-                netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
                 next_wage=self.get_wage_raw(next_age,wage,employment_status)
             elif emp_action==2:
                 if age>=self.min_retirementage: # ve
@@ -909,7 +935,6 @@ class SavingsEnv_v0(gym.Env):
                     pension=self.scale_pension(pension,age,emp=3)
                     pension=self.ben.laske_kokonaiselake(age,pension/12,include_kansanelake=True,include_takuuelake=True)*12
                     netto=self.comp_benefits(0,0,pension,employment_status,age)
-                    netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
                     next_wage=0
                 else:
                     print('error 13')
@@ -919,10 +944,15 @@ class SavingsEnv_v0(gym.Env):
             employment_status = 2 # unchanged
             pension=pension*self.elakeindeksi
             netto=self.comp_benefits(0,0,pension,employment_status,age)
-            netto,savings = self.update_savings(netto,savings,sav_action,employment_status) 
             next_wage=0
         else:
             print('Unknown employment_status {s} of type {t}'.format(s=employment_status,t=type(employment_status)))
+
+        if emp_action==15:
+            a=1
+            # mortality not included
+        else:
+            netto,savings,mod_sav_action = self.update_savings(netto,savings,sav_action,employment_status,age) 
         
         age=age+self.timestep
 
@@ -936,7 +966,7 @@ class SavingsEnv_v0(gym.Env):
             self.steps_beyond_done = 0
             #if employment_status == 2 and age<self.max_age+self.timestep:
             if age<self.max_age+self.timestep:
-                savings_component=max(0,savings/self.npv_savings)
+                savings_component=savings/self.npv_savings
                 netto=netto+savings_component
                 savings=0
                 reward,equivalent = self.log_utility(netto,2,age)
@@ -962,9 +992,9 @@ class SavingsEnv_v0(gym.Env):
             netto=1e-10
                 
         if self.plotdebug:
-            self.render(done=done,reward=reward,netto=netto,s_ac=sav_action)
+            self.render(done=done,reward=reward,netto=netto,s_ac=mod_sav_action)
             
-        return np.array(self.state), reward, done, {'netto': netto, 'r': reward, 'eq': equivalent}
+        return np.array(self.state), reward, done, {'netto': netto, 'r': reward, 'eq': equivalent, 'mod_sav_action': mod_sav_action}
 
     def get_lc_version(self):
         '''
