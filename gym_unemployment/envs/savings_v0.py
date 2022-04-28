@@ -15,6 +15,8 @@ import numpy as np
 import fin_benefits
 import random
 from scipy.stats import lognorm
+from . rates import Rates
+
 
 class SavingsEnv_v0(gym.Env):
     """
@@ -64,6 +66,9 @@ class SavingsEnv_v0(gym.Env):
                 
         # sets parameters based on kwargs
         self.set_parameters(**kwargs)
+        self.n_age=self.max_age-self.min_age+1
+        self.inv_timestep=int(np.round(1/self.timestep)) # pitäisi olla kokonaisluku
+        self.n_time = int(np.round((self.n_age-1)*self.inv_timestep))+1
 
         #if self.train:
         #    self.partial_npv=True
@@ -74,7 +79,13 @@ class SavingsEnv_v0(gym.Env):
         # ei skaalata!
         #self.ansiopvraha_kesto400=self.ansiopvraha_kesto400/(12*21.5)
 
-        self.r=(1+self.tuotto)/self.reaalinen_palkkojenkasvu # reaalituotto 10 %
+        self.r=(1+self.r_mean)/self.reaalinen_palkkojenkasvu # reaalituotto 10 %
+        
+        if self.random_returns:
+            self.returns=self.stock_returns()
+        else:
+            self.returns=np.ones((self.n_time,1))*self.r
+            
         self.salary_const=0.05*self.timestep
         self.gamma=self.gamma_discount**self.timestep
         
@@ -82,7 +93,6 @@ class SavingsEnv_v0(gym.Env):
         
         if not self.silent:
             print('minimal model')
-        self.n_age=self.max_age-self.min_age+1
         
         #if self.min_retirementage>self.max_unemp_age:
         self.max_unemp_age=self.min_retirementage 
@@ -101,8 +111,12 @@ class SavingsEnv_v0(gym.Env):
             
         self.salary=np.zeros(self.max_age+1)
         
+        self.n_groups=1
+        self.rates=Rates(year=self.year,silent=self.silent,max_age=self.max_age,
+            n_groups=self.n_groups,timestep=self.timestep,inv_timestep=self.inv_timestep,n_empl=self.n_empl)
+        
         self.pinkslip_intensity=0.05*self.timestep # todennäköisyys tulla irtisanotuksi vuodessa, skaalaa!
-        self.mort_intensity=self.get_mort_rate()*self.timestep # todennäköisyys , skaalaa!
+        self.mort_intensity=self.rates.get_mort_rate_nogroups()*self.timestep # todennäköisyys , skaalaa!
         self.npv,self.npv0,self.npv_pension,self.npv_savings=self.comp_npv()
         #print(self.npv,self.npv0,self.npv_pension,self.npv_savings)
         
@@ -142,6 +156,7 @@ class SavingsEnv_v0(gym.Env):
         
         self.unemp_wageshock=0.95
         
+        self.random_returns=False
         self.timestep=1.0
         self.gamma_discount=0.92 # discounting
         #self.gamma=gamma**self.timestep # discounting
@@ -150,7 +165,8 @@ class SavingsEnv_v0(gym.Env):
         self.elakeindeksi=(0.2*1+0.8*1.0/self.reaalinen_palkkojenkasvu)**self.timestep
         self.kelaindeksi=(1.0/self.reaalinen_palkkojenkasvu)**self.timestep
         
-        self.tuotto=0.10 # 10 % tuotto
+        self.r_mean=0.10 # 10 % tuotto
+        self.r_std=0.10 # 10 % volatiliteetti
 
         # karttumaprosentit
         self.acc=0.015*self.timestep
@@ -199,7 +215,10 @@ class SavingsEnv_v0(gym.Env):
         for key, value in kwarg.items():
             if key=='step':
                 if value is not None:
-                    self.timestep==value
+                    self.timestep=value
+            if key=='random_returns':
+                if value is not None:
+                    self.random_returns=value
             elif key=='gamma':
                 if value is not None:
                     self.gamma_discount=value
@@ -209,9 +228,12 @@ class SavingsEnv_v0(gym.Env):
             elif key=='perustulo':
                 if value is not None:
                     self.perustulo=value
-            elif key=='r':
+            elif key=='r_mean':
                 if value is not None:
-                    self.tuotto=value
+                    self.r_mean=value
+            elif key=='r_std':
+                if value is not None:
+                    self.r_std=value
             elif key=='reset_exploration_go':
                 if value is not None:
                     self.reset_exploration_go=value
@@ -428,12 +450,6 @@ class SavingsEnv_v0(gym.Env):
         else:
             return 0
             
-    def get_mort_rate(self):
-        # tilastokeskuksen kuolleisuusdata 2017 sukupuolittain
-        mort=np.array([2.12,0.32,0.17,0.07,0.07,0.10,0.00,0.09,0.03,0.13,0.03,0.07,0.10,0.10,0.10,0.23,0.50,0.52,0.42,0.87,0.79,0.66,0.71,0.69,0.98,0.80,0.77,1.07,0.97,0.76,0.83,1.03,0.98,1.20,1.03,0.76,1.22,1.29,1.10,1.26,1.37,1.43,1.71,2.32,2.22,1.89,2.05,2.15,2.71,2.96,3.52,3.54,4.30,4.34,5.09,4.75,6.17,5.88,6.67,8.00,9.20,10.52,10.30,12.26,12.74,13.22,15.03,17.24,18.14,17.78,20.35,25.57,23.53,26.50,28.57,31.87,34.65,40.88,42.43,52.28,59.26,62.92,68.86,72.70,94.04,99.88,113.11,128.52,147.96,161.89,175.99,199.39,212.52,248.32,260.47,284.01,319.98,349.28,301.37,370.17,370.17])/1000.0
-        
-        return mort
-        
     def pension_accrual(self,age,wage,pension,state=1):
         '''
         Eläkkeen karttumisrutiini
@@ -534,15 +550,15 @@ class SavingsEnv_v0(gym.Env):
     # from Hakola and Määttänen, 2005
     def log_utility(self,income,employment_state,age):
         # kappa tells how much person values free-time
-        kappa_fulltime=0.75
+        kappa_fulltime=0.76
         kappa_parttime=0.40
         kappa_retirement=0.10
         mu_age=58+(self.min_retirementage-63.5)
         
         if age>mu_age:
-            mu=0.025 #45
-            kappa_fulltime += mu*max(0,min(6,age-mu_age))
-            kappa_parttime += mu*max(0,min(6,age-mu_age))
+            mu=0.01 #45
+            kappa_fulltime += mu*max(0,min(10,age-mu_age))
+            kappa_parttime += mu*max(0,min(10,age-mu_age))
             #kappa_fulltime *= (1+mu*max(0,min(68,age)-mu_age))
             #kappa_parttime *= (1+mu*max(0,min(68,age)-mu_age))
         #elif age<40:
@@ -589,8 +605,7 @@ class SavingsEnv_v0(gym.Env):
     def get_wage_raw(self,age,wage,state):
         a0=self.palkat_ika[min(self.palkat_maxlen,max(0,age-1-self.min_age))]
         a1=self.palkat_ika[min(self.palkat_maxlen,age-self.min_age)]
-        #a0=self.palkat_ika_miehet[max(0,age-1-self.min_age)]
-        #a1=self.palkat_ika_miehet[age-self.min_age]
+
         if state==0:
             r=self.unemp_wageshock #0.95
         else:
@@ -612,8 +627,6 @@ class SavingsEnv_v0(gym.Env):
         
         a0=self.palkat_ika[max(0,age-1-self.min_age)]
         a1=self.palkat_ika[age-self.min_age]
-        #a0=self.palkat_ika_miehet[max(0,age-1-self.min_age)]
-        #a1=self.palkat_ika_miehet[age-self.min_age]
            
         if state==0:
            factor=self.unemp_wageshock # 0.95
@@ -759,8 +772,9 @@ class SavingsEnv_v0(gym.Env):
         
         return s
         
-    def update_savings(self,netto,savings,sav_action,empstate,age):
-        interest=savings*(self.r-1.0)
+    def update_savings(self,age,netto,savings,sav_action,empstate):
+        t=self.map_age(age)
+        interest=savings*(self.returns[t]-1.0)
         savings=savings+interest
         
         if savings<0:
@@ -800,7 +814,13 @@ class SavingsEnv_v0(gym.Env):
         #print(f'netto {netto} savings {savings} mod_sav_act {mod_sav_act}')
                     
         return netto,savings,mod_sav_act
-
+        
+    def map_age(self,age : float,start_zero=False):
+        if start_zero:
+            return int((age)*self.inv_timestep)
+        else:
+            return int((age-self.min_age)*self.inv_timestep)
+          
     def step(self, action, randomness=True, dynprog=False):
         '''
         Open AI interfacen mukainen step-funktio, joka tekee askeleen eteenpäin
@@ -952,7 +972,7 @@ class SavingsEnv_v0(gym.Env):
             a=1
             # mortality not included
         else:
-            netto,savings,mod_sav_action = self.update_savings(netto,savings,sav_action,employment_status,age) 
+            netto,savings,mod_sav_action = self.update_savings(age,netto,savings,sav_action,employment_status) 
         
         age=age+self.timestep
 
@@ -966,7 +986,7 @@ class SavingsEnv_v0(gym.Env):
             self.steps_beyond_done = 0
             #if employment_status == 2 and age<self.max_age+self.timestep:
             if age<self.max_age+self.timestep:
-                savings_component=savings/self.npv_savings
+                savings_component=savings/self.npv_savings # ostetaan sijoituksilla annuiteetti
                 netto=netto+savings_component
                 savings=0
                 reward,equivalent = self.log_utility(netto,2,age)
@@ -1157,6 +1177,8 @@ class SavingsEnv_v0(gym.Env):
         print(f'ansiopvraha_kesto {self.ansiopvraha_kesto}\nTrain {self.train}')
         print(f'reset_exploration_go {self.reset_exploration_go}\nreset_exploration_ratio {self.reset_exploration_ratio}\nplotdebug {self.plotdebug}')
         print(f'basic income {self.perustulo}')
+        tuotto=(np.mean(self.returns)-1.0)*100
+        print(f'investment return {tuotto:.3f}%')
 
     def reset(self,init=None,debug=False,ini_age=None,pension=None,ini_wage=None,ini_old_wage=None):
         '''
@@ -1168,6 +1190,11 @@ class SavingsEnv_v0(gym.Env):
         #employment_status=random.choices(np.array([0,1,3],dtype=int),weights=[0.56*0.626,0.374,0.44*0.626])[0]
         employment_status=random.choices(np.array([0,1],dtype=int),weights=[0.626,0.374])[0]
         
+        if self.random_returns:
+            self.returns=self.stock_returns()
+        else:
+            self.returns=np.ones((self.n_time,1))*self.r
+
         if debug:
             age=self.min_age
             initial_age=age
@@ -1233,3 +1260,6 @@ class SavingsEnv_v0(gym.Env):
     def set_state(self,employment_status,pension,old_wage,age,wage,savings):
         s0=self.env.state_encode(employment_status,pension,old_wage,age,wage,savings)
         self.state=s0
+
+    def stock_returns(self):
+        return 1.0+np.random.randn(self.n_time)*self.r_std+self.r_mean

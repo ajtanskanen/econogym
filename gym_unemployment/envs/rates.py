@@ -39,6 +39,12 @@ class Rates():
     def get_w(self,g,a0,a1):
         return (1-a0*self.group_weights[g,0]-a1*self.group_weights[g,1])/self.group_weights[g,2]
         
+    def get_mort_rate_nogroups(self):
+        # tilastokeskuksen kuolleisuusdata 2017 sukupuolittain
+        mort=np.array([2.12,0.32,0.17,0.07,0.07,0.10,0.00,0.09,0.03,0.13,0.03,0.07,0.10,0.10,0.10,0.23,0.50,0.52,0.42,0.87,0.79,0.66,0.71,0.69,0.98,0.80,0.77,1.07,0.97,0.76,0.83,1.03,0.98,1.20,1.03,0.76,1.22,1.29,1.10,1.26,1.37,1.43,1.71,2.32,2.22,1.89,2.05,2.15,2.71,2.96,3.52,3.54,4.30,4.34,5.09,4.75,6.17,5.88,6.67,8.00,9.20,10.52,10.30,12.26,12.74,13.22,15.03,17.24,18.14,17.78,20.35,25.57,23.53,26.50,28.57,31.87,34.65,40.88,42.43,52.28,59.26,62.92,68.86,72.70,94.04,99.88,113.11,128.52,147.96,161.89,175.99,199.39,212.52,248.32,260.47,284.01,319.98,349.28,301.37,370.17,370.17])/1000.0
+        
+        return mort
+                
     def get_mort_rate(self,debug=False):
         '''
         Kuolleisuus-intensiteetit eri ryhmille
@@ -885,3 +891,15 @@ class Rates():
         ptel=0.5*(tyel_kokomaksu-tyel_kokomaksu[0])+0.0615 # vuonna 2017 ptel oli 6,15 %
         
         return tyel_kokomaksu
+        
+    def initial_wealth(self,g):
+        # kotitalouksien varallisuus
+        # / StatFin / Tulot ja kulutus / Kotitalouksien varallisuus / 136l -- Kotitalouksien varat, velat ja tulot viitehenkilön ikäryhmän mukaan, 1987-2019
+        # vuodelta 2019
+        varat=[-4_257,1_979,17_031,-4_257,1_979,17_031]/2
+        std=[4_000,4_000,10_000,4_000,4_000,10_000]/2
+        r=std*random.randn(1)+varat[g]
+        
+        return r
+        
+        return 

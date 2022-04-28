@@ -70,3 +70,9 @@ register(
     entry_point='gym_unemployment.envs:SavingsEnv_v0',
 )
 
+
+register(
+    id='megasavings-v0',
+    entry_point='gym_unemployment.envs:MegaSavingsEnv_v0',
+)
+

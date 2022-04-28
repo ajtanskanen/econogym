@@ -28,7 +28,7 @@ from scipy.interpolate import interp1d
 #         return 'Unknown state '+key
 
 
-class SavingsEnv_v1(gym.Env):
+class MegaSavingsEnv_v0(gym.Env):
     """
     Description:
         The Finnish Unemployment Pension Scheme 

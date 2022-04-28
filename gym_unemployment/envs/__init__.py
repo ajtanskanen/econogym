@@ -12,5 +12,6 @@ from gym_unemployment.envs.unemployment_ek_v4 import UnemploymentEKEnv_v4
 from gym_unemployment.envs.unemployment_porrastus_v1 import UnemploymentStepsLargeEnv
 from gym_unemployment.envs.test_environment import TestEnv
 from gym_unemployment.envs.savings_v0 import SavingsEnv_v0
+from gym_unemployment.envs.megasavings_v0 import MegaSavingsEnv_v0
 from gym_unemployment.envs.rates import Rates
 from gym_unemployment.envs.wages_v1 import Wages_v1
