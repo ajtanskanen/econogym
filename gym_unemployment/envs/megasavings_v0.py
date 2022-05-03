@@ -274,6 +274,7 @@ class MegaSavingsEnv_v0(gym.Env):
         self.random_returns=False
         self.CRRA_eta=1.5
         self.use_utility=0 # log; 1 CRRA
+        self.include_wealth=False
 
         # male low income, male mid, male high, female low, female mid, female high income
         self.n_groups=6
@@ -364,7 +365,7 @@ class MegaSavingsEnv_v0(gym.Env):
         self.plottkdebug=False    
         
         # lainaus
-        self.max_debt=-20_000
+        self.max_debt=0 #-20_000
             
     def set_annual_params(self,year : int) -> None:
         inflation_raw=np.array([1.0,1.011,1.010,1.009,1.01,1.01,1.01]) # 2018 2019 2020 2021 2022 2023
@@ -579,8 +580,8 @@ class MegaSavingsEnv_v0(gym.Env):
         npv_pension=cpsum_pension
         npv_gpension=cpsum_gpension
             
-        if self.plotdebug:
-            print('comp_npv_simulation npv:',npv)
+        #if self.plotdebug:
+        print('comp_npv_simulation npv:',npv)
 
         return npv,npv0,npv_pension,npv_gpension
 
@@ -3883,6 +3884,7 @@ class MegaSavingsEnv_v0(gym.Env):
         self.women_kappa_pinkslip_young=0.35
         self.women_kappa_pinkslip_middle=0.20
         self.women_kappa_pinkslip_elderly=0.20
+        self.kappa_svpaivaraha=0.5        
         
     def log_utility_mort_ove_params(self):
         #
@@ -3898,37 +3900,38 @@ class MegaSavingsEnv_v0(gym.Env):
         self.salary_const_student=0.01*self.timestep # 0.05 opiskelu pienentää leikkausta tämän verran vuodessa
         self.wage_initial_reduction=0.015 # työttömäksi siirtymisestä tuleva alennus tuleviin palkkoihin, NOT USED!
         
-        self.max_mu_age=self.min_retirementage+6.0 # 
+        self.max_mu_age=self.min_retirementage+7.0 # 
         
-        self.men_kappa_fulltime=0.736 # vapaa-ajan menetyksestä rangaistus miehille
-        self.men_mu_scale_kokoaika=0.0518 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-        self.men_mu_scale_osaaika=0.0350 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-        self.men_mu_age=self.min_retirementage-8.75 #5.5 # P.O. 60??
-        self.men_kappa_osaaika_young=0.515 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
-        self.men_kappa_osaaika_middle=0.655 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
+        self.men_kappa_fulltime=0.820 # vapaa-ajan menetyksestä rangaistus miehille
+        self.men_mu_scale_kokoaika=0.02 # 0.0560 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+        self.men_mu_scale_osaaika=0.01 # 0.0330 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+        self.men_mu_age=self.min_retirementage-7.25 #5.5 # P.O. 60??
+        self.men_kappa_osaaika_young=0.535 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
+        self.men_kappa_osaaika_middle=0.660 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
         #self.men_kappa_osaaika_old=0.62 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
-        self.men_kappa_osaaika_old=0.62 # self.men_kappa_osaaika_middle
+        self.men_kappa_osaaika_old=0.625 # self.men_kappa_osaaika_middle
         self.men_kappa_osaaika_pension=0.65
-        self.men_kappa_hoitovapaa=0.037 # hyäty hoitovapaalla olosta
-        self.men_kappa_ve=0.25
-        self.men_kappa_pinkslip_young=0.30
-        self.men_kappa_pinkslip_middle=0.20
+        self.men_kappa_hoitovapaa=0.04 # hyäty hoitovapaalla olosta
+        self.men_kappa_ve=0.29
+        self.men_kappa_pinkslip_young=0.25
+        self.men_kappa_pinkslip_middle=0.15
         self.men_kappa_pinkslip_elderly=0.15
         
-        self.women_kappa_fulltime=0.581 # vapaa-ajan menetyksestä rangaistus naisille
-        self.women_mu_scale_kokoaika=0.0318 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
-        self.women_mu_scale_osaaika=0.0150 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
-        self.women_mu_age=self.min_retirementage-4.5 #4.0 # 61 #5 P.O. 60??
-        self.women_kappa_osaaika_young=0.376
+        self.women_kappa_fulltime=0.635 # vapaa-ajan menetyksestä rangaistus naisille
+        self.women_mu_scale_kokoaika=0.02 # 0.0560 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
+        self.women_mu_scale_osaaika=0.01 # 0.0330 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
+        self.women_mu_age=self.min_retirementage-3.5 #4.0 # 61 #5 P.O. 60??
+        self.women_kappa_osaaika_young=0.360
         self.women_kappa_osaaika_middle=0.400
         #self.women_kappa_osaaika_old=0.48
-        self.women_kappa_osaaika_old=0.400 # self.women_kappa_osaaika_middle
+        self.women_kappa_osaaika_old=0.405 # self.women_kappa_osaaika_middle
         self.women_kappa_osaaika_pension=0.55
-        self.women_kappa_hoitovapaa=0.270 # 0.27
-        self.women_kappa_ve=0.25
-        self.women_kappa_pinkslip_young=0.35
+        self.women_kappa_hoitovapaa=0.300 # 0.27
+        self.women_kappa_ve=0.29
+        self.women_kappa_pinkslip_young=0.30
         self.women_kappa_pinkslip_middle=0.20
         self.women_kappa_pinkslip_elderly=0.20   
+        self.kappa_svpaivaraha=0.5
              
     def log_utility_nomort_noove_params(self):
         #
@@ -3973,6 +3976,7 @@ class MegaSavingsEnv_v0(gym.Env):
         self.women_kappa_pinkslip_young=0.10
         self.women_kappa_pinkslip_middle=0.27
         self.women_kappa_pinkslip_elderly=0.25
+        self.kappa_svpaivaraha=0.5
 
     def log_get_kappa(self,age : float,g : int,employment_state : int,pinkslip : int):
         # kappa tells how much person values free-time
@@ -4181,6 +4185,9 @@ class MegaSavingsEnv_v0(gym.Env):
             elif key=='investment':
                 if value is not None:
                     self.include_investment=value
+            elif key=='wealth':
+                if value is not None:
+                    self.include_wealth=value
             elif key=='r_mean':
                 if value is not None:
                     self.r_mean=value
@@ -4747,7 +4754,7 @@ class MegaSavingsEnv_v0(gym.Env):
             puoliso_kansanelake=np.random.uniform(0,50000)
             tyoelake_maksussa=np.random.uniform(0,50000)
             puoliso_tyoelake_maksussa=np.random.uniform(0,50000)
-            if include_investment:
+            if self.include_investment:
                 puoliso_savings=np.random.uniform(0,50000)
                 savings=np.random.uniform(0,50000)
             else:
@@ -5390,9 +5397,9 @@ class MegaSavingsEnv_v0(gym.Env):
         kappa=self.log_get_kappa(age,g,emp,pink)
 
         out=f'{m}s{onpuoliso} {emp:2d} g {g:d} a {age:.2f} w {wage:.0f} nw {next_wage:.0f} red {wage_red:.2f} tis {time_in_state:.2f}'+\
-            f' pen {pension:.0f} paid_e {tyoelake_maksussa:.0f} paid_k {kansanelake:.0f} ueb {used_unemp_benefit:.2f}'+\
+            f' pen {pension:.0f} p_e {tyoelake_maksussa:.0f} p_k {kansanelake:.0f} ueb {used_unemp_benefit:.2f}'+\
             f' toe {toe:.2f}{kassassa} tk{toekesto:.2f} ura {tyohist:.2f} uew {unempwage:.0f}'+\
-            f' (b {unempwage_basis:.0f}) uleft {unemp_left:.2f} aa {oikeus:.0f} 58 {toe58:.0f} ove {ove_paid:.0f}'+\
+            f' (b {unempwage_basis:.0f}) ul {unemp_left:.2f} aa {oikeus:.0f} 58 {toe58:.0f} ove {ove_paid:.0f}'+\
             f' pink {pink:d} c{c3:.0f}/{c7:.0f}/{c18:.0f} k {kappa:.2f}'+\
             f' sav {savings:.0f}'
             
@@ -5663,8 +5670,10 @@ class MegaSavingsEnv_v0(gym.Env):
             f'additional_tyel_premium {self.additional_tyel_premium}\nscale_tyel_accrual {self.scale_tyel_accrual}\ninclude_ove {self.include_ove}\n'+\
             f'unemp_limit_reemp {self.unemp_limit_reemp}\n'+\
             f'investment {self.include_investment}\n'+\
+            f'random_returns {self.random_returns}\n'+\
             f'r_mean {self.r_mean:.4f} (ann. {r_ann:.4f})\nr_std {self.r_std:.4f}\n'+\
-            f'r_t {r_t:.4f}\nr_s {r_s:.4f}')
+            f'r_t {r_t:.4f}\nr_s {r_s:.4f}\n'+\
+            f'wealth {self.include_wealth}')
 
     def unempright_left(self,emp : int,tis : float,bu : float,ika : float,tyohistoria : float):
         '''
@@ -6212,7 +6221,7 @@ class MegaSavingsEnv_v0(gym.Env):
         else:
             return 1.0+np.ones((self.n_time,1))*self.r_mean
 
-    def map_save_action(self,sav_act):
+    def map_save_action(self,sav_act : int):
         if sav_act>0:
             s=(sav_act-self.mid_sav_act)/100*2
         else:
@@ -6221,6 +6230,10 @@ class MegaSavingsEnv_v0(gym.Env):
         return s
         
     def update_savings(self,netto : float,savings : float,sav_action : int,empstate : int,age : float):
+        '''
+        netto income is at annual level, not actual money earned during timestep
+        => savings are at similarly scale level. to get real money, multiply by self.timestep
+        '''
         t=self.map_age(age)
         interest = savings*(self.returns[t,0]-1.0)
         savings += interest
@@ -6239,26 +6252,38 @@ class MegaSavingsEnv_v0(gym.Env):
             netto -= save
             savings += save
             mod_sav_act=sav_action
+            #if savings>100_000:
+            #    print(f'!!! save {save} savings {savings}')
         elif sav_action<0:
-            save=sav_action*netto
-            if savings+save<self.max_debt:
+            save=min(0.9*netto,sav_action*netto+payback)
+    
+            if savings+save<self.max_debt and save<0:
                 save=max(save,self.max_debt-savings)
-            if savings+save>self.max_debt and (empstate not in set([2,8,9])) and age<self.min_retirementage:
-                save += payback
-                save = min(save,0.9*netto)
-                netto += -save
-                savings += save
-                mod_sav_act = sav_action
-            elif savings>0 and empstate in set([2,8,9]):
-                save = sav_action*savings
-                netto += -save
-                savings += save
-                mod_sav_act = sav_action
+        
+            if empstate in set([2,3,8,9]):
+                if savings+save>0:
+                    netto += -save
+                    savings += save
+                    mod_sav_act = sav_action
+                else:
+                    save=min(0.9*netto,payback)
+                    netto -= save
+                    savings += save
+                    mod_sav_act = 0
             else:
-                save=min(0.9*netto,payback)
-                netto -= save
-                savings += save
-                mod_sav_act = 0
+                if savings+save>0:
+                    netto += -save
+                    savings += save
+                    mod_sav_act = sav_action
+                elif savings+save>self.max_debt and age<self.min_retirementage:
+                    netto += -save
+                    savings += save
+                    mod_sav_act = sav_action
+                else:
+                    save=min(0.9*netto,payback)
+                    netto -= save
+                    savings += save
+                    mod_sav_act = 0
         else:
             save=min(0.9*netto,payback)
             netto-=save

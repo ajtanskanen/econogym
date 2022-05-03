@@ -2848,6 +2848,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
                     self.move_to_disab_state(wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse)
                 pinkslip=0
             else:
+                # tähän myös siirtymä takaisin töihin
                 time_in_state+=self.timestep
                 employment_status = 14 # unchanged
                 tyoelake = tyoelake * self.elakeindeksi
@@ -3821,32 +3822,32 @@ class UnemploymentLargeEnv_v4(gym.Env):
         
         self.max_mu_age=self.min_retirementage+7.0 # 
         
-        self.men_kappa_fulltime=0.755 # vapaa-ajan menetyksestä rangaistus miehille
-        self.men_mu_scale_kokoaika=0.0078 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+        self.men_kappa_fulltime=0.745 # vapaa-ajan menetyksestä rangaistus miehille
+        self.men_mu_scale_kokoaika=0.0120 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
         self.men_mu_scale_osaaika=0.0040 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-        self.men_mu_age=self.min_retirementage-7.25 #5.5 # P.O. 60??
-        self.men_kappa_osaaika_young=0.530 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
-        self.men_kappa_osaaika_middle=0.655 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
+        self.men_mu_age=self.min_retirementage-7.0 #5.5 # P.O. 60??
+        self.men_kappa_osaaika_young=0.520 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
+        self.men_kappa_osaaika_middle=0.645 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
         #self.men_kappa_osaaika_old=0.62 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
-        self.men_kappa_osaaika_old=0.62 # self.men_kappa_osaaika_middle
+        self.men_kappa_osaaika_old=0.610 # self.men_kappa_osaaika_middle
         self.men_kappa_osaaika_pension=0.65
         self.men_kappa_hoitovapaa=0.037 # hyäty hoitovapaalla olosta
-        self.men_kappa_ve=0.25
+        self.men_kappa_ve=0.30
         self.men_kappa_pinkslip_young=0.25
         self.men_kappa_pinkslip_middle=0.15
         self.men_kappa_pinkslip_elderly=0.15
         
-        self.women_kappa_fulltime=0.597 # vapaa-ajan menetyksestä rangaistus naisille
-        self.women_mu_scale_kokoaika=0.078 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
-        self.women_mu_scale_osaaika=0.0040 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
-        self.women_mu_age=self.min_retirementage-3.5 #4.0 # 61 #5 P.O. 60??
-        self.women_kappa_osaaika_young=0.385
-        self.women_kappa_osaaika_middle=0.400
+        self.women_kappa_fulltime=0.605 # vapaa-ajan menetyksestä rangaistus naisille
+        self.women_mu_scale_kokoaika=0.0#120 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
+        self.women_mu_scale_osaaika=0.0#040 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
+        self.women_mu_age=self.min_retirementage-2.5 #4.0 # 61 #5 P.O. 60??
+        self.women_kappa_osaaika_young=0.420
+        self.women_kappa_osaaika_middle=0.420
         #self.women_kappa_osaaika_old=0.48
-        self.women_kappa_osaaika_old=0.405 # self.women_kappa_osaaika_middle
+        self.women_kappa_osaaika_old=0.440 # self.women_kappa_osaaika_middle
         self.women_kappa_osaaika_pension=0.55
-        self.women_kappa_hoitovapaa=0.270 # 0.27
-        self.women_kappa_ve=0.25
+        self.women_kappa_hoitovapaa=0.290 # 0.27
+        self.women_kappa_ve=0.30
         self.women_kappa_pinkslip_young=0.30
         self.women_kappa_pinkslip_middle=0.20
         self.women_kappa_pinkslip_elderly=0.20   
