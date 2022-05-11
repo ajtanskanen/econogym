@@ -565,6 +565,7 @@ class MegaSavingsEnv_v0(gym.Env):
         k=0
         while alive and x<100+self.timestep:
             intx=int(np.floor(x))
+            print(intx,cpsum)
             if sattuma[k]>self.mort_intensity[intx,g]:
                 cpsum=1.0+self.gamma*cpsum
                 cpsum0=1.0+cpsum0
@@ -580,8 +581,8 @@ class MegaSavingsEnv_v0(gym.Env):
         npv_pension=cpsum_pension
         npv_gpension=cpsum_gpension
             
-        #if self.plotdebug:
-        print('comp_npv_simulation npv:',npv)
+        if self.plotdebug:
+            print('comp_npv_simulation npv:',npv)
 
         return npv,npv0,npv_pension,npv_gpension
 

@@ -135,7 +135,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
         if self.perustulo:
             self.ben = fin_benefits.BasicIncomeBenefits(**kwargs)
         elif self.universalcredit:
-            self.ben = fin_benefits.UniversalCreditIncomeBenefits(**kwargs)
+            self.ben = fin_benefits.SingleBenefit(**kwargs)
         else:
             #self.ben = fin_benefits.CyBenefits(**kwargs)
             self.ben = fin_benefits.Benefits(**kwargs)
@@ -3822,12 +3822,12 @@ class UnemploymentLargeEnv_v4(gym.Env):
         
         self.max_mu_age=self.min_retirementage+7.0 # 
         
-        self.men_kappa_fulltime=0.745 # vapaa-ajan menetyksestä rangaistus miehille
-        self.men_mu_scale_kokoaika=0.0120 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-        self.men_mu_scale_osaaika=0.0040 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+        self.men_kappa_fulltime=0.737 # vapaa-ajan menetyksestä rangaistus miehille
+        self.men_mu_scale_kokoaika=0.0#120 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+        self.men_mu_scale_osaaika=0.0#040 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
         self.men_mu_age=self.min_retirementage-7.0 #5.5 # P.O. 60??
-        self.men_kappa_osaaika_young=0.520 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
-        self.men_kappa_osaaika_middle=0.645 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
+        self.men_kappa_osaaika_young=0.515 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
+        self.men_kappa_osaaika_middle=0.640 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
         #self.men_kappa_osaaika_old=0.62 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
         self.men_kappa_osaaika_old=0.610 # self.men_kappa_osaaika_middle
         self.men_kappa_osaaika_pension=0.65
@@ -3837,14 +3837,14 @@ class UnemploymentLargeEnv_v4(gym.Env):
         self.men_kappa_pinkslip_middle=0.15
         self.men_kappa_pinkslip_elderly=0.15
         
-        self.women_kappa_fulltime=0.605 # vapaa-ajan menetyksestä rangaistus naisille
+        self.women_kappa_fulltime=0.600 # vapaa-ajan menetyksestä rangaistus naisille
         self.women_mu_scale_kokoaika=0.0#120 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
         self.women_mu_scale_osaaika=0.0#040 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
         self.women_mu_age=self.min_retirementage-2.5 #4.0 # 61 #5 P.O. 60??
-        self.women_kappa_osaaika_young=0.420
-        self.women_kappa_osaaika_middle=0.420
+        self.women_kappa_osaaika_young=0.440
+        self.women_kappa_osaaika_middle=0.440
         #self.women_kappa_osaaika_old=0.48
-        self.women_kappa_osaaika_old=0.440 # self.women_kappa_osaaika_middle
+        self.women_kappa_osaaika_old=0.455 # self.women_kappa_osaaika_middle
         self.women_kappa_osaaika_pension=0.55
         self.women_kappa_hoitovapaa=0.290 # 0.27
         self.women_kappa_ve=0.30
@@ -6015,3 +6015,57 @@ class UnemploymentLargeEnv_v4(gym.Env):
     def get_timestep(self):
         return self.timestep
 
+    def comp_tyolveroaste(self):
+        '''
+        Laskee työllistymisveroasteen tämän hetkiselle tilalle
+        '''
+        employment_status,g,pension,old_wage,age,time_in_state,paid_pension,pinkslip,toe,\
+            toekesto,tyoura,used_unemp_benefit,wage_reduction,unemp_after_ra,unempwage,\
+            unempwage_basis,prefnoise,children_under3,children_under7,children_under18,\
+            unemp_left,alkanut_ansiosidonnainen,toe58,ove_paid,jasen,\
+            puoliso,puoliso_tila,spouse_g,puoliso_old_wage,puoliso_pension,puoliso_wage_reduction,\
+            puoliso_paid_pension,puoliso_next_wage,puoliso_used_unemp_benefit,\
+            puoliso_unemp_benefit_left,puoliso_unemp_after_ra,puoliso_unempwage,\
+            puoliso_unempwage_basis,puoliso_alkanut_ansiosidonnainen,puoliso_toe58,\
+            puoliso_toe,puoliso_toekesto,puoliso_tyoura,puoliso_time_in_state,puoliso_pinkslip,\
+            puoliso_ove_paid,kansanelake,puoliso_kansanelake,tyoelake_maksussa,\
+            puoliso_tyoelake_maksussa,next_wage\
+                =self.state_decode(self.state)
+                
+        netto,benq,netto_omat,netto_puoliso=self.get_benefits(employment_status,wage,kansanelake,tyoelake_maksussa,pension,time_in_state,pinkslip,old_wage,
+            unempwage,unempwage_basis,karenssia_jaljella,age,children_under3,children_under7,children_under18,ove_paid,used_unemp_benefit,
+            puoliso,puoliso_tila,spouse_wage,puoliso_kansanelake,puoliso_tyoelake_maksussa,puoliso_old_wage,puoliso_pinkslip,puoliso_karenssia_jaljella,
+            puoliso_time_in_state,puoliso_unempwage,puoliso_unempwage_basis,puoliso_used_unemp_benefit,g,spouse_g)
+                
+        if employment_status in set([1,10]):
+            # siirrä työttömäksi ja laske
+            if jasen and (alkanut_ansiosidonnainen or self.toe):
+                e2=0
+            else:
+                e2=13
+        elif employment_status in set([2,8,9,3,5,6,14]):
+            e2=-1
+        elif employment_status in set([0,4,13,7,11]):
+            # siirrä työhön
+            e2=1
+
+        if puoliso_tila in set([1,10]):
+            # siirrä työttömäksi ja laske
+            if jasen and (alkanut_ansiosidonnainen or self.toe):
+                p2=0
+            else:
+                p2=13
+        elif employment_status in set([2,8,9,3,5,6,14]):
+            p2=-1
+        elif employment_status in set([0,4,13,7,11]):
+            # siirrä työhön
+            p2=1
+
+
+        netto2,benq2,netto_omat2,netto_puoliso2=self.get_benefits(e2,wage,kansanelake,tyoelake_maksussa,pension,time_in_state,pinkslip,old_wage,
+            unempwage,unempwage_basis,karenssia_jaljella,age,children_under3,children_under7,children_under18,ove_paid,used_unemp_benefit,
+            puoliso,puoliso_tila,spouse_wage,puoliso_kansanelake,puoliso_tyoelake_maksussa,puoliso_old_wage,puoliso_pinkslip,puoliso_karenssia_jaljella,
+            puoliso_time_in_state,puoliso_unempwage,puoliso_unempwage_basis,puoliso_used_unemp_benefit,g,spouse_g)
+            
+            
+            
