@@ -183,3 +183,14 @@ class Wages_v1():
         else:
             return 0
             
+    def get_potential_wage(self,age):
+        '''
+        palkka age-ikäiselle ILMAN time_in_state-vähennystä työllistymispalkkaan, step-kohtaisesti, ei vuosikohtaisesti
+        '''
+        intage=self.map_age(age)
+        if age<self.max_age and age>=self.min_age-1:
+            return np.maximum(self.min_salary,self.salary[intage])
+        else:
+            return 0
+            
+            

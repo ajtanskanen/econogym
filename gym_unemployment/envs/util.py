@@ -4,8 +4,25 @@ Util functions
 
 '''
 
+import math
 
-def pretty_print(q,q2):
+def compare_q_print(q,q2,omat='omat_',puoliso='puoliso_'):
+    '''
+    Helper function that prettyprints arrays
+    '''
+    for key in q:
+        if key in q and key in q2:
+            if not math.isclose(q[key],q2[key]):
+                print(f'{key}: {q[key]:.2f} vs {q2[key]:.2f}')
+        else:
+            if key in q:
+                print(key,' not in q2')
+            else:
+                print(key,' not in q')
+                    
+                    
+
+def crosscheck_print(q,q2):
     '''
     Helper function that prettyprints arrays
     '''
@@ -19,7 +36,7 @@ def pretty_print(q,q2):
                 key2=key.replace('puoliso_','omat_')
             if key in q and key in q2:
                 if not math.isclose(q[key],q2[key2]):
-                    print(key,': {:.2f} vs {:.2f}, {} {} ({:.2f} vs {:.2f})'.format(q[key],q2[key2],key,key2,q[key2],q2[key],))
+                    print(key,': {key:.2f} vs {:.2f}, {} {} ({:.2f} vs {:.2f})'.format(q[key],q2[key2],key,key2,q[key2],q2[key],))
             else:
                 if key in q:
                     print(key2,' not in q2')

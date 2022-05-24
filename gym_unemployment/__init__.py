@@ -30,6 +30,11 @@ register(
     entry_point='gym_unemployment.envs:UnemploymentLargeEnv_v4',
 )
 
+register(
+    id='unemployment-v5',
+    entry_point='gym_unemployment.envs:UnemploymentLargeEnv_v5',
+)
+
 #register(
 #    id='unemploymentEK-v0',
 #    entry_point='gym_unemployment.envs:UnemploymentEKEnv',
