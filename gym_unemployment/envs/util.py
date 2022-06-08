@@ -53,13 +53,18 @@ def check_q(q,num=-1):
         if np.abs(d2-d1)>1e-6:
             print(f'check_q {num}: {person} {d2-d1}')
     
-def print_q(a):
+def print_q(a,alku=None):
     '''
     pretty printer for dict
     '''
-    for x in a.keys():
-        if a[x]>0 or a[x]<0:
-            print('{}:{:.2f} '.format(x,a[x]),end='')
+    if alku is not None:
+        for x in a.keys():
+            if alku in x:
+                print('{}:{:.2f} '.format(x,a[x]),end='')
+    else:
+        for x in a.keys():
+            if a[x]>0 or a[x]<0:
+                print('{}:{:.2f} '.format(x,a[x]),end='')
             
     print('')
         
