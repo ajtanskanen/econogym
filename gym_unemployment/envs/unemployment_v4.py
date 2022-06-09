@@ -3627,7 +3627,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
                         moved=True
                     elif employment_status in set([8,9]):
                         employment_status,kansanelake,tyoelake_maksussa,pension,wage,time_in_state,ove_paid\
-                            =self.move_to_retirement(wage,pension,0,age,kansanelake,tyoelake_maksussa,
+                            =self.move_to_retirement(wage,pension,wage,age,kansanelake,tyoelake_maksussa,
                                 employment_status,unemp_after_ra,all_acc=True,scale_acc=True,has_spouse=puoliso,is_spouse=False)
                         pinkslip=0
                         wage_reduction=self.update_wage_reduction(employment_status,wage_reduction,pinkslip,time_in_state)
@@ -3652,7 +3652,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
                         puoliso_karenssia_jaljella=0
                         puoliso_pinkslip=0
                         puoliso_wage_reduction=self.update_wage_reduction(puoliso_tila,puoliso_wage_reduction,puoliso_pinkslip,puoliso_time_in_state)
-                        puoliso_moved=True
+                        spouse_moved=True
                 else:
                     if puoliso_tila in set([0,1,4,10,12,13]) and age<self.min_retirementage: # not in set([2,3,5,6,7,8,9,11,12,15]):
                         puoliso_tila,puoliso_pension,puoliso_tyoelake_maksussa,spouse_wage,puoliso_time_in_state,puoliso_pinkslip=\
@@ -3660,14 +3660,14 @@ class UnemploymentLargeEnv_v4(gym.Env):
                         puoliso_karenssia_jaljella=0
                         puoliso_pinkslip=0
                         puoliso_wage_reduction=self.update_wage_reduction(puoliso_tila,puoliso_wage_reduction,puoliso_pinkslip,puoliso_time_in_state)
-                        puoliso_moved=True
+                        spouse_moved=True
                     elif employment_status in set([8,9]):
                         puoliso_tila,puoliso_kansanelake,puoliso_tyoelake_maksussa,puoliso_pension,spouse_wage,puoliso_time_in_state,puoliso_ove_paid\
-                            =self.move_to_retirement(spouse_wage,puoliso_pension,0,age,puoliso_kansanelake,puoliso_tyoelake_maksussa,
+                            =self.move_to_retirement(spouse_wage,puoliso_pension,spouse_wage,age,puoliso_kansanelake,puoliso_tyoelake_maksussa,
                                 puoliso_tila,puoliso_unemp_after_ra,all_acc=True,scale_acc=True,has_spouse=puoliso,is_spouse=True)
                         puoliso_pinkslip=0
                         puoliso_wage_reduction=self.update_wage_reduction(puoliso_tila,puoliso_wage_reduction,puoliso_pinkslip,puoliso_time_in_state)
-                        puoliso_moved=True
+                        spouse_moved=True
                         
             # voi aiheuttaa epästabiilisuutta
             if sattuma[3]<self.mort_intensity[intage,g] and self.include_mort and employment_status!=15: 
