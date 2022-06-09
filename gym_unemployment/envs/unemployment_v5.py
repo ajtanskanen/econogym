@@ -172,7 +172,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
             else:
                 self.log_utility_mort_noove_params()
         else:
-            self.log_utility_nomort_noove_params()
+            self.log_utility_mort_ove_params()
         
         self.n_age=self.max_age-self.min_age+1
 
@@ -998,7 +998,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
                 if puoliso_tila in emtr_tilat:
                     pe0,pe1,pw0,pw1,pow0,pow1=self.setup_contrafactual(puoliso_tila,puoliso_palkka,potential_spouse_wage,puoliso_unempwage_basis,kassanjasen,puoliso_unempwage)
                     if pw1<1.0 or pw1<pw0+1.0:
-                        print('co puoliso',puoliso_tila,pw0,pw1,ika)                
+                        print('co puoliso',puoliso_tila,pw0,pw1,ika,puoliso_palkka)                
                     pp0=self.setup_couples(ika,wage,benefitbasis,kansanelake,tyoelake,employment_state,time_in_state,used_unemp_benefit,
                             children_under3,children_under7,children_under18,irtisanottu,karenssia_jaljella,
                             pw0,pow0,puoliso_kansanelake,puoliso_tyoelake,pe0,0,puoliso_used_unemp_benefit,
@@ -1580,6 +1580,9 @@ class UnemploymentLargeEnv_v5(gym.Env):
                 employment_status = 9
                 paid_wage,pt_factor=self.get_paid_wage(wage,employment_status,pt_action)
 
+            if paid_wage<1.0:
+                print(f'state {employment_status} wage {wage} paid_wage {paid_wage} age {age} is_spouse {is_spouse}')
+
             time_in_state=self.timestep
             alkanut_ansiosidonnainen=0
             pension=self.pension_accrual(age,paid_wage,pension,state=employment_status)
@@ -1670,6 +1673,9 @@ class UnemploymentLargeEnv_v5(gym.Env):
                 employment_status = 8
                 paid_wage,pt_factor=self.get_paid_wage(wage,employment_status,pt_action)
 
+            if paid_wage<1.0:
+                print(f'state {employment_status} wage {wage} paid_wage {paid_wage} age {age} is_spouse {is_spouse}')
+                
             time_in_state=self.timestep
             alkanut_ansiosidonnainen=0
             pension=self.pension_accrual(age,paid_wage,pension,state=employment_status)
@@ -2636,10 +2642,16 @@ class UnemploymentLargeEnv_v5(gym.Env):
                 kansanelake = kansanelake * self.kelaindeksi
                 pension=pension*self.palkkakerroin 
             elif action == 2 or action == 1 or action == 4:
+                if wage<1.0:
+                    print(f'state {employment_status} wage {wage} paid_wage {paid_wage} age {age} is_spouse {is_spouse}')
+            
                 employment_status,kansanelake,tyoelake,pension,paid_wage,time_in_state,ove_paid,basis_wage=\
                     self.move_to_oa_parttime(wage,pt_action,pension,wage,age,kansanelake,tyoelake,employment_status,0,
                         scale_acc=False,has_spouse=has_spouse,is_spouse=is_spouse)
             elif action == 3 or action == 5:
+                if wage<1.0:
+                    print(f'state {employment_status} wage {wage} paid_wage {paid_wage} age {age} is_spouse {is_spouse}')
+
                 employment_status,kansanelake,tyoelake,pension,paid_wage,time_in_state,ove_paid,basis_wage=\
                     self.move_to_oa_fulltime(wage,pt_action,pension,wage,age,kansanelake,tyoelake,employment_status,0,
                         scale_acc=False,has_spouse=has_spouse,is_spouse=is_spouse)
@@ -4127,69 +4139,68 @@ class UnemploymentLargeEnv_v5(gym.Env):
         # MORT - YES
         #
     
-        # paljonko työstä poissaolo vaikuttaa palkkaan
         self.salary_const=0.04*self.timestep # 0.038 työttämyydestä palkka alenee tämän verran vuodessa
         self.salary_const_retirement=0.10*self.timestep # vanhuuseläkkeellä muutos nopeampaa
-        self.salary_const_svpaiva=0.20*self.timestep # pitkällä svpäivärahalla muutos nopeaa
+        self.salary_const_svpaiva=0.15*self.timestep # pitkällä svpäivärahalla muutos nopeaa
         self.salary_const_up=0.030*self.timestep # 0.04 työssäolo palauttaa ansioita tämän verran vuodessa
         self.salary_const_up_osaaika=0.030*self.timestep # 0.04 osa-aikainen työssäolo palauttaa ansioita tämän verran vuodessa
         self.salary_const_student=0.01*self.timestep # 0.05 opiskelu pienentää leikkausta tämän verran vuodessa
         self.wage_initial_reduction=0.015 # työttömäksi siirtymisestä tuleva alennus tuleviin palkkoihin, NOT USED!
         
-        self.max_mu_age=self.min_retirementage+6.0 # 
+        self.max_mu_age=self.min_retirementage+7.0 # 
         
-        self.men_mu_scale_kokoaika=0.0518 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-        self.men_mu_scale_osaaika=0.0350 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-        self.men_mu_age=self.min_retirementage-8.75 #5.5 # P.O. 60??
-        self.men_kappa_hoitovapaa=0.037 # hyäty hoitovapaalla olosta
-        self.men_kappa_ve=0.25
-        self.men_kappa_pinkslip_young=0.30
-        self.men_kappa_pinkslip_middle=0.20
+        self.men_mu_scale_kokoaika=0.019 #250 #120 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+        self.men_mu_scale_osaaika=0.015 #14 #040 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+        self.men_mu_age=self.min_retirementage-7.5 #5.5 # P.O. 60??
+        self.men_kappa_hoitovapaa=0.100 # hyäty hoitovapaalla olosta
+        self.men_kappa_ve=0.50
+        self.men_kappa_pinkslip_young=0.25
+        self.men_kappa_pinkslip_middle=0.15
         self.men_kappa_pinkslip_elderly=0.15
         
-        self.women_mu_scale_kokoaika=0.0518 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
-        self.women_mu_scale_osaaika=0.0350 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
-        self.women_mu_age=self.min_retirementage-4.5 #4.0 # 61 #5 P.O. 60??
-        self.women_kappa_hoitovapaa=0.270 # 0.27
-        self.women_kappa_ve=0.25
-        self.women_kappa_pinkslip_young=0.35
-        self.women_kappa_pinkslip_middle=0.20
-        self.women_kappa_pinkslip_elderly=0.20
+        self.women_mu_scale_kokoaika=0.019 #250 #120 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
+        self.women_mu_scale_osaaika=0.015 #14 #040 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
+        self.women_mu_age=self.min_retirementage-3.0 #4.0 # 61 #5 P.O. 60??
+        self.women_kappa_hoitovapaa=0.400 # 0.27
+        self.women_kappa_ve=0.50
+        self.women_kappa_pinkslip_young=0.30
+        self.women_kappa_pinkslip_middle=0.30
+        self.women_kappa_pinkslip_elderly=0.10   
         self.kappa_svpaivaraha=0.5
                      
     def log_utility_nomort_noove_params(self):
         #
         # OVE - NO/YES
-        # MORT - YES
+        # MORT - NO
         #
         
-        self.salary_const=0.045*self.timestep # työttämyydestä palkka alenee tämän verran vuodessa
+        self.salary_const=0.04*self.timestep # 0.038 työttämyydestä palkka alenee tämän verran vuodessa
         self.salary_const_retirement=0.10*self.timestep # vanhuuseläkkeellä muutos nopeampaa
-        self.salary_const_svpaiva=0.20*self.timestep # pitkällä svpäivärahalla muutos nopeaa
-        self.salary_const_up=0.04*self.timestep # työssäolo palauttaa ansioita tämän verran vuodessa
+        self.salary_const_svpaiva=0.15*self.timestep # pitkällä svpäivärahalla muutos nopeaa
+        self.salary_const_up=0.030*self.timestep # 0.04 työssäolo palauttaa ansioita tämän verran vuodessa
         self.salary_const_up_osaaika=0.030*self.timestep # 0.04 osa-aikainen työssäolo palauttaa ansioita tämän verran vuodessa
-        self.salary_const_student=0.05*self.timestep # opiskelu pienentää leikkausta tämän verran vuodessa
+        self.salary_const_student=0.01*self.timestep # 0.05 opiskelu pienentää leikkausta tämän verran vuodessa
         self.wage_initial_reduction=0.015 # työttömäksi siirtymisestä tuleva alennus tuleviin palkkoihin, NOT USED!
         
-        self.max_mu_age=self.min_retirementage+6.0 # 
-
-        self.men_mu_scale_kokoaika=0.0518 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-        self.men_mu_scale_osaaika=0.0350 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-        self.men_mu_age=self.min_retirementage-4.0 # P.O. 60??
-        self.men_kappa_hoitovapaa=0.35 # hyäty hoitovapaalla olosta
-        self.men_kappa_ve=0.00 # 0.03 # ehkä 0.10?
-        self.men_kappa_pinkslip_young=0.01
-        self.men_kappa_pinkslip_middle=0.20
-        self.men_kappa_pinkslip_elderly=0.05
+        self.max_mu_age=self.min_retirementage+7.0 # 
         
-        self.women_mu_scale_kokoaika=0.0518 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
-        self.women_mu_scale_osaaika=0.0350 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
-        self.women_mu_age=self.min_retirementage-3.5 # 61 #5 P.O. 60??
-        self.women_kappa_hoitovapaa=0.75 # 0.08
-        self.women_kappa_ve=0.00 # 0.03 # ehkä 0.10?
-        self.women_kappa_pinkslip_young=0.10
-        self.women_kappa_pinkslip_middle=0.27
-        self.women_kappa_pinkslip_elderly=0.25
+        self.men_mu_scale_kokoaika=0.019 #250 #120 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+        self.men_mu_scale_osaaika=0.015 #14 #040 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+        self.men_mu_age=self.min_retirementage-7.5 #5.5 # P.O. 60??
+        self.men_kappa_hoitovapaa=0.100 # hyäty hoitovapaalla olosta
+        self.men_kappa_ve=0.50
+        self.men_kappa_pinkslip_young=0.25
+        self.men_kappa_pinkslip_middle=0.15
+        self.men_kappa_pinkslip_elderly=0.15
+        
+        self.women_mu_scale_kokoaika=0.019 #250 #120 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
+        self.women_mu_scale_osaaika=0.015 #14 #040 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
+        self.women_mu_age=self.min_retirementage-3.0 #4.0 # 61 #5 P.O. 60??
+        self.women_kappa_hoitovapaa=0.400 # 0.27
+        self.women_kappa_ve=0.50
+        self.women_kappa_pinkslip_young=0.30
+        self.women_kappa_pinkslip_middle=0.30
+        self.women_kappa_pinkslip_elderly=0.10   
         self.kappa_svpaivaraha=0.5
         
     def map_pt_kappa(self,pt_factor,nu,div):
