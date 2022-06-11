@@ -170,9 +170,9 @@ class UnemploymentLargeEnv_v4(gym.Env):
             if self.include_ove:
                 self.log_utility_mort_ove_params()
             else:
-                self.log_utility_mort_noove_params()
+                self.log_utility_mort_ove_params()
         else:
-            self.log_utility_nomort_noove_params()
+            self.log_utility_nomort_ove_params()
         
         self.n_age=self.max_age-self.min_age+1
 
