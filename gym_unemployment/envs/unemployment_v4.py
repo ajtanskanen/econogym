@@ -3356,8 +3356,8 @@ class UnemploymentLargeEnv_v4(gym.Env):
         elif state in set([11]): # työelämän ulkopuolella
             wage_reduction=max(min_reduction,1.0-(1.0-self.salary_const_outsider)*(1.0-wage_reduction))
         elif state in set([0,4,13]): # työtön
-            if pinkslip<1 or (pinkslip>0 and time_in_state>0.49): # time_in_state ei ole ihan oikein tässä
-                wage_reduction=max(min_reduction,1.0-(1.0-self.salary_const)*(1.0-wage_reduction))
+            #if pinkslip<1 or (pinkslip>0 and time_in_state>0.49): # time_in_state ei ole ihan oikein tässä
+            wage_reduction=max(min_reduction,1.0-(1.0-self.salary_const)*(1.0-wage_reduction))
         elif state in set([5,6]): # isyys-, äitiys- tai vanhempainvapaa
             wage_reduction=max(min_reduction,1.0-(1.0-self.salary_const)*(1.0-wage_reduction))
         elif state in set([3]):
@@ -4058,9 +4058,9 @@ class UnemploymentLargeEnv_v4(gym.Env):
         
         self.max_mu_age=self.min_retirementage+7.0 # 
         
-        self.men_kappa_fulltime=0.640 # vapaa-ajan menetyksestä rangaistus miehille
+        self.men_kappa_fulltime=0.655 # vapaa-ajan menetyksestä rangaistus miehille
         self.men_mu_scale_kokoaika=0.0170#263 #120 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-        self.men_mu_scale_osaaika=0.015#173 #040 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+        self.men_mu_scale_osaaika=0.014#173 #040 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
         self.men_mu_age=self.min_retirementage-7.0 #5.5 # P.O. 60??
         self.men_kappa_osaaika_young=0.650 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
         self.men_kappa_osaaika_middle=0.743 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
@@ -4073,18 +4073,18 @@ class UnemploymentLargeEnv_v4(gym.Env):
         self.men_kappa_pinkslip_middle=0.15
         self.men_kappa_pinkslip_elderly=0.10
         
-        self.women_kappa_fulltime=0.478 # vapaa-ajan menetyksestä rangaistus naisille
+        self.women_kappa_fulltime=0.480 # vapaa-ajan menetyksestä rangaistus naisille
         self.women_mu_scale_kokoaika=0.0170#263 #120 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
-        self.women_mu_scale_osaaika=0.0150#173 #040 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
+        self.women_mu_scale_osaaika=0.0140#173 #040 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
         self.women_mu_age=self.min_retirementage-2.5 #4.0 # 61 #5 P.O. 60??
-        self.women_kappa_osaaika_young=0.530
-        self.women_kappa_osaaika_middle=0.615
+        self.women_kappa_osaaika_young=0.525
+        self.women_kappa_osaaika_middle=0.610
         #self.women_kappa_osaaika_old=0.48
-        self.women_kappa_osaaika_old=0.600 # self.women_kappa_osaaika_middle
+        self.women_kappa_osaaika_old=0.595 # self.women_kappa_osaaika_middle
         self.women_kappa_osaaika_pension=0.55
-        self.women_kappa_hoitovapaa=0.400 # 0.27
+        self.women_kappa_hoitovapaa=0.500 # 0.27
         self.women_kappa_ve=0.40
-        self.women_kappa_pinkslip_young=0.35
+        self.women_kappa_pinkslip_young=0.40
         self.women_kappa_pinkslip_middle=0.20
         self.women_kappa_pinkslip_elderly=0.15
         self.kappa_svpaivaraha=0.5
