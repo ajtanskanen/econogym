@@ -437,7 +437,6 @@ class UnemploymentLargeEnv_v4(gym.Env):
         prob_1y=1-(1-prob_3m)**(1./0.25)
         self.parttime_fullemp_prob=1-(1-prob_1y)**self.timestep # kolmessa kuukaudessa
         
-        #self.disability_intensity,self.svpaivaraha_disabilityrate=self.rates.get_eff_disab_rate_v4()
         self.disability_intensity,self.svpaivaraha_disabilityrate=self.rates.get_eff_disab_rate_v5()
         self.pinkslip_intensity=self.rates.get_pinkslip_rate()*self.timestep
         self.birth_intensity=self.rates.get_birth_rate_v4(symmetric=False)
@@ -2715,7 +2714,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
             else:
                 action=3
          
-        # oikeus palata töihin       
+        # oikeus palata töihin
         #if (action == 2 or action == 5 or action == 3) and self.unemp_limit_reemp:
         #    if sattuma[7]>self.unemp_reemp_prob[intage] and self.randomness:
         #        action = 1
@@ -3033,12 +3032,20 @@ class UnemploymentLargeEnv_v4(gym.Env):
         Pysy sairauspäivärahalla (14)
         '''
         karenssia_jaljella=0
+        
+        if time_in_state<0.3:
+           if sattuma[8]<0.5:
+               exit=True
+           else:
+               exit=False
+        else:
+           exit=False
 
         if age>=self.max_unemploymentbenefitage or age>=self.min_retirementage:
                 employment_status,pension,kansanelake,tyoelake,wage,time_in_state,ove_paid=\
                     self.move_to_disab_state(wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse)
                 pinkslip=0
-        elif time_in_state<1.0:
+        elif time_in_state<1.0 and not exit:
             if age>=self.min_retirementage and action==1:
                 employment_status,kansanelake,tyoelake,pension,wage,time_in_state,ove_paid=\
                     self.move_to_retirement(wage,pension,old_wage,age,kansanelake,tyoelake,employment_status,
@@ -3054,7 +3061,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
                 tyoelake = tyoelake * self.elakeindeksi
                 pension=self.pension_accrual(age,old_wage,pension,state=14)
         else:
-            if sattuma[5]<self.svpaivaraha_disabilityrate[intage,g] or action==11:
+            if (not exit and sattuma[5]<self.svpaivaraha_disabilityrate[intage,g]) or action==11:
                 employment_status,pension,kansanelake,tyoelake,wage,time_in_state,ove_paid=\
                     self.move_to_disab_state(wage,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse)
                 pinkslip=0
@@ -3158,7 +3165,7 @@ class UnemploymentLargeEnv_v4(gym.Env):
         elif empstate==13:
             wage=0
             old_wage=unempwage_basis
-        elif empstate==14:
+        elif empstate==14: # sairasajan palkkaa ei implementeoitu!
             wage=0
             old_wage=max(unempwage,0.5*(pot_wage+old_wage)) # ei tarkkaa laskentaa
         elif empstate==15:
@@ -3554,8 +3561,8 @@ class UnemploymentLargeEnv_v4(gym.Env):
         prevstatepuol=puoliso_tila
         if self.randomness:
             # kaikki satunnaisuus kerralla
-            sattuma = np.random.uniform(size=8)
-            sattuma2 = np.random.uniform(size=8)
+            sattuma = np.random.uniform(size=9)
+            sattuma2 = np.random.uniform(size=9)
             
             if self.include_spouses:
                 puoliso=self.update_family(puoliso,age,employment_status,puoliso_tila,sattuma)
@@ -4058,32 +4065,32 @@ class UnemploymentLargeEnv_v4(gym.Env):
         
         self.max_mu_age=self.min_retirementage+7.0 # 
         
-        self.men_kappa_fulltime=0.655 # vapaa-ajan menetyksestä rangaistus miehille
-        self.men_mu_scale_kokoaika=0.0170#263 #120 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-        self.men_mu_scale_osaaika=0.014#173 #040 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-        self.men_mu_age=self.min_retirementage-7.0 #5.5 # P.O. 60??
-        self.men_kappa_osaaika_young=0.650 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
-        self.men_kappa_osaaika_middle=0.743 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
+        self.men_kappa_fulltime=0.685 # vapaa-ajan menetyksestä rangaistus miehille
+        self.men_mu_scale_kokoaika=0.0120 #263 #120 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+        self.men_mu_scale_osaaika=0.0090 #173 #040 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+        self.men_mu_age=self.min_retirementage-6.0 #5.5 # P.O. 60??
+        self.men_kappa_osaaika_young=0.635 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
+        self.men_kappa_osaaika_middle=0.770 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
         #self.men_kappa_osaaika_old=0.62 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
-        self.men_kappa_osaaika_old=0.715 # self.men_kappa_osaaika_middle
+        self.men_kappa_osaaika_old=0.750 # self.men_kappa_osaaika_middle
         self.men_kappa_osaaika_pension=0.65
-        self.men_kappa_hoitovapaa=0.12 # hyäty hoitovapaalla olosta
-        self.men_kappa_ve=0.40
+        self.men_kappa_hoitovapaa=0.15 # hyäty hoitovapaalla olosta
+        self.men_kappa_ve=0.30
         self.men_kappa_pinkslip_young=0.35
         self.men_kappa_pinkslip_middle=0.15
         self.men_kappa_pinkslip_elderly=0.10
         
-        self.women_kappa_fulltime=0.480 # vapaa-ajan menetyksestä rangaistus naisille
-        self.women_mu_scale_kokoaika=0.0170#263 #120 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
-        self.women_mu_scale_osaaika=0.0140#173 #040 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
-        self.women_mu_age=self.min_retirementage-2.5 #4.0 # 61 #5 P.O. 60??
-        self.women_kappa_osaaika_young=0.525
-        self.women_kappa_osaaika_middle=0.610
+        self.women_kappa_fulltime=0.470 # vapaa-ajan menetyksestä rangaistus naisille
+        self.women_mu_scale_kokoaika=0.0120#263 #120 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
+        self.women_mu_scale_osaaika=0.0090 #173 #040 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
+        self.women_mu_age=self.min_retirementage-2.0 #4.0 # 61 #5 P.O. 60??
+        self.women_kappa_osaaika_young=0.440
+        self.women_kappa_osaaika_middle=0.565
         #self.women_kappa_osaaika_old=0.48
-        self.women_kappa_osaaika_old=0.595 # self.women_kappa_osaaika_middle
+        self.women_kappa_osaaika_old=0.590 # self.women_kappa_osaaika_middle
         self.women_kappa_osaaika_pension=0.55
-        self.women_kappa_hoitovapaa=0.500 # 0.27
-        self.women_kappa_ve=0.40
+        self.women_kappa_hoitovapaa=0.530 # 0.27
+        self.women_kappa_ve=0.30
         self.women_kappa_pinkslip_young=0.40
         self.women_kappa_pinkslip_middle=0.20
         self.women_kappa_pinkslip_elderly=0.15

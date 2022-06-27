@@ -1220,9 +1220,9 @@ class UnemploymentLargeEnv_v5(gym.Env):
         return netto,benefitq,netto_omat,netto_puoliso
 
     def seed(self, seed=None):
-        '''
-        Open AI interfacen mukainen seed-funktio, joka alustaa satunnaisluvut
-        '''
+    #    '''
+    #    Open AI interfacen mukainen seed-funktio, joka alustaa satunnaisluvut
+    #    '''
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
@@ -1231,7 +1231,6 @@ class UnemploymentLargeEnv_v5(gym.Env):
         Alustetaan numpy.random enviä varten
         '''
         np.random.seed(seed)
-        #return [seed]
 
     def get_initial_weights(self):
         '''
@@ -2527,8 +2526,10 @@ class UnemploymentLargeEnv_v5(gym.Env):
         '''
         time_in_state+=self.timestep
         karenssia_jaljella=0
+        #print(sattuma[1],self.pinkslip_intensity[g])
         if sattuma[1]<self.pinkslip_intensity[g]:
             if age<self.min_retirementage:
+                #print('*BING*')
                 pinkslip=1
                 action=1 # unemp
             else:
@@ -3133,11 +3134,19 @@ class UnemploymentLargeEnv_v5(gym.Env):
         '''
         karenssia_jaljella=0
         
+        if time_in_state<0.3:
+           if sattuma[8]<0.5:
+               exit=True
+           else:
+               exit=False
+        else:
+           exit=False
+        
         if age>=self.max_unemploymentbenefitage or age>=self.min_retirementage:
                 employment_status,pension,kansanelake,tyoelake,wage,time_in_state,ove_paid,basis_wage=\
                     self.move_to_disab_state(pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse)
                 pinkslip=0
-        elif time_in_state<1.0:
+        elif time_in_state<1.0 and not exit:
             if age>=self.min_retirementage and action==1:
                 employment_status,kansanelake,tyoelake,pension,paid_wage,time_in_state,ove_paid,basis_wage=\
                     self.move_to_retirement(pension,old_wage,age,kansanelake,tyoelake,employment_status,
@@ -3153,7 +3162,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
                 tyoelake = tyoelake * self.elakeindeksi
                 pension=self.pension_accrual(age,old_wage,pension,state=14)
         else:
-            if sattuma[5]<self.svpaivaraha_disabilityrate[intage,g] or action==11:
+            if (not exit and sattuma[5]<self.svpaivaraha_disabilityrate[intage,g]) or action==11:
                 employment_status,pension,kansanelake,tyoelake,wage,time_in_state,ove_paid,basis_wage=\
                     self.move_to_disab_state(pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse)
                 pinkslip=0
@@ -3680,8 +3689,8 @@ class UnemploymentLargeEnv_v5(gym.Env):
         
         if self.randomness:
             # kaikki satunnaisuus kerralla
-            sattuma = np.random.uniform(size=8)
-            sattuma2 = np.random.uniform(size=8)
+            sattuma = np.random.uniform(size=9)
+            sattuma2 = np.random.uniform(size=9)
             
             if self.include_spouses:
                 puoliso=self.update_family(puoliso,age,main_empstate,spouse_empstate,sattuma)
@@ -4131,25 +4140,25 @@ class UnemploymentLargeEnv_v5(gym.Env):
         
         self.max_mu_age=self.min_retirementage+7.0 # 
         
-        self.men_mu_scale_kokoaika=0.015 #250 #120 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-        self.men_mu_scale_osaaika=0.012 #14 #040 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-        self.men_mu_age=self.min_retirementage-6.75 #5.5 # P.O. 60??
-        self.men_kappa_hoitovapaa=0.130 # hyäty hoitovapaalla olosta
-        self.men_kappa_ve=0.50
+        self.men_mu_scale_kokoaika=0.009 #11 #250 #120 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+        self.men_mu_scale_osaaika=0.005 #09 #14 #040 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+        self.men_mu_age=self.min_retirementage-3.0
+        self.men_kappa_hoitovapaa=0.110 # hyäty hoitovapaalla olosta
+        self.men_kappa_ve=0.35
         self.men_kappa_pinkslip_young=0.25
         self.men_kappa_pinkslip_middle=0.15
-        self.men_kappa_pinkslip_elderly=0.15
-        self.men_kappa_param=np.array([-0.340, -0.345, -0.437, -0.600, -0.870, -1.355]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
+        self.men_kappa_pinkslip_elderly=0.10
+        self.men_kappa_param=np.array([-0.388, -0.390, -0.440, -0.570, -0.883, -1.358]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
         
-        self.women_mu_scale_kokoaika=0.015 #250 #120 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
-        self.women_mu_scale_osaaika=0.012 #14 #040 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
-        self.women_mu_age=self.min_retirementage-2.75 #4.0 # 61 #5 P.O. 60??
-        self.women_kappa_hoitovapaa=0.450 # 0.27
-        self.women_kappa_ve=0.50
-        self.women_kappa_pinkslip_young=0.30
-        self.women_kappa_pinkslip_middle=0.30
-        self.women_kappa_pinkslip_elderly=0.10   
-        self.women_kappa_param=np.array([-0.205, -0.210, -0.255, -0.387, -0.740, -0.955]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
+        self.women_mu_scale_kokoaika=0.009 #11 #250 #120 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
+        self.women_mu_scale_osaaika=0.005 #09 #14 #040 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
+        self.women_mu_age=self.min_retirementage-3.0
+        self.women_kappa_hoitovapaa=0.420 # 0.27
+        self.women_kappa_ve=0.35
+        self.women_kappa_pinkslip_young=0.35
+        self.women_kappa_pinkslip_middle=0.20
+        self.women_kappa_pinkslip_elderly=0.10
+        self.women_kappa_param=np.array([-0.131, -0.132, -0.245, -0.345, -0.755, -0.960]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
 
         self.kappa_svpaivaraha=0.5
         
@@ -4158,6 +4167,9 @@ class UnemploymentLargeEnv_v5(gym.Env):
         # OVE - NO
         # MORT - YES
         #
+        
+        print('No ove')
+        exit()
     
         self.salary_const=0.04*self.timestep # 0.038 työttämyydestä palkka alenee tämän verran vuodessa
         self.salary_const_retirement=0.10*self.timestep # vanhuuseläkkeellä muutos nopeampaa
@@ -4232,6 +4244,18 @@ class UnemploymentLargeEnv_v5(gym.Env):
             return self.men_kappa_param[n]
         else:
             return self.women_kappa_param[n]
+
+    def map_pt_kappa_TU(self,pt_factor,g):
+        '''
+        Trabandt-Uhlig
+        
+        self.x_kappa_fii is Frisch's elasticity for gender x
+        self.x_kappa_pt is weight of effort for gender x
+        '''
+        if g<3:
+            return self.men_kappa_pt*pt_factor^(1.0+1.0/self.men_kappa_fii)
+        else:
+            return self.women_kappa_pt*pt_factor^(1.0+1.0/self.women_kappa_fii)
         
     def log_get_kappa(self,age : float,g : int,employment_state : int,pinkslip : int,pt_factor : float):
         # kappa tells how much person values free-time
@@ -4245,9 +4269,6 @@ class UnemploymentLargeEnv_v5(gym.Env):
             #    kappa_kokoaika += prefnoise
             
             if employment_state in set([1,10,8,9]):
-                #nu=0.56
-                #div=24/13.44
-                #kappa_tyo=self.map_pt_kappa(pt_factor,nu,div)
                 kappa_tyo=self.map_pt_kappa_v2(pt_factor,g)
             else:
                 kappa_tyo=0
@@ -4277,9 +4298,6 @@ class UnemploymentLargeEnv_v5(gym.Env):
             #    kappa_kokoaika += prefnoise
             
             if employment_state in set([1,10,8,9]):
-                #nu=0.66
-                #div=24/15.84
-                #kappa_tyo=self.map_pt_kappa(pt_factor,nu,div)
                 kappa_tyo=self.map_pt_kappa_v2(pt_factor,g)
             else:
                 kappa_tyo=0
@@ -5336,6 +5354,9 @@ class UnemploymentLargeEnv_v5(gym.Env):
         '''
         Open AI-interfacen mukainen reset-funktio, joka nollaa laskennan alkutilaan
         '''
+        # We need the following line to seed self.np_random
+        #super().reset()
+                
         self.init_state()
         self.steps_beyond_done = None
 
@@ -5374,9 +5395,9 @@ class UnemploymentLargeEnv_v5(gym.Env):
         paid_pension=0
         kansanelake=0
         tyoelake_maksussa=0
-        main_pt_action=0
+        main_pt_action=1
         main_paid_wage=0        
-        spouse_basis_wage=0
+        basis_wage=0
         
         # set up salary for the entire career
         if is_spouse:
@@ -5438,6 +5459,8 @@ class UnemploymentLargeEnv_v5(gym.Env):
             old_wage=self.get_wage(self.min_age,wage_reduction)
             
         next_wage=old_wage
+        
+        main_paid_wage,main_pt_factor=self.get_paid_wage(old_wage,employment_state,main_pt_action)
         
         if not reset_exp:
             if employment_state==0:
@@ -5524,7 +5547,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
         return employment_state,group,pension,old_wage,age,time_in_state,paid_pension,pink,toe,toekesto,tyohist,next_wage,\
             used_unemp_benefit,wage_reduction,unemp_after_ra,unempwage,unempwage_basis,\
             children_under3,children_under7,children_under18,unemp_benefit_left,alkanut_ansiosidonnainen,toe58,\
-            ove_paid,kassanjasenyys,kansanelake,tyoelake_maksussa,main_pt_action,main_paid_wage,spouse_basis_wage
+            ove_paid,kassanjasenyys,kansanelake,tyoelake_maksussa,main_pt_action,main_paid_wage,basis_wage
 
     
     def init_state(self):
@@ -5591,7 +5614,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
                                        main_basis_wage,spouse_basis_wage,
                                        prefnoise)
 
-    def render(self,mode='human',close=False,done=False,reward=None,netto=None,render_omat=True,render_puoliso=True,benq=None,netto_omat=None,netto_puoliso=None):
+    def render(self,mode='human',close=False,done=False,reward=None,netto=None,render_omat=False,render_puoliso=True,benq=None,netto_omat=None,netto_puoliso=None):
         '''
         Tulostus-rutiini
         '''
