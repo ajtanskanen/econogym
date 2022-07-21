@@ -4066,13 +4066,13 @@ class UnemploymentLargeEnv_v4(gym.Env):
         self.max_mu_age=self.min_retirementage+7.0 # 
         
         self.men_kappa_fulltime=0.685 # vapaa-ajan menetyksestä rangaistus miehille
-        self.men_mu_scale_kokoaika=0.0120 #263 #120 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-        self.men_mu_scale_osaaika=0.0090 #173 #040 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+        self.men_mu_scale_kokoaika=0.0150 #263 #120 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+        self.men_mu_scale_osaaika=0.0120 #173 #040 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
         self.men_mu_age=self.min_retirementage-6.0 #5.5 # P.O. 60??
-        self.men_kappa_osaaika_young=0.635 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
-        self.men_kappa_osaaika_middle=0.770 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
+        self.men_kappa_osaaika_young=0.660 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
+        self.men_kappa_osaaika_middle=0.790 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
         #self.men_kappa_osaaika_old=0.62 # vapaa-ajan menetyksestä rangaistus miehille osa-aikatyön teosta, suhteessa kokoaikaan
-        self.men_kappa_osaaika_old=0.750 # self.men_kappa_osaaika_middle
+        self.men_kappa_osaaika_old=0.770 # self.men_kappa_osaaika_middle
         self.men_kappa_osaaika_pension=0.65
         self.men_kappa_hoitovapaa=0.15 # hyäty hoitovapaalla olosta
         self.men_kappa_ve=0.30
@@ -4081,8 +4081,8 @@ class UnemploymentLargeEnv_v4(gym.Env):
         self.men_kappa_pinkslip_elderly=0.10
         
         self.women_kappa_fulltime=0.470 # vapaa-ajan menetyksestä rangaistus naisille
-        self.women_mu_scale_kokoaika=0.0120#263 #120 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
-        self.women_mu_scale_osaaika=0.0090 #173 #040 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
+        self.women_mu_scale_kokoaika=0.0150#263 #120 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
+        self.women_mu_scale_osaaika=0.0120 #173 #040 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
         self.women_mu_age=self.min_retirementage-2.0 #4.0 # 61 #5 P.O. 60??
         self.women_kappa_osaaika_young=0.440
         self.women_kappa_osaaika_middle=0.565

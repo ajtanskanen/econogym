@@ -1,6 +1,6 @@
 """
 
-    unemployment_v4
+    unemployment_v5
 
 
     Gym module implementing the Finnish social security including earnings-related components,
@@ -483,7 +483,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
         
         self.disability_intensity,self.svpaivaraha_disabilityrate=self.rates.get_eff_disab_rate_v5()
         self.pinkslip_intensity=self.rates.get_pinkslip_rate()*self.timestep
-        self.birth_intensity=self.rates.get_birth_rate_v4(symmetric=False)
+        self.birth_intensity=self.rates.get_birth_rate_v5(symmetric=False)
         self.mort_intensity=self.rates.get_mort_rate()
         self.student_inrate,self.student_outrate=self.rates.get_student_rate_v5() # myös armeijassa olevat tässä
         self.outsider_inrate,self.outsider_outrate=self.rates.get_outsider_rate_v5()
@@ -4132,7 +4132,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
     
         self.salary_const=0.04*self.timestep # 0.038 työttämyydestä palkka alenee tämän verran vuodessa
         self.salary_const_retirement=0.10*self.timestep # vanhuuseläkkeellä muutos nopeampaa
-        self.salary_const_svpaiva=0.15*self.timestep # pitkällä svpäivärahalla muutos nopeaa
+        self.salary_const_svpaiva=0.10*self.timestep # pitkällä svpäivärahalla muutos nopeaa
         self.salary_const_up=0.030*self.timestep # 0.04 työssäolo palauttaa ansioita tämän verran vuodessa
         self.salary_const_up_osaaika=0.030*self.timestep # 0.04 osa-aikainen työssäolo palauttaa ansioita tämän verran vuodessa
         self.salary_const_student=0.01*self.timestep # 0.05 opiskelu pienentää leikkausta tämän verran vuodessa
@@ -4140,25 +4140,25 @@ class UnemploymentLargeEnv_v5(gym.Env):
         
         self.max_mu_age=self.min_retirementage+7.0 # 
         
-        self.men_mu_scale_kokoaika=0.009 #11 #250 #120 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-        self.men_mu_scale_osaaika=0.005 #09 #14 #040 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-        self.men_mu_age=self.min_retirementage-3.0
+        self.men_mu_scale_kokoaika=0.012 #11 #250 #120 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+        self.men_mu_scale_osaaika=0.007 #09 #14 #040 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+        self.men_mu_age=self.min_retirementage-4.0
         self.men_kappa_hoitovapaa=0.110 # hyäty hoitovapaalla olosta
-        self.men_kappa_ve=0.35
+        self.men_kappa_ve=0.33
         self.men_kappa_pinkslip_young=0.25
         self.men_kappa_pinkslip_middle=0.15
         self.men_kappa_pinkslip_elderly=0.10
-        self.men_kappa_param=np.array([-0.388, -0.390, -0.440, -0.570, -0.883, -1.358]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
+        self.men_kappa_param=np.array([-0.400, -0.416, -0.450, -0.570, -0.880, -1.365]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
         
         self.women_mu_scale_kokoaika=0.009 #11 #250 #120 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
         self.women_mu_scale_osaaika=0.005 #09 #14 #040 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
-        self.women_mu_age=self.min_retirementage-3.0
-        self.women_kappa_hoitovapaa=0.420 # 0.27
-        self.women_kappa_ve=0.35
+        self.women_mu_age=self.min_retirementage-2.0
+        self.women_kappa_hoitovapaa=0.450 # 0.27
+        self.women_kappa_ve=0.33
         self.women_kappa_pinkslip_young=0.35
         self.women_kappa_pinkslip_middle=0.20
         self.women_kappa_pinkslip_elderly=0.10
-        self.women_kappa_param=np.array([-0.131, -0.132, -0.245, -0.345, -0.755, -0.960]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
+        self.women_kappa_param=np.array([-0.1365, -0.137, -0.230, -0.355, -0.745, -0.950]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
 
         self.kappa_svpaivaraha=0.5
         
