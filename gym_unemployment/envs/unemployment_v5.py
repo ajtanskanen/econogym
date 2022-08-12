@@ -385,7 +385,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
             
     def set_annual_params(self,year : int) -> None:
         # arvot tammikuun lukuja inflaation vuosimuutoksessa, https://pxweb2.stat.fi/PxWeb/pxweb/fi/StatFin/StatFin__khi/statfin_khi_pxt_122p.px/table/tableViewLayout1/
-        inflation_raw=np.array([1.0,1.011,1.010,1.009,1.044,1.01,1.01]) # 2018 2019 2020 2021 2022 2023 2024
+        inflation_raw=np.array([1.0,1.011,1.010,1.003,1.022,1.052,1.022]) # 2018 2019 2020 2021 2022 2023 2024
         self.inflation=np.cumprod(inflation_raw)
         self.inflationfactor=self.inflation[year-2018]
         
@@ -4083,7 +4083,17 @@ class UnemploymentLargeEnv_v5(gym.Env):
         if self.plotdebug:
             self.render(done=done,reward=reward,netto=netto,benq=benq,netto_omat=netto_omat,netto_puoliso=netto_puoliso)
 
-        return np.array(self.state), reward, done, benq
+        if False:
+            if not np.logical_and(self.state >= self.low, self.state <= self.high).all():
+                print('reset FAILED')
+                for k in range(self.state.shape[0]):
+                    if np.logical_or(self.state[k] < self.low[k], self.state[k] > self.high[k]):
+                        aa='*'
+                    else:
+                        aa=''
+                    print(f'{aa} {k}:',self.state[k],'dl =',self.state[k] -self.low[k],'dh =',self.high[k] - self.state[k],'[',self.low[k],';',self.high[k],']')
+
+        return np.array(self.state,dtype=np.float32), reward, done, benq
         
     def scale_q(self,npv,npv0,npv_pension,npv_gpension,p_npv,p_npv0,p_npv_pension,p_npv_gpension,benq,age):
         '''
@@ -4167,8 +4177,8 @@ class UnemploymentLargeEnv_v5(gym.Env):
         self.men_kappa_ve=0.27
         self.men_kappa_pinkslip_young=0.25
         self.men_kappa_pinkslip_middle=0.15
-        self.men_kappa_pinkslip_elderly=0.25
-        self.men_kappa_param=np.array([-0.435, -0.455, -0.485, -0.625, -0.935, -1.400]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
+        self.men_kappa_pinkslip_elderly=0.15
+        self.men_kappa_param=np.array([-0.438, -0.453, -0.485, -0.625, -0.935, -1.400]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
         
         self.women_mu_scale_kokoaika=0.035 #11 #250 #120 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
         self.women_mu_scale_osaaika=0.020 #09 #14 #040 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
@@ -4178,7 +4188,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
         self.women_kappa_pinkslip_young=0.35
         self.women_kappa_pinkslip_middle=0.20
         self.women_kappa_pinkslip_elderly=0.25
-        self.women_kappa_param=np.array([-0.165, -0.165, -0.230, -0.350, -0.775, -1.000]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
+        self.women_kappa_param=np.array([-0.170, -0.170, -0.225, -0.350, -0.775, -1.000]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
 
         self.kappa_svpaivaraha=0.5
         
@@ -4704,7 +4714,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
             retaged=0
 
         d[states5+5]=pink # irtisanottu vai ei 
-        d[states5+6]=toe-14/12 # työssäoloehto
+        d[states5+6]=toe-14/12 # työssäoloehto **
         d[states5+7]=(tyohist-10)/20 # tyohistoria: 300/400 pv
         d[states5+8]=(self.min_retirementage-age)/43
         d[states5+9]=unemp_benefit_left-1 #retaged
@@ -5385,8 +5395,18 @@ class UnemploymentLargeEnv_v5(gym.Env):
         
         if self.plotdebug:
             self.render()
-
-        return np.array(self.state)
+            
+        if False:
+            if not np.logical_and(self.state >= self.low, self.state <= self.high).all():
+                print('reset FAILED')
+                for k in range(self.state.shape[0]):
+                    if np.logical_or(self.state[k] < self.low[k], self.state[k] > self.high[k]):
+                        aa='*'
+                    else:
+                        aa=''
+                    print(f'{aa} {k}:',self.state[k],'dl =',self.state[k] -self.low[k],'dh =',self.high[k] - self.state[k],'[',self.low[k],';',self.high[k],']')
+            
+        return np.array(self.state,dtype=np.float32)
     
     def get_initial_state(self,puoliso : int,is_spouse=False,g=-1):    
         '''
@@ -5745,14 +5765,14 @@ class UnemploymentLargeEnv_v5(gym.Env):
             paid_pension_min=(0-40_000)/40_000 # alkanut eläke
             paid_pension_max=(200_000-40_000)/40_000 # alkanut eläke
 
-        age_max=(self.max_age-(self.max_age+self.min_age)/2)/20
-        age_min=(self.min_age-(self.max_age+self.min_age)/2)/20
+        age_max=(self.max_age+1-(self.max_age+self.min_age)/2)/20
+        age_min=(self.min_age-1-(self.max_age+self.min_age)/2)/20
         tis_max=(self.max_age-self.min_age-10)/10
         tis_min=-10/10
         pink_min=0 # irtisanottu vai ei 
         pink_max=1 # irtisanottu vai ei 
-        toe_min=0-28/12*0.5 # työssäoloehto
-        toe_max=28/12-28/12*0.5 # työssäoloehto
+        toe_min=-15/12 # työssäoloehto
+        toe_max=15/12 # työssäoloehto
         thist_min=-10/20 # tyohistoria: 300/400 pv
         thist_max=(self.max_age-self.min_age-10)/20 # tyohistoria: 300/400 pv
         out_max=100
@@ -5772,8 +5792,8 @@ class UnemploymentLargeEnv_v5(gym.Env):
         unra_max=1
         child_min=-1
         child_max=1
-        tr_min=-1
-        tr_max=1
+        tr_min=(self.min_retirementage-self.max_age)/43
+        tr_max=(self.min_retirementage-self.min_age)/43
         left_min=-1
         left_max=1
         
@@ -5914,8 +5934,8 @@ class UnemploymentLargeEnv_v5(gym.Env):
             low.append(pref_min)
             high.append(pref_max)
                 
-        self.low=np.array(low)
-        self.high=np.array(high)
+        self.low=np.array(low,dtype=np.float32)
+        self.high=np.array(high,dtype=np.float32)
 
     def explain(self):
         '''
