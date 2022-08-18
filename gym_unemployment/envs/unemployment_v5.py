@@ -2940,7 +2940,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
             pinkslip=1
             
         if (action in set ([2,3])) and self.unemp_limit_reemp:
-            if sattuma[7]>self.self.parttime_fullemp_prob and self.randomness:
+            if sattuma[7]>self.parttime_fullemp_prob and self.randomness:
                 action = 0
 
         if age>=self.max_retirementage:
@@ -2988,7 +2988,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
             pinkslip=1
             
         if (action in set ([1,2,5])) and self.unemp_limit_reemp:
-            if sattuma[7]>self.self.parttime_fullemp_prob and self.randomness:
+            if sattuma[7]>self.parttime_fullemp_prob and self.randomness:
                 action = 0
 
         if age>=self.max_retirementage:
