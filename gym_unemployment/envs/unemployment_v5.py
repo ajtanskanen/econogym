@@ -1575,6 +1575,8 @@ class UnemploymentLargeEnv_v5(gym.Env):
                 kansanelake = kansanelake * self.kelaindeksi
                 employment_status = 9
                 paid_wage,pt_factor=self.get_paid_wage(wage,employment_status,pt_action)
+            elif employment_status==3:
+                print('error: moved from disability to oa_fulltime')
             elif employment_status==4:
                 # lykkäyskorotus
                 tyoelake = tyoelake*self.elakeindeksi + pension
@@ -1674,10 +1676,13 @@ class UnemploymentLargeEnv_v5(gym.Env):
                 kansanelake = kansanelake * self.kelaindeksi
                 employment_status = 8
                 paid_wage,pt_factor=self.get_paid_wage(wage,employment_status,pt_action)
+            elif employment_status==3:
+                print('error: moved from disability to oa_parttime')
             elif employment_status==4:
                 # lykkäyskorotus
                 tyoelake = tyoelake*self.elakeindeksi + pension
                 if self.include_kansanelake:
+                    # ei lykkäyskorotusta
                     kansanelake = self.ben.laske_kansanelake(age,tyoelake*self.elinaikakerroin/12,1-has_spouse,disability=True)*12 # ben-modulissa palkat kk-tasolla
                 else:
                     kansanelake = 0
@@ -1691,6 +1696,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
                 # lykkäyskorotus
                 tyoelake = tyoelake*self.elakeindeksi + pension
                 if self.include_kansanelake:
+                    # lykkäyskorotus
                     kansanelake = self.ben.laske_kansanelake(age,tyoelake*self.elinaikakerroin/12,1-has_spouse)*12 # ben-modulissa palkat kk-tasolla
                 else:
                     kansanelake = 0
@@ -3071,7 +3077,8 @@ class UnemploymentLargeEnv_v5(gym.Env):
                     self.move_to_retirement(pension,old_wage,age,kansanelake,tyoelake,employment_status,
                         unemp_after_ra,all_acc=True,scale_acc=True,has_spouse=has_spouse,is_spouse=is_spouse)
             elif children_under3>0:
-                employment_status,pension,tyoelake,paid_wage,time_in_state,pinkslip,basis_wage=self.move_to_kht(pension,tyoelake,old_wage,age)
+                employment_status,pension,tyoelake,paid_wage,time_in_state,pinkslip,basis_wage=\
+                    self.move_to_kht(pension,tyoelake,old_wage,age)
             else:
                 employment_status,kansanelake,tyoelake,pension,paid_wage,time_in_state,\
                     used_unemp_benefit,pinkslip,unemp_after_ra,unempwage_basis,\
@@ -3454,7 +3461,8 @@ class UnemploymentLargeEnv_v5(gym.Env):
             #wage_reduction+=self.salary_const
             wage_reduction=min(1.0,wage_reduction+self.salary_const)
         elif state in set([3]):
-            wage_reduction=0.60 # vastaa määritelmää
+            #wage_reduction=0.60 # vastaa määritelmää
+            wage_reduction=wage_reduction # jäädytetään
         elif state in set([7]): # kotihoidontuki tai ve tai tk
             wage_reduction=min(1.0,wage_reduction+self.salary_const)
         elif state in set([2]): # kotihoidontuki tai ve tai tk
@@ -3502,7 +3510,8 @@ class UnemploymentLargeEnv_v5(gym.Env):
         elif state in set([5,6]): # isyys-, äitiys- tai vanhempainvapaa
             wage_reduction=max(min_reduction,1.0-(1.0-self.salary_const)*(1.0-wage_reduction))
         elif state in set([3]):
-            wage_reduction=0.60 # vastaa määritelmää
+            #wage_reduction=0.60 # vastaa määritelmää
+            wage_reduction=wage_reduction # vastaa määritelmää
         elif state in set([7]): # kotihoidontuki 
             wage_reduction=max(min_reduction,1.0-(1.0-self.salary_const)*(1.0-wage_reduction))
         elif state in set([2]): # ve
@@ -4180,13 +4189,13 @@ class UnemploymentLargeEnv_v5(gym.Env):
         
         self.men_mu_scale_kokoaika=0.04 #11 #250 #120 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
         self.men_mu_scale_osaaika=0.025 #09 #14 #040 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-        self.men_mu_age=self.min_retirementage-2.0
+        self.men_mu_age=self.min_retirementage#-1.0
         self.men_kappa_hoitovapaa=0.100 # hyäty hoitovapaalla olosta
         self.men_kappa_ve=0.27
         self.men_kappa_pinkslip_young=0.35
         self.men_kappa_pinkslip_middle=0.10
         self.men_kappa_pinkslip_elderly=0.10
-        self.men_kappa_param=np.array([-0.440, -0.460, -0.480, -0.625, -0.900, -1.380]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
+        self.men_kappa_param=np.array([-0.440, -0.460, -0.470, -0.610, -0.885, -1.360]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
         
         self.women_mu_scale_kokoaika=0.035 #11 #250 #120 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
         self.women_mu_scale_osaaika=0.020 #09 #14 #040 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
@@ -4196,7 +4205,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
         self.women_kappa_pinkslip_young=0.35
         self.women_kappa_pinkslip_middle=0.20
         self.women_kappa_pinkslip_elderly=0.25
-        self.women_kappa_param=np.array([-0.150, -0.145, -0.190, -0.310, -0.730, -0.970]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
+        self.women_kappa_param=np.array([-0.145, -0.135, -0.170, -0.310, -0.720, -0.960]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
 
         self.kappa_svpaivaraha=0.5
         
