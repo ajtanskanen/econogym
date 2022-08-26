@@ -208,15 +208,29 @@ class UnemploymentLargeEnv_v5(gym.Env):
             self.n_actions=5
             self.n_spouse_actions=self.n_actions 
 
-        if self.include_parttimeactions:
-            self.n_parttime_action=3
-            self.action_space = spaces.MultiDiscrete([self.n_actions,self.n_spouse_actions,self.n_parttime_action,self.n_parttime_action])
-            self.parttime_actions=self.setup_parttime_actions()
+        self.include_savings=False
+        if self.include_savings:
+            self.n_savings=41 # -5,-4,-3,-2,-1,0,1,2,3,4,5
+            self.mid_sav_act=np.floor(self.n_savings/2)
+            
+            if self.include_parttimeactions:
+                self.n_parttime_action=3
+                self.action_space = spaces.MultiDiscrete([self.n_actions,self.n_spouse_actions,self.n_parttime_action,self.n_parttime_action,self.n_savings,self.n_savings])
+                self.parttime_actions=self.setup_parttime_actions()
+            else:
+                self.n_parttime_action=3
+                self.action_space = spaces.MultiDiscrete([self.n_actions,self.n_spouse_actions,self.n_savings,self.n_savings])
+                self.parttime_actions=self.setup_parttime_actions(debug=True)
         else:
-            self.n_parttime_action=3
-            self.action_space = spaces.MultiDiscrete([self.n_actions,self.n_spouse_actions])
-            self.parttime_actions=self.setup_parttime_actions(debug=True)
-
+            if self.include_parttimeactions:
+                self.n_parttime_action=3
+                self.action_space = spaces.MultiDiscrete([self.n_actions,self.n_spouse_actions,self.n_parttime_action,self.n_parttime_action])
+                self.parttime_actions=self.setup_parttime_actions()
+            else:
+                self.n_parttime_action=3
+                self.action_space = spaces.MultiDiscrete([self.n_actions,self.n_spouse_actions])
+                self.parttime_actions=self.setup_parttime_actions(debug=True)
+            
         self.setup_state_encoding()
         self.set_state_limits()
             
@@ -251,7 +265,59 @@ class UnemploymentLargeEnv_v5(gym.Env):
         
         if self.plotdebug:
             self.unit_test_code_decode()
-    
+
+            
+    def map_save_action(self,sav_act):
+        if sav_act>0:
+            s=(sav_act-self.mid_sav_act)/100*2
+        else:
+            s=(sav_act-self.mid_sav_act)/self.mid_sav_act
+        
+        return s
+        
+    def update_savings(self,age,netto,savings,sav_action,empstate):
+        t=self.map_age(age)
+        interest=savings*(self.returns[t]-1.0)
+        savings=savings+interest
+        
+        if savings<0:
+            payback = -0.20*savings # lyhennys vähintään  20 % vuodessa
+        else:
+            payback = 0
+
+        if sav_action>0:
+            save=min(0.9*netto,payback+sav_action*netto)
+            netto-=save
+            savings+=save
+            mod_sav_act=sav_action
+        elif sav_action<0:
+            save=sav_action*netto
+            if savings+save>self.max_debt and empstate!=2 and age<self.min_retirementage:
+                save += payback
+                save = min(save,0.9*netto)
+                netto +=-save
+                savings+=save
+                mod_sav_act=sav_action
+            elif savings>0 and empstate==2:
+                save = sav_action*savings
+                netto += -save
+                savings+=save
+                mod_sav_act=sav_action
+            else:
+                save=min(0.9*netto,payback)
+                netto-=save
+                savings+=save
+                mod_sav_act=0
+        else:
+            save=min(0.9*netto,payback)
+            netto-=save
+            savings+=save
+            mod_sav_act=0
+            
+        #print(f'netto {netto} savings {savings} mod_sav_act {mod_sav_act}')
+                    
+        return netto,savings,mod_sav_act
+            
     def setup_parttime_actions(self,debug=False):
         actions=np.zeros((self.n_empl,3))
         if debug:
@@ -3675,6 +3741,13 @@ class UnemploymentLargeEnv_v5(gym.Env):
 
         emp_action=int(action[0])
         spouse_action=int(action[1])
+
+        if self.include_savings:
+            emp_savaction=int(action[4])
+            spouse_savaction=int(action[5])
+        else:
+            emp_savaction=0
+            spouse_savaction=0
         
         if self.include_parttimeactions:
             main_pt_action=int(action[2])
@@ -4191,11 +4264,11 @@ class UnemploymentLargeEnv_v5(gym.Env):
         self.men_mu_scale_osaaika=0.025 #09 #14 #040 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
         self.men_mu_age=self.min_retirementage#-1.0
         self.men_kappa_hoitovapaa=0.100 # hyäty hoitovapaalla olosta
-        self.men_kappa_ve=0.27
+        self.men_kappa_ve=0.28
         self.men_kappa_pinkslip_young=0.35
         self.men_kappa_pinkslip_middle=0.10
         self.men_kappa_pinkslip_elderly=0.10
-        self.men_kappa_param=np.array([-0.440, -0.460, -0.470, -0.610, -0.885, -1.360]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
+        self.men_kappa_param=np.array([-0.445, -0.457, -0.470, -0.605, -0.890, -1.360]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
         
         self.women_mu_scale_kokoaika=0.035 #11 #250 #120 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
         self.women_mu_scale_osaaika=0.020 #09 #14 #040 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
@@ -4205,7 +4278,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
         self.women_kappa_pinkslip_young=0.35
         self.women_kappa_pinkslip_middle=0.20
         self.women_kappa_pinkslip_elderly=0.25
-        self.women_kappa_param=np.array([-0.145, -0.135, -0.170, -0.310, -0.720, -0.960]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
+        self.women_kappa_param=np.array([-0.150, -0.140, -0.165, -0.305, -0.715, -0.965]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
 
         self.kappa_svpaivaraha=0.5
         
@@ -4320,13 +4393,6 @@ class UnemploymentLargeEnv_v5(gym.Env):
             else:
                 kappa_tyo=0
                 
-         #    if age<28: # ikääntyneet preferoivat osa-aikatyötä
-#                 kappa_osaaika=self.men_kappa_osaaika_young
-#             elif age<58: # ikääntyneet preferoivat osa-aikatyötä
-#                 kappa_osaaika=self.men_kappa_osaaika_middle
-#             else:
-#                 kappa_osaaika=self.men_kappa_osaaika_elderly
-                
             kappa_hoitovapaa=self.men_kappa_hoitovapaa
             kappa_ve=self.men_kappa_ve
             if age>50:
@@ -4348,13 +4414,6 @@ class UnemploymentLargeEnv_v5(gym.Env):
                 kappa_tyo=self.map_pt_kappa_v2(pt_factor,g)
             else:
                 kappa_tyo=0
-                
-         #    if age<28: # ikääntyneet preferoivat osa-aikatyötä
-#                 kappa_osaaika=self.women_kappa_osaaika_young
-#             elif age<58: # ikääntyneet preferoivat osa-aikatyötä
-#                 kappa_osaaika=self.women_kappa_osaaika_middle
-#             else:
-#                 kappa_osaaika=self.women_kappa_osaaika_elderly
                 
             kappa_hoitovapaa=self.women_kappa_hoitovapaa
             kappa_ve=self.women_kappa_ve
@@ -4381,10 +4440,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
         elif employment_state in set([0,4]):
             kappa= -kappa_pinkslip
         elif employment_state in set([13]):
-            if self.perustulo:
-                kappa= 0
-            else:
-                kappa= -kappa_pinkslip
+            kappa= -kappa_pinkslip
         elif employment_state == 2:
             kappa=kappa_ve
         elif employment_state == 7:
