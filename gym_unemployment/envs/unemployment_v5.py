@@ -137,7 +137,6 @@ class UnemploymentLargeEnv_v5(gym.Env):
         elif self.universalcredit:
             self.ben = fin_benefits.SingleBenefit(**kwargs)
         else:
-            #self.ben = fin_benefits.CyBenefits(**kwargs)
             self.ben = fin_benefits.Benefits(**kwargs)
              
         self.gamma=gamma**self.timestep # discounting
@@ -1030,7 +1029,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
                     puoliso_palkka,puoliso_benefitbasis,puoliso_kansanelake,puoliso_tyoelake,puoliso_tila,puoliso_time_in_state,puoliso_used_unemp_benefit,
                     puoliso_irtisanottu,puoliso_karenssia_jaljella)
     
-            netto,benefitq=self.ben.laske_tulot_v2(p,include_takuuelake=self.include_takuuelake,omatalku='',puolisoalku='puoliso_')
+            netto,benefitq=self.ben.laske_tulot_v3(p,include_takuuelake=self.include_takuuelake,omatalku='',puolisoalku='puoliso_',split_costs=True)
             benefitq['netto']=netto
             netto=netto*12
             
@@ -1152,7 +1151,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
                 self.setup_children(p,puoliso,employment_state,puoliso_tila,0,0,0,children_under18)
                 self.setup_asumismenot(employment_state,0,-1,0,p)
     
-            netto1,benefitq1=self.ben.laske_tulot_v2(p,include_takuuelake=self.include_takuuelake)
+            netto1,benefitq1=self.ben.laske_tulot_v3(p,include_takuuelake=self.include_takuuelake,split_costs=True)
             
             if puoliso_tila in [5,6,7]:
                 if employment_state not in [5,6,7] or (employment_state in [5,6,7] and p_g>g):
@@ -1193,7 +1192,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
                 pc7=0
                 pc18=0
                           
-            netto2,benefitq2=self.ben.laske_tulot_v2(p2,include_takuuelake=self.include_takuuelake,omat='puoliso_',puoliso='omat_',omatalku='',puolisoalku='puoliso_') # switch order
+            netto2,benefitq2=self.ben.laske_tulot_v3(p2,include_takuuelake=self.include_takuuelake,omat='puoliso_',puoliso='omat_',omatalku='',puolisoalku='puoliso_',split_costs=True) # switch order
             netto=netto1+netto2
             
             if self.include_emtr:
@@ -2171,8 +2170,8 @@ class UnemploymentLargeEnv_v5(gym.Env):
                 employment_status = 13 # siirto työmarkkinatuelle
                 alkanut_ansiosidonnainen = 0
                 unempwage_basis=0
-                if irtisanottu: # muuten ei oikeutta tm-tukeen karenssin vuoksi
-                    karenssia_jaljella=0.0
+                if irtisanottu: # muuten ei oikeutta tm-tukeen karenssin vuoksi, PERUSTULO??
+                    karenssia_jaljella=0.0 
                 else:
                     karenssia_jaljella=0.25 # 90 pv
 
@@ -2910,7 +2909,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
             employment_status,kansanelake,tyoelake,pension,paid_wage,time_in_state,ove_paid,basis_wage=\
                 self.move_to_retirement(pension,old_wage,age,kansanelake,tyoelake,employment_status,
                     unemp_after_ra,all_acc=True,scale_acc=True,has_spouse=has_spouse,is_spouse=is_spouse)
-        elif (action == 0) and ((time_in_state<=self.kht_kesto and children_under3>0) or self.perustulo): # jos perustulo, ei aikarajoitetta
+        elif (action == 0) and ((time_in_state<=self.kht_kesto and children_under3>0) or (self.perustulo and children_under18>0)): # jos perustulo, ei aikarajoitetta
             employment_status  = 7 # stay
             time_in_state+=self.timestep
             pension=self.pension_accrual(age,wage,pension,state=7)
@@ -4268,7 +4267,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
         self.men_kappa_pinkslip_young=0.35
         self.men_kappa_pinkslip_middle=0.10
         self.men_kappa_pinkslip_elderly=0.10
-        self.men_kappa_param=np.array([-0.445, -0.457, -0.470, -0.605, -0.890, -1.360]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
+        self.men_kappa_param=np.array([-0.455, -0.459, -0.465, -0.635, -0.900, -1.380]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
         
         self.women_mu_scale_kokoaika=0.035 #11 #250 #120 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
         self.women_mu_scale_osaaika=0.020 #09 #14 #040 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
@@ -4278,7 +4277,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
         self.women_kappa_pinkslip_young=0.35
         self.women_kappa_pinkslip_middle=0.20
         self.women_kappa_pinkslip_elderly=0.25
-        self.women_kappa_param=np.array([-0.150, -0.140, -0.165, -0.305, -0.715, -0.965]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
+        self.women_kappa_param=np.array([-0.223, -0.215, -0.235, -0.370, -0.725, -0.975]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
 
         self.kappa_svpaivaraha=0.5
         
@@ -4451,7 +4450,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
             kappa=0
         elif employment_state == 14:
             kappa= -self.kappa_svpaivaraha
-        else: # states 3, 5, 6, 7, 14, 15
+        else: # states 3, 5, 6, 15
             kappa=0  
             
         return kappa  
@@ -5727,7 +5726,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
                                        main_basis_wage,spouse_basis_wage,
                                        prefnoise)
 
-    def render(self,mode='human',close=False,done=False,reward=None,netto=None,render_omat=False,render_puoliso=True,benq=None,netto_omat=None,netto_puoliso=None):
+    def render(self,mode='human',close=False,done=False,reward=None,netto=None,render_omat=True,render_puoliso=True,benq=None,netto_omat=None,netto_puoliso=None):
         '''
         Tulostus-rutiini
         '''
@@ -5764,7 +5763,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
         else:
             var=f'paid_k {kansanelake:.0f}'
             
-        paid_wage,pt_factor=self.get_paid_wage(wage,emp,pt_act)
+        main_paid_wage,pt_factor=self.get_paid_wage(wage,emp,pt_act) # CHECK! 
         kappa=self.log_get_kappa(age,g,emp,pink,pt_factor)
 
         out=f'{m}s{onpuoliso} {emp:2d} g {g:d} a {age:.2f} w {wage:.0f} (wp {main_paid_wage:.0f} pt {pt_act:d}) nw {next_wage:.0f} red {wage_red:.2f} tis {time_in_state:.2f}'+\
@@ -5786,7 +5785,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
         else:
             m=''
 
-        paid_wage,s_pt_factor=self.get_paid_wage(puoliso_old_wage,puoliso_tila,s_pt_act)
+        spouse_paid_wage,s_pt_factor=self.get_paid_wage(puoliso_old_wage,puoliso_tila,s_pt_act) # CHECK!
         kappa=self.log_get_kappa(age,spouse_g,puoliso_tila,puoliso_pink,s_pt_factor)
 
         if puoliso_tila in set([0,1,10,5,6,7,14]):
