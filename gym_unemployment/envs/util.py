@@ -36,7 +36,7 @@ def crosscheck_print(q,q2):
                 key2=key.replace('puoliso_','omat_')
             if key in q and key in q2:
                 if not math.isclose(q[key],q2[key2]):
-                    print(key,': {key:.2f} vs {:.2f}, {} {} ({:.2f} vs {:.2f})'.format(q[key],q2[key2],key,key2,q[key2],q2[key],))
+                    print(key,': {:.2f} vs {:.2f}, {} {} ({:.2f} vs {:.2f})'.format(q[key],q2[key2],key,key2,q[key2],q2[key],))
             else:
                 if key in q:
                     print(key2,' not in q2')
