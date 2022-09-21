@@ -373,6 +373,8 @@ class UnemploymentLargeEnv_v5(gym.Env):
         self.minage_500=58 # minimi-ikä 500 päivälle
         self.min_salary=1450*12 # 1000 # julkaistujen laskelmien jälkeen
         
+        self.update_disab_wage_reduction=True # päivitä wage reduction, vaikke henkilö on työkyvyttömyyseläkkeellä
+        
         self.pensionscale=25_000 # neuroverkon eläkeskaalaus
         self.wagescale=50_000 # neuroverkon palkkaskaalaus
         
@@ -524,9 +526,6 @@ class UnemploymentLargeEnv_v5(gym.Env):
         self.wages_main=Wages_v1(year=self.year,silent=self.silent,max_age=self.max_age,
             n_groups=self.n_groups,timestep=self.timestep,inv_timestep=self.inv_timestep,
             min_retirementage=self.min_retirementage,min_salary=self.min_salary)
-
-        #self.get_wage=self.get_wage_step        
-        #self.get_spousewage=self.get_spousewage_step
 
         self.get_wage=self.wages_main.get_wage        
         self.get_spousewage=self.wages_spouse.get_wage
@@ -2269,7 +2268,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
             pension=0
             alkanut_ansiosidonnainen=0
             time_in_state=self.timestep
-            wage=0
+            #wage=0
             ove_paid=0 # ?? oikein??
             #wage_reduction=0.60 # vastaa määritelmää
         else:
@@ -2710,7 +2709,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
         else:
             pension=pension*self.palkkakerroin
             
-        wage=0
+        #wage=0
         kansanelake = kansanelake*self.kelaindeksi
 
         return employment_status,kansanelake,tyoelake,pension,wage,time_in_state,\
@@ -3353,9 +3352,11 @@ class UnemploymentLargeEnv_v5(gym.Env):
             benefitbasis=0
         elif empstate==8:
             wage=wage #parttimewage
+            pot_wage=wage
             benefitbasis=0
         elif empstate==9:
-            wage=pot_wage
+            #wage=wage
+            pot_wage=wage
             benefitbasis=0
         elif empstate==10:
             wage=wage #parttimewage
@@ -3408,9 +3409,11 @@ class UnemploymentLargeEnv_v5(gym.Env):
             spouse_benefitbasis=0
         elif puoliso_tila==8:
             puoliso_palkka=spouse_wage
+            pot_spouse_wage=spouse_wage
             spouse_benefitbasis=0
         elif puoliso_tila==9:
             puoliso_palkka=spouse_wage
+            pot_spouse_wage=spouse_wage
             spouse_benefitbasis=0
         elif puoliso_tila==10:
             puoliso_palkka=spouse_wage
@@ -3529,7 +3532,8 @@ class UnemploymentLargeEnv_v5(gym.Env):
         elif state in set([3]):
             #wage_reduction=0.60 # vastaa määritelmää
             #wage_reduction=wage_reduction # jäädytetään
-            wage_reduction=min(1.0,wage_reduction+self.salary_const)
+            if self.update_disab_wage_reduction:
+                wage_reduction=min(1.0,wage_reduction+self.salary_const)
         elif state in set([7]): # kotihoidontuki tai ve tai tk
             wage_reduction=min(1.0,wage_reduction+self.salary_const)
         elif state in set([2]): # kotihoidontuki tai ve tai tk
@@ -3579,7 +3583,8 @@ class UnemploymentLargeEnv_v5(gym.Env):
         elif state in set([3]):
             #wage_reduction=0.60 # vastaa määritelmää
             #wage_reduction=wage_reduction # jäädytys
-            wage_reduction=max(min_reduction,1.0-(1.0-self.salary_const)*(1.0-wage_reduction))
+            if self.update_disab_wage_reduction:
+                wage_reduction=max(min_reduction,1.0-(1.0-self.salary_const)*(1.0-wage_reduction))
         elif state in set([7]): # kotihoidontuki 
             wage_reduction=max(min_reduction,1.0-(1.0-self.salary_const)*(1.0-wage_reduction))
         elif state in set([2]): # ve
@@ -3793,7 +3798,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
 
         pot_main_wage=main_wage
         pot_spouse_wage=spouse_wage
-            
+        
         intage=int(np.floor(age))
         t=int((age-self.min_age)/self.timestep)
         moved=False
@@ -4270,7 +4275,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
         self.men_kappa_pinkslip_young=0.35
         self.men_kappa_pinkslip_middle=0.10
         self.men_kappa_pinkslip_elderly=0.10
-        self.men_kappa_param=np.array([-0.460, -0.462, -0.495, -0.637, -0.955, -1.440]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
+        self.men_kappa_param=np.array([-0.455, -0.455, -0.470, -0.655, -0.950, -1.435]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
         
         self.women_mu_scale_kokoaika=0.035 #11 #250 #120 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
         self.women_mu_scale_osaaika=0.020 #09 #14 #040 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
@@ -4280,7 +4285,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
         self.women_kappa_pinkslip_young=0.35
         self.women_kappa_pinkslip_middle=0.20
         self.women_kappa_pinkslip_elderly=0.25
-        self.women_kappa_param=np.array([-0.246, -0.238, -0.288, -0.370, -0.780, -1.100]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
+        self.women_kappa_param=np.array([-0.243, -0.230, -0.250, -0.375, -0.780, -1.100]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
 
         self.kappa_svpaivaraha=0.5
         
@@ -6651,12 +6656,13 @@ class UnemploymentLargeEnv_v5(gym.Env):
             if not math.isclose(r0,r1):
                 self.render()
                 print('!!!! ERROR:')
-            print(r0,r1)
+                print(r0,r1)
+                
             vec2=self.swap_spouses(vec1)
             self.check_state_vec(vec0,vec2)
-            crosscheck_print(q0,q1)
-            
-            print('\n----------')
+            if not math.isclose(r0,r1):
+                crosscheck_print(q0,q1)
+                print('\n----------')
 
     def get_minimal(self):
         return False
