@@ -1,8 +1,9 @@
 """
 
-    infostate_v4
+    infostate_v5
 
-
+    - toimii unemployment_v5:n muistina
+    - tämän avulla lasketaan mm. tulevan ajan palkka työkyvyttömyyteen
     
     
 """
@@ -10,47 +11,24 @@
 import math
 import numpy as np
 import random
-from . rates import Rates
-from . util import pretty_print
 
-
-class infostate:
-    def __init__(self,n_time,timestep,min_age,lapsia=0,lasten_iat=np.zeros(15),lapsia_paivakodissa=0,age=18):
+class Infostate():
+    def __init__(self,n_time,timestep,min_age,lapsia=0,lasten_iat=np.zeros(15),
+        lapsia_paivakodissa=0,age=18,kassanjasenyys_joinrate=None,kassanjasenyys_rate=None,include_halftoe=None,min_toewage=None):
         '''
         Alustaa infostate-dictorionaryn
         Siihen talletetaan tieto aiemmista tiloista, joiden avulla lasketaan statistiikkoja
         '''
-        self.infostate={}
         self.n_time=n_time
         self.timestep=timestep
         self.min_age=min_age
-        self.reset()
+        self.include_halftoe=include_halftoe
+        self.min_toewage=min_toewage
+        self.kassanjasenyys_joinrate=kassanjasenyys_joinrate
+        self.kassanjasenyys_rate=kassanjasenyys_rate
+        self.reset(lapsia=lapsia,lasten_iat=lasten_iat,lapsia_paivakodissa=lapsia_paivakodissa,age=age)
         
-    def reset(self):
-        states,latest,enimaika,palkka,voc_unempbasis=self.infostate_vocabulary(is_spouse=False)
-
-        self.infostate[states]=np.zeros(self.n_time)-1
-        self.infostate[palkka]=np.zeros(self.n_time)-1
-        self.infostate[voc_unempbasis]=np.zeros(self.n_time)-1
-        self.infostate[latest]=0
-        self.infostate['children_n']=0
-        self.infostate['children_date']=np.zeros(15)
-        self.infostate[enimaika]=0
-        
-        states,latest,enimaika,palkka,voc_unempbasis=self.infostate_vocabulary(is_spouse=True)
-        self.infostate[states]=np.zeros(self.n_time)-1
-        self.infostate[palkka]=np.zeros(self.n_time)-1
-        self.infostate[voc_unempbasis]=np.zeros(self.n_time)-1
-        self.infostate[latest]=0
-        self.infostate[enimaika]=0
-        
-        #print('age {} sattuma {} rate {}'.format(age,sattuma,self.kassanjasenyys_rate[t]))
-        
-    def init_infostate(self,lapsia=0,lasten_iat=np.zeros(15),lapsia_paivakodissa=0,age=18,spouse=False):
-        '''
-        Alustaa infostate-dictorionaryn
-        Siihen talletetaan tieto aiemmista tiloista, joiden avulla lasketaan statistiikkoja
-        '''
+    def reset(self,lapsia=0,lasten_iat=np.zeros(15),lapsia_paivakodissa=0,age=18,spouse=False):
         self.infostate={}
         states,latest,enimaika,palkka,voc_unempbasis,member=self.infostate_vocabulary(is_spouse=False)
 
@@ -76,7 +54,12 @@ class infostate:
         if sattuma[0]<self.kassanjasenyys_rate[t]:
             self.set_kassanjasenyys(1) #self.infostate['kassanjasen']=1
         else:
-            self.set_kassanjasenyys(0) # self.infostate['kassanjasen']=0
+            self.set_kassanjasenyys(0) # self.infostate['kassanjasen']=0        
+        
+        #print('age {} sattuma {} rate {}'.format(age,sattuma,self.kassanjasenyys_rate[t]))
+
+    #def init_inforate(self):
+    #    self.kassanjasenyys_joinrate,self.kassanjasenyys_rate=self.rates.get_kassanjasenyys_rate()
         
     def infostate_add_child(self,age : float):
         if self.infostate['children_n']<14:
@@ -104,7 +87,7 @@ class infostate:
         else:
             self.infostate[palkka][t]=0
         
-    def render_infostate(self):
+    def render(self):
         print('states {}'.format(self.infostate['states']))
         
     def get_kassanjasenyys(self):
