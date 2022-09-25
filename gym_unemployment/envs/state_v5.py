@@ -9,7 +9,7 @@ class Statevector_v5():
     Implements class for handling of state vector for UnemploymentLargeEnv_v5
     '''
     def __init__(self,n_empl,n_groups,n_parttime_action,include_mort,min_age,max_age,include_preferencenoise,
-                min_retirementage,min_ove_age,get_paid_wage):
+                min_retirementage,min_ove_age,get_paid_wage,timestep):
         self.n_empl=n_empl
         self.n_groups=n_groups
         self.n_empl=n_empl
@@ -26,6 +26,7 @@ class Statevector_v5():
         self.min_retirementage=min_retirementage
         self.min_ove_age=min_ove_age
         self.get_paid_wage=get_paid_wage
+        self.timestep=timestep
         
     def state_encode(self,emp : int,g : int,pension : float,old_wage : float,age : float,time_in_state : float,tyoelake_maksussa : float,pink : int,
                         toe : float,toekesto : float,tyohist : float,next_wage : float,used_unemp_benefit : float,wage_reduction : float,
