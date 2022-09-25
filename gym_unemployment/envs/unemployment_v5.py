@@ -260,7 +260,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
             self.explain()
         
         if self.plotdebug:
-            self.unit_test_code_decode()
+            self.states.unit_test_code_decode()
             self.test_swap(n=10)
 
             
