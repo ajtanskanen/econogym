@@ -359,8 +359,8 @@ class Statevector_v5():
         puoliso_paid_pension=puoliso_kansanelake+puoliso_tyoelake_maksussa
         main_pt_action=np.random.randint(0,2)
         spouse_pt_action=np.random.randint(0,2)
-        main_paid_wage,main_pt_factor=self.get_paid_wage(old_wage,emp,main_pt_action)
-        spouse_paid_wage,spouse_pt_factor=self.get_paid_wage(puoliso_old_wage,puoliso_tila,spouse_pt_action)
+        main_paid_wage,main_pt_factor=self.super().get_paid_wage(old_wage,emp,main_pt_action)
+        spouse_paid_wage,spouse_pt_factor=self.super().get_paid_wage(puoliso_old_wage,puoliso_tila,spouse_pt_action)
         
         if age<63.5:
             if puoliso_tila in set([2,8,9]):
@@ -447,8 +447,8 @@ class Statevector_v5():
             spouse_pt_action=np.random.randint(0,3)
             old_paid=np.random.uniform(0,50000)
             spouse_old_paid=np.random.uniform(0,50000)
-            main_paid_wage,main_pt_factor=self.get_paid_wage(old_wage,emp,main_pt_action)
-            spouse_paid_wage,spouse_pt_factor=self.get_paid_wage(puoliso_old_wage,puoliso_tila,spouse_pt_action)
+            main_paid_wage,main_pt_factor=self.super().get_paid_wage(old_wage,emp,main_pt_action)
+            spouse_paid_wage,spouse_pt_factor=self.super().get_paid_wage(puoliso_old_wage,puoliso_tila,spouse_pt_action)
             main_wage_basis=np.random.uniform(0,50000)
             spouse_wage_basis=np.random.uniform(0,50000)
         
