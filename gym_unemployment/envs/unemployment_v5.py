@@ -227,7 +227,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
                 self.parttime_actions=self.setup_parttime_actions(debug=True)
             
         #self.setup_state_encoding()
-        self.states=Statevector_v5(self.n_empl,self.n_groups,self.n_parttime_action,self.include_mort,self.min_age,self.max_age,self.include_preferencenoise,self.min_retirementage,self.min_ove_age)
+        self.states=Statevector_v5(self.n_empl,self.n_groups,self.n_parttime_action,self.include_mort,self.min_age,self.max_age,self.include_preferencenoise,self.min_retirementage,self.min_ove_age,self.get_paid_wage)
         self.low,self.high=self.states.set_state_limits()
             
         #self.action_space = spaces.MultiDiscrete([self.n_actions,self.n_spouse_actions])

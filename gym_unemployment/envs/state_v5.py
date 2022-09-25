@@ -8,7 +8,8 @@ class Statevector_v5():
     '''
     Implements class for handling of state vector for UnemploymentLargeEnv_v5
     '''
-    def __init__(self,n_empl,n_groups,n_parttime_action,include_mort,min_age,max_age,include_preferencenoise,min_retirementage,min_ove_age):
+    def __init__(self,n_empl,n_groups,n_parttime_action,include_mort,min_age,max_age,include_preferencenoise,
+                min_retirementage,min_ove_age,get_paid_wage):
         self.n_empl=n_empl
         self.n_groups=n_groups
         self.n_empl=n_empl
@@ -24,6 +25,7 @@ class Statevector_v5():
         self.include_preferencenoise=include_preferencenoise
         self.min_retirementage=min_retirementage
         self.min_ove_age=min_ove_age
+        self.get_paid_wage=get_paid_wage
         
     def state_encode(self,emp : int,g : int,pension : float,old_wage : float,age : float,time_in_state : float,tyoelake_maksussa : float,pink : int,
                         toe : float,toekesto : float,tyohist : float,next_wage : float,used_unemp_benefit : float,wage_reduction : float,
@@ -359,8 +361,8 @@ class Statevector_v5():
         puoliso_paid_pension=puoliso_kansanelake+puoliso_tyoelake_maksussa
         main_pt_action=np.random.randint(0,2)
         spouse_pt_action=np.random.randint(0,2)
-        main_paid_wage,main_pt_factor=super().get_paid_wage(old_wage,emp,main_pt_action)
-        spouse_paid_wage,spouse_pt_factor=super().get_paid_wage(puoliso_old_wage,puoliso_tila,spouse_pt_action)
+        main_paid_wage,main_pt_factor=self.super().get_paid_wage(old_wage,emp,main_pt_action)
+        spouse_paid_wage,spouse_pt_factor=self.super().get_paid_wage(puoliso_old_wage,puoliso_tila,spouse_pt_action)
         
         if age<63.5:
             if puoliso_tila in set([2,8,9]):
@@ -447,8 +449,8 @@ class Statevector_v5():
             spouse_pt_action=np.random.randint(0,3)
             old_paid=np.random.uniform(0,50000)
             spouse_old_paid=np.random.uniform(0,50000)
-            main_paid_wage,main_pt_factor=super().get_paid_wage(old_wage,emp,main_pt_action)
-            spouse_paid_wage,spouse_pt_factor=super().get_paid_wage(puoliso_old_wage,puoliso_tila,spouse_pt_action)
+            main_paid_wage,main_pt_factor=self.get_paid_wage(old_wage,emp,main_pt_action)
+            spouse_paid_wage,spouse_pt_factor=self.get_paid_wage(puoliso_old_wage,puoliso_tila,spouse_pt_action)
             main_wage_basis=np.random.uniform(0,50000)
             spouse_wage_basis=np.random.uniform(0,50000)
         
