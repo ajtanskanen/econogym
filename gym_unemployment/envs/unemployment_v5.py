@@ -264,7 +264,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
             self.test_swap(n=10)
 
             
-    def map_save_action(self,sav_act):
+    def map_save_action(self,sav_act: int):
         if sav_act>0:
             s=(sav_act-self.mid_sav_act)/100*2
         else:
@@ -272,7 +272,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
         
         return s
         
-    def update_savings(self,age,netto,savings,sav_action,empstate):
+    def update_savings(self,age: float,netto: float,savings: float,sav_action: int,empstate: int):
         t=self.map_age(age)
         interest=savings*(self.returns[t]-1.0)
         savings=savings+interest
@@ -315,7 +315,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
                     
         return netto,savings,mod_sav_act
             
-    def setup_parttime_actions(self,debug=False):
+    def setup_parttime_actions(self,debug : bool = False):
         actions=np.zeros((self.n_empl,3))
         if debug:
             work_actions=np.array([40/40,40/40,40/40])
@@ -449,7 +449,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
         self.plotdebug=False # tulostetaanko rivi riviltä tiloja
         self.plottkdebug=False    
             
-    def set_annual_params(self,year : int) -> None:
+    def set_annual_params(self,year: int) -> None:
         # arvot tammikuun lukuja inflaation vuosimuutoksessa, https://pxweb2.stat.fi/PxWeb/pxweb/fi/StatFin/StatFin__khi/statfin_khi_pxt_122p.px/table/tableViewLayout1/
         inflation_raw=np.array([1.0,1.011,1.010,1.003,1.022,1.052,1.022]) # 2018 2019 2020 2021 2022 2023 2024
         self.inflation=np.cumprod(inflation_raw)
@@ -484,7 +484,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
     def get_retirementage(self) -> float:
         return self.min_retirementage
 
-    def set_retirementage(self,year : int) -> None:
+    def set_retirementage(self,year: int) -> None:
         if year==2018:
             self.min_retirementage=63.5
             self.max_retirementage=68
@@ -509,7 +509,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
         else:
             error('retirement_age')
             
-    def set_year(self,year : int) -> None:
+    def set_year(self,year: int) -> None:
         self.year=year
         self.set_annual_params(year)
         self.set_retirementage(year)
@@ -627,7 +627,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
             
         return npv,npv0,npv_pension,npv_gpension
 
-    def comp_npv_simulation(self,g : int):
+    def comp_npv_simulation(self,g: int):
 
         '''
         simuloidaan npv jokaiselle erikseen montako timestep:iä (diskontattuna) max_age:n jälkeen henkilä on vanhuuseläkkeellä 
@@ -673,8 +673,8 @@ class UnemploymentLargeEnv_v5(gym.Env):
 
         return npv,npv0,npv_pension,npv_gpension
 
-    def setup_children(self,p : dict,puoliso : int,employment_state : int,puoliso_tila : int,
-                    children_under3 : int,children_under7 : int,children_under18 : int,lapsikorotus_lapsia : int) -> None:
+    def setup_children(self,p : dict,puoliso: int,employment_state: int,puoliso_tila: int,
+                    children_under3: int,children_under7: int,children_under18: int,lapsikorotus_lapsia: int) -> None:
         # tässä ei alku+, koska lapset yhteisiä
         if puoliso>0:
             p['lapsia']=children_under18
@@ -726,9 +726,9 @@ class UnemploymentLargeEnv_v5(gym.Env):
             if children_under18>0:
                 p['saa_elatustukea']=1 # vain yksinhuoltaja
 
-    def setup_benefits(self,wage : float,benefitbasis : float,kansanelake : float,tyoelake : float,employment_state : int,
-                    time_in_state : float,ika : float,used_unemp_benefit : float,children_under3 : int,children_under7 : int,children_under18 : int,puoliso=0,
-                    irtisanottu=0,karenssia_jaljella=0,alku='omat_',p2=None,puolisoalku='puoliso_') -> dict:
+    def setup_benefits(self,wage: float,benefitbasis: float,kansanelake: float,tyoelake: float,employment_state: int,
+                    time_in_state: float,ika: float,used_unemp_benefit: float,children_under3: int,children_under7: int,children_under18: int,puoliso=0,
+                    irtisanottu: int = 0,karenssia_jaljella: float = 0,alku='omat_',p2 : dict = None,puolisoalku='puoliso_') -> dict:
         if p2 is not None:
             p=p2.copy()
         else:
@@ -914,7 +914,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
             
         return p    
 
-    def setup_asumismenot(self,employment_state : int,puoliso : int,puoliso_tila : int,children_under18 : int,p : dict) -> None:
+    def setup_asumismenot(self,employment_state: int,puoliso: int,puoliso_tila: int,children_under18: int,p : dict) -> None:
         puolisokerroin=0.75
         if employment_state==12: # opiskelija
             if puoliso>0:
@@ -969,7 +969,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
                 p['asumismenot_toimeentulo']=self.muu_asumismenot_toimeentulo+children_under18*self.muu_asumismenot_lisa
                 p['asumismenot_asumistuki']=self.muu_asumismenot_asumistuki+children_under18*self.muu_asumismenot_lisa
 
-    def setup_contrafactual(self,empstate,wage,pot_wage,unempwage_basis,jasen,unempwage):
+    def setup_contrafactual(self,empstate: int,wage: float,pot_wage: float,unempwage_basis: float,jasen: int,unempwage: float):
         if empstate in set([0,4]):
             return empstate,1,0,pot_wage,unempwage_basis,0
         elif empstate in set([5,6,7,11,12,13,14]):
@@ -986,10 +986,12 @@ class UnemploymentLargeEnv_v5(gym.Env):
         else:
             return 15,15,0,0,0,0
             
-    def setup_couples(self,age,wage,benefitbasis,kansanelake,tyoelake,employment_state,time_in_state,used_unemp_benefit,
-            children_under3,children_under7,children_under18,irtisanottu,karenssia_jaljella,
-            puoliso_palkka,puoliso_benefitbasis,puoliso_kansanelake,puoliso_tyoelake,puoliso_tila,puoliso_time_in_state,puoliso_used_unemp_benefit,
-            puoliso_irtisanottu,puoliso_karenssia_jaljella):
+    def setup_couples(self,age: int,wage: float,benefitbasis: float,kansanelake: float,tyoelake: float,
+        employment_state: int,time_in_state: float,used_unemp_benefit: float,
+            children_under3: int,children_under7: int,children_under18: int,irtisanottu: int,karenssia_jaljella: float,
+            puoliso_palkka: float,puoliso_benefitbasis: float,puoliso_kansanelake: float,puoliso_tyoelake: float,
+            puoliso_tila: int,puoliso_time_in_state: float,puoliso_used_unemp_benefit: float,
+            puoliso_irtisanottu: float,puoliso_karenssia_jaljella: float):
         
         p=self.setup_benefits(wage,benefitbasis,kansanelake,tyoelake,employment_state,time_in_state,age,used_unemp_benefit,
             children_under3,children_under7,children_under18,puoliso=1,
@@ -1006,15 +1008,16 @@ class UnemploymentLargeEnv_v5(gym.Env):
                     
         return p
     
-    def comp_benefits(self,wage : float,benefitbasis : float,kansanelake : float,tyoelake : float,employment_state : int,
-                    time_in_state : float,children_under3 : int,children_under7 : int,children_under18 : int,ika : float,
-                    puoliso : int,puoliso_tila : int,puoliso_palkka : float,puoliso_kansanelake : float,puoliso_tyoelake : float,
-                    puoliso_benefitbasis : float,puoliso_time_in_state : float,
-                    used_unemp_benefit : float, puoliso_used_unemp_benefit : float,
-                    g : int,p_g : int,
-                    irtisanottu=0,puoliso_irtisanottu=0,karenssia_jaljella=0,puoliso_karenssia_jaljella=0,
-                    ove=False,debug=False,potential_wage=0,potential_spouse_wage=0,unempwage_basis=0,puoliso_unempwage_basis=0,
-                    kassanjasen=0,unempwage=0,puoliso_unempwage=0):
+    def comp_benefits(self,wage: float,benefitbasis: float,kansanelake: float,tyoelake: float,employment_state: int,
+                    time_in_state: float,children_under3: int,children_under7: int,children_under18: int,ika: float,
+                    puoliso: int,puoliso_tila: int,puoliso_palkka: float,puoliso_kansanelake: float,puoliso_tyoelake: float,
+                    puoliso_benefitbasis: float,puoliso_time_in_state: float,
+                    used_unemp_benefit: float, puoliso_used_unemp_benefit: float,
+                    g: int,p_g: int,
+                    irtisanottu: int = 0,puoliso_irtisanottu: int = 0,karenssia_jaljella: float = 0,
+                    puoliso_karenssia_jaljella: float = 0, ove: bool = False,debug: bool = False,
+                    potential_wage: float = 0,potential_spouse_wage: float = 0,unempwage_basis: float = 0,
+                    puoliso_unempwage_basis: float = 0, kassanjasen: int =0,unempwage: float = 0,puoliso_unempwage: float = 0):
         '''
         Kutsuu fin_benefits-modulia, jonka avulla lasketaan etuudet ja huomioidaan verotus
         Laske etuuksien arvo, kun 
@@ -1291,7 +1294,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
             
         return netto,benefitq,netto_omat,netto_puoliso
 
-    def seed(self, seed=None):
+    def seed(self, seed: int =None):
     #    '''
     #    Open AI interfacen mukainen seed-funktio, joka alustaa satunnaisluvut
     #    '''
@@ -1556,7 +1559,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
             
         return initial_weight
 
-    def scale_pension(self,pension : float,age : float,scale=True,unemp_after_ra=0,elinaikakerroin=True):
+    def scale_pension(self,pension: float,age: float,scale: bool = True,unemp_after_ra: float = 0,elinaikakerroin: bool = True):
         '''
         Elinaikakertoimen ja lykkäyskorotuksen huomiointi
         '''
@@ -1577,9 +1580,9 @@ class UnemploymentLargeEnv_v5(gym.Env):
 #
 #############################
         
-    def move_to_parttime(self,wage : float,pt_action : int,pension : float,tyoelake : float,old_wage : float,
-                        age : float,tyoura : float,time_in_state : float,
-                        has_spouse=False,is_spouse=False):
+    def move_to_parttime(self,wage: float,pt_action: int,pension: float,tyoelake: float,old_wage: float,
+                        age: float,tyoura: float,time_in_state: float,
+                        has_spouse: bool = False,is_spouse: bool = False):
         '''
         Siirtymä osa-aikaiseen työskentelyyn
         '''
@@ -1594,7 +1597,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
 
         return employment_status,pension,tyoelake,paid_wage,time_in_state,tyoura,pinkslip,basis_wage
 
-    def move_to_work(self,wage : float,pt_action : int,pension : float,tyoelake : float,old_wage : float,age : float,time_in_state : float,tyoura : float,pinkslip : int,
+    def move_to_work(self,wage: float,pt_action: int,pension: float,tyoelake: float,old_wage: float,age: float,time_in_state: float,tyoura: float,pinkslip: int,
                     has_spouse=False,is_spouse=False):
         '''
         Siirtymä täysiaikaiseen työskentelyyn
@@ -1610,8 +1613,8 @@ class UnemploymentLargeEnv_v5(gym.Env):
 
         return employment_status,pension,tyoelake,paid_wage,time_in_state,tyoura,pinkslip,basis_wage
 
-    def move_to_oa_fulltime(self,wage : float,pt_action : int,pension : float,old_wage : float,age : float,kansanelake : float,
-            tyoelake : float,employment_status : int,unemp_after_ra : float,scale_acc=True,has_spouse=0,is_spouse=False):
+    def move_to_oa_fulltime(self,wage: float,pt_action: int,pension: float,old_wage: float,age: float,kansanelake: float,
+            tyoelake: float,employment_status: int,unemp_after_ra: float,scale_acc=True,has_spouse=0,is_spouse=False):
         '''
         Siirtymä vanhuuseläkkeelle
         '''
@@ -1697,7 +1700,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
 
         return employment_status,kansanelake,tyoelake,pension,paid_wage,time_in_state,ove_paid,basis_wage
 
-    def move_to_student(self,wage : float,pension : float,tyoelake : float,age : float,time_in_state : float,tyoura : float,pinkslip : int):
+    def move_to_student(self,wage: float,pension: float,tyoelake: float,age: float,time_in_state: float,tyoura: float,pinkslip: int):
         '''
         Siirtymä opiskelijaksi
         Tässä ei muuttujien päivityksiä, koska se tehdään jo muualla!
@@ -1711,8 +1714,8 @@ class UnemploymentLargeEnv_v5(gym.Env):
 
         return employment_status,pension,tyoelake,wage,time_in_state,pinkslip,basis_wage
         
-    def move_to_oa_parttime(self,wage : float,pt_action : int,pension : float,old_wage : float,age : float,kansanelake : float,tyoelake : float,employment_status : float,
-            unemp_after_ra : float,scale_acc=True,has_spouse=0,is_spouse=False):
+    def move_to_oa_parttime(self,wage: float,pt_action: int,pension: float,old_wage: float,age: float,kansanelake: float,tyoelake: float,employment_status: float,
+            unemp_after_ra: float,scale_acc=True,has_spouse: int =0,is_spouse: bool =False):
         '''
         Siirtymä vanhuuseläkkeelle
         '''
@@ -1797,7 +1800,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
 
         return employment_status,kansanelake,tyoelake,pension,paid_wage,time_in_state,ove_paid,basis_wage
 
-    def move_to_ove(self,employment_status : int,pension : float,tyoelake : float,ove_paid : float,age : float,unemp_after_ra : float):
+    def move_to_ove(self,employment_status: int,pension: float,tyoelake: float,ove_paid: float,age: float,unemp_after_ra: float):
         if not self.include_ove:
             return pension,tyoelake,0
     
@@ -1818,8 +1821,8 @@ class UnemploymentLargeEnv_v5(gym.Env):
 
         return pension,tyoelake,ove_paid
 
-    def move_to_retirement(self,pension : float,old_wage : float,age : float,kansanelake : float,tyoelake : float,employment_status : float,unemp_after_ra : float,
-        all_acc=True,scale_acc=True,has_spouse=0,is_spouse=False):
+    def move_to_retirement(self,pension: float,old_wage: float,age: float,kansanelake: float,tyoelake: float,employment_status: float,unemp_after_ra: float,
+        all_acc: bool =True,scale_acc: bool =True,has_spouse: int=0,is_spouse: bool =False):
         '''
         Moving to retirement
         '''
@@ -1916,12 +1919,12 @@ class UnemploymentLargeEnv_v5(gym.Env):
             time_in_state += self.timestep
             print('retired before retirement age!!!!')
             
-        if kansanelake>10_000:
-            print('kansanelake',kansanelake,age,tyoelake*self.elinaikakerroin/12,1-has_spouse)
+        #if kansanelake>10_000:
+        #    print('kansanelake',kansanelake,age,tyoelake*self.elinaikakerroin/12,1-has_spouse)
 
         return employment_status,kansanelake,tyoelake,pension,paid_wage,time_in_state,ove_paid,basis_wage
 
-    def move_to_retdisab(self,pension : float,old_wage : float,age : float,time_in_state : float,kansanelake : float,tyoelake : float,unemp_after_ra : float):   
+    def move_to_retdisab(self,pension: float,old_wage: float,age: float,time_in_state: float,kansanelake: float,tyoelake: float,unemp_after_ra: float):   
         '''
         Siirtymä vanhuuseläkkeelle, jossa ei voi tehdä työtä
         '''
@@ -1945,7 +1948,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
 
         return employment_status,kansanelake,tyoelake,pension,wage,time_in_state,kansanelake,tyoelake,basis_wage
         
-    def tyossaoloehto(self,toe : float,tyoura : float,age : float):
+    def tyossaoloehto(self,toe: float,tyoura: float,age: float):
         '''
         täyttyykä työssäoloehto
         '''
@@ -1954,7 +1957,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
         else:
             return False
                 
-    def setup_unempdays_left(self,porrastus=False):
+    def setup_unempdays_left(self,porrastus: bool =False):
         '''
         valmistaudu toen porrastukseen
         '''
@@ -1967,7 +1970,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
             self.paivarahapaivia_jaljella=self.paivarahapaivia_jaljella_nykytila
             self.comp_toe_wage=self.comp_toe_wage_nykytila
     
-    def comp_unempdays_left_nykytila(self,kesto : float,tyoura : float,age : float,toe : float,emp : int,alkanut_ansiosidonnainen : int,toe58 : int,old_toe : float,printti=False):
+    def comp_unempdays_left_nykytila(self,kesto: float,tyoura: float,age: float,toe: float,emp: int,alkanut_ansiosidonnainen: int,toe58: int,old_toe: float,printti: bool =False):
         '''
         Nykytilan mukainen jäljellä olevien työttämyyspäivärahapäivien laskenta
         '''
@@ -2001,7 +2004,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
          
         return max(0,min(toekesto,self.max_unemploymentbenefitage-age))
 
-    def paivarahapaivia_jaljella_nykytila(self,kesto : float,tyoura : float,age : float,toe58 : int,toe: int):
+    def paivarahapaivia_jaljella_nykytila(self,kesto: float,tyoura: float,age: float,toe58: int,toe: int):
         '''
         Onko työttämyyspäivärahapäiviä jäljellä?
         '''
@@ -2018,7 +2021,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
         else:
             return True
             
-    def comp_unempdays_left_porrastus(self,kesto : float,tyoura : float,age : float,toe : float,emp : int,alkanut_ansiosidonnainen : int,toe58 : int,old_toe,printti=False):
+    def comp_unempdays_left_porrastus(self,kesto: float,tyoura: float,age: float,toe: float,emp: int,alkanut_ansiosidonnainen: int,toe58: int,old_toe: float,printti: bool=False):
         if emp in set([2,3,8,9,13]):
             return 0
     
@@ -2060,7 +2063,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
             
         return max(0,min(ret,self.max_unemploymentbenefitage-age))
 
-    def toe_porrastus_kesto(self,kesto,toe,tyoura):
+    def toe_porrastus_kesto(self,kesto: float,toe: float,tyoura: float):
         if toe<0.5:
             return False
 
@@ -2107,9 +2110,9 @@ class UnemploymentLargeEnv_v5(gym.Env):
         else:
             return unempwage
 
-    def move_to_unemp(self,pension,old_wage,age,kansanelake,tyoelake,toe,toekesto,irtisanottu,tyoura,
-                    used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,alkanut_ansiosidonnainen,toe58,
-                    ove_paid,has_spouse,is_spouse):
+    def move_to_unemp(self,pension: bool,old_wage: bool,age: bool,kansanelake: bool,tyoelake: bool,toe: bool,toekesto: bool,irtisanottu: int,tyoura: bool,
+                    used_unemp_benefit: bool,unemp_after_ra: bool,unempwage: bool,unempwage_basis: bool,alkanut_ansiosidonnainen: int,toe58: float,
+                    ove_paid: int,has_spouse: bool,is_spouse: int):
         '''
         Siirtymä työttämyysturvalle
         '''
@@ -2213,7 +2216,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
         return karenssia_jaljella
         
 
-    def move_to_outsider(self,pension,tyoelake):
+    def move_to_outsider(self,pension: float,tyoelake: float):
         '''
         Siirtymä työvoiman ulkopuolelle
         '''
@@ -2229,7 +2232,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
 
         return employment_status,pension,tyoelake,paid_wage,time_in_state,pinkslip,basis_wage
         
-    def move_to_svraha(self,pension,tyoelake,ove_paid,is_spouse=False):
+    def move_to_svraha(self,pension: float,tyoelake: float,ove_paid: int,is_spouse: bool=False):
         '''
         Siirtymä työkyvyttämyyseläkkeelle aktiivista, ei eläkkeeltä
         '''
@@ -2245,7 +2248,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
 
         return employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage
         
-    def move_to_disab(self,pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse):
+    def move_to_disab(self,pension: float,old_wage: float,age: float,unemp_after_ra: float,kansanelake: float,tyoelake: float,ove_paid: int,has_spouse: int,children_under18: int,is_spouse: bool):
         '''
         Siirtymä työkyvyttämyyseläkkeelle aktiivista, ei eläkkeeltä
         '''
@@ -2356,7 +2359,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
 
         return employment_status,pension,wage,time_in_state,puoliso,tyoelake_maksussa,basis_wage
 
-    def move_to_kht(self,pension : float,tyoelake : float,old_wage : float,age : float):
+    def move_to_kht(self,pension: float,tyoelake: float,old_wage: float,age: float):
         '''
         Siirtymä kotihoidontuelle
         '''
@@ -2371,7 +2374,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
 
         return employment_status,pension,tyoelake,paid_wage,time_in_state,pinkslip,basis_wage
 
-    def move_to_fatherleave(self,pension : float,tyoelake : float,age : float,is_spouse : bool):
+    def move_to_fatherleave(self,pension: float,tyoelake: float,age: float,is_spouse : bool):
         '''
         Siirtymä isyysvapaalle
         '''
@@ -2388,7 +2391,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
         
         return employment_status,pension,tyoelake,paid_wage,time_in_state,pinkslip,basis_wage
 
-    def move_to_motherleave(self,pension : float,tyoelake : float,age : float,is_spouse : bool):
+    def move_to_motherleave(self,pension: float,tyoelake: float,age: float,is_spouse : bool):
         '''
         Siirtymä äitiysvapaalle
         '''
@@ -2404,11 +2407,11 @@ class UnemploymentLargeEnv_v5(gym.Env):
 
         return employment_status,pension,tyoelake,paid_wage,time_in_state,pinkslip,basis_wage
 
-    def stay_unemployed(self,wage,paid_wage,pt_action,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
-                        tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
-                        unempwage_basis,action,age,sattuma,intage,g,alkanut_ansiosidonnainen,
-                        toe58,ove_paid,children_under3,children_under18,basis_wage,
-                        has_spouse,is_spouse):
+    def stay_unemployed(self,wage: float,paid_wage: float,pt_action: int,employment_status: int,
+                        kansanelake: float,tyoelake: float,pension: float,time_in_state: float,toe: float,toekesto: float,
+                        tyoura: float,used_unemp_benefit: float,pinkslip: int,unemp_after_ra: float,old_wage: float,unempwage: float,
+                        unempwage_basis: float,action: int,age: float,sattuma,intage: int,g: int ,alkanut_ansiosidonnainen: int,
+                        toe58: int,ove_paid: int,children_under3: int,children_under18: int,basis_wage: float,has_spouse: int,is_spouse: bool):
         '''
         Pysy tilassa työtön (0)
         '''
@@ -2489,10 +2492,11 @@ class UnemploymentLargeEnv_v5(gym.Env):
             pinkslip,unemp_after_ra,tyoura,used_unemp_benefit,unempwage_basis,\
             alkanut_ansiosidonnainen,ove_paid,karenssia_jaljella,basis_wage
 
-    def stay_tyomarkkinatuki(self,wage,paid_wage,pt_action,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
-                        tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
-                        unempwage_basis,action,age,sattuma,intage,g,alkanut_ansiosidonnainen,
-                        toe58,ove_paid,children_under3,children_under18,basis_wage,has_spouse,is_spouse):
+    def stay_tyomarkkinatuki(self,wage: float,paid_wage: float,pt_action: int,employment_status: int,
+                        kansanelake: float,tyoelake: float,pension: float,time_in_state: float,toe: float,toekesto: float,
+                        tyoura: float,used_unemp_benefit: float,pinkslip: int,unemp_after_ra: float,old_wage: float,unempwage: float,
+                        unempwage_basis: float,action: int,age: float,sattuma,intage: int,g: int ,alkanut_ansiosidonnainen: int,
+                        toe58: int,ove_paid: int,children_under3: int,children_under18: int,basis_wage: float,has_spouse: int,is_spouse: bool):
         '''
         Pysy tilassa työmarkkinatuki (13)
         '''
@@ -2553,10 +2557,11 @@ class UnemploymentLargeEnv_v5(gym.Env):
                pinkslip,unemp_after_ra,tyoura,used_unemp_benefit,unempwage_basis,\
                alkanut_ansiosidonnainen,ove_paid,karenssia_jaljella,basis_wage
                 
-    def stay_pipeline(self,wage,paid_wage,pt_action,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
-                        tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
-                        unempwage_basis,action,age,sattuma,intage,g,alkanut_ansiosidonnainen,
-                        toe58,ove_paid,children_under3,children_under18,basis_wage,has_spouse,is_spouse):
+    def stay_pipeline(self,wage: float,paid_wage: float,pt_action: int,employment_status: int,
+                        kansanelake: float,tyoelake: float,pension: float,time_in_state: float,toe: float,toekesto: float,
+                        tyoura: float,used_unemp_benefit: float,pinkslip: int,unemp_after_ra: float,old_wage: float,unempwage: float,
+                        unempwage_basis: float,action: int,age: float,sattuma,intage: int,g: int ,alkanut_ansiosidonnainen: int,
+                        toe58: int,ove_paid: int,children_under3: int,children_under18: int,basis_wage: float,has_spouse: int,is_spouse: bool):
         '''
         Pysy tilassa työttämyysputki (4)
         '''
@@ -2616,10 +2621,11 @@ class UnemploymentLargeEnv_v5(gym.Env):
                pinkslip,unemp_after_ra,tyoura,used_unemp_benefit,unempwage_basis,\
                alkanut_ansiosidonnainen,ove_paid,karenssia_jaljella,basis_wage
         
-    def stay_employed(self,wage,paid_wage,pt_action,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
-                        tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
-                        unempwage_basis,action,age,sattuma,intage,g,alkanut_ansiosidonnainen,
-                        toe58,ove_paid,children_under3,children_under18,basis_wage,has_spouse,is_spouse):
+    def stay_employed(self,wage: float,paid_wage: float,pt_action: int,employment_status: int,
+                        kansanelake: float,tyoelake: float,pension: float,time_in_state: float,toe: float,toekesto: float,
+                        tyoura: float,used_unemp_benefit: float,pinkslip: int,unemp_after_ra: float,old_wage: float,unempwage: float,
+                        unempwage_basis: float,action: int,age: float,sattuma,intage: int,g: int ,alkanut_ansiosidonnainen: int,
+                        toe58: int,ove_paid: int,children_under3: int,children_under18: int,basis_wage: float,has_spouse: int,is_spouse: bool):
         '''
         Pysy tilassa töissä (1)
         '''
@@ -2637,7 +2643,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
         else:
             pinkslip=0
             
-        if action == 3: # or action == 4:
+        if action == 3 or (action == 4 and age < self.min_retirementage):
             if sattuma[7]>self.parttime_fullemp_prob and self.randomness:
                 action = 0
 
@@ -2663,6 +2669,8 @@ class UnemploymentLargeEnv_v5(gym.Env):
                 employment_status,kansanelake,tyoelake,pension,paid_wage,time_in_state,ove_paid,basis_wage=\
                     self.move_to_retirement(pension,old_wage,age,kansanelake,tyoelake,
                         employment_status,unemp_after_ra,has_spouse=has_spouse,is_spouse=is_spouse,all_acc=True,scale_acc=True) 
+            elif children_under3>0:
+                employment_status,pension,tyoelake,paid_wage,time_in_state,pinkslip,basis_wage=self.move_to_kht(pension,tyoelake,old_wage,age)
             else:
                 employment_status,kansanelake,tyoelake,pension,paid_wage,time_in_state,\
                     used_unemp_benefit,pinkslip,unemp_after_ra,unempwage_basis,alkanut_ansiosidonnainen,\
@@ -2687,10 +2695,11 @@ class UnemploymentLargeEnv_v5(gym.Env):
               pinkslip,unemp_after_ra,tyoura,used_unemp_benefit,unempwage_basis,\
               alkanut_ansiosidonnainen,ove_paid,karenssia_jaljella,basis_wage
            
-    def stay_disabled(self,wage,paid_wage,pt_action,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
-                        tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
-                        unempwage_basis,action,age,sattuma,intage,g,alkanut_ansiosidonnainen,
-                        toe58,ove_paid,children_under3,children_under18,basis_wage,has_spouse,is_spouse):
+    def stay_disabled(self,wage: float,paid_wage: float,pt_action: int,employment_status: int,
+                        kansanelake: float,tyoelake: float,pension: float,time_in_state: float,toe: float,toekesto: float,
+                        tyoura: float,used_unemp_benefit: float,pinkslip: int,unemp_after_ra: float,old_wage: float,unempwage: float,
+                        unempwage_basis: float,action: int,age: float,sattuma,intage: int,g: int ,alkanut_ansiosidonnainen: int,
+                        toe58: int,ove_paid: int,children_under3: int,children_under18: int,basis_wage: float,has_spouse: int,is_spouse: bool):
             
         '''
         Pysy tilassa työkyvytön (4)
@@ -2725,10 +2734,11 @@ class UnemploymentLargeEnv_v5(gym.Env):
                pinkslip,unemp_after_ra,tyoura,used_unemp_benefit,unempwage_basis,\
                alkanut_ansiosidonnainen,ove_paid,karenssia_jaljella,basis_wage
 
-    def stay_retired(self,wage,paid_wage,pt_action,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
-                        tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
-                        unempwage_basis,action,age,sattuma,intage,g,alkanut_ansiosidonnainen,
-                        toe58,ove_paid,children_under3,children_under18,basis_wage,has_spouse,is_spouse):
+    def stay_retired(self,wage: float,paid_wage: float,pt_action: int,employment_status: int,
+                        kansanelake: float,tyoelake: float,pension: float,time_in_state: float,toe: float,toekesto: float,
+                        tyoura: float,used_unemp_benefit: float,pinkslip: int,unemp_after_ra: float,old_wage: float,unempwage: float,
+                        unempwage_basis: float,action: int,age: float,sattuma,intage: int,g: int ,alkanut_ansiosidonnainen: int,
+                        toe58: int,ove_paid: int,children_under3: int,children_under18: int,basis_wage: float,has_spouse: int,is_spouse: bool):
         '''
         Pysy tilassa vanhuuseläke (2)
         '''
@@ -2803,10 +2813,11 @@ class UnemploymentLargeEnv_v5(gym.Env):
                pinkslip,unemp_after_ra,tyoura,used_unemp_benefit,unempwage_basis,\
                alkanut_ansiosidonnainen,ove_paid,karenssia_jaljella,basis_wage
 
-    def stay_motherleave(self,wage,paid_wage,pt_action,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
-                        tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
-                        unempwage_basis,action,age,sattuma,intage,g,alkanut_ansiosidonnainen,
-                        toe58,ove_paid,children_under3,children_under18,basis_wage,has_spouse,is_spouse):
+    def stay_motherleave(self,wage: float,paid_wage: float,pt_action: int,employment_status: int,
+                        kansanelake: float,tyoelake: float,pension: float,time_in_state: float,toe: float,toekesto: float,
+                        tyoura: float,used_unemp_benefit: float,pinkslip: int,unemp_after_ra: float,old_wage: float,unempwage: float,
+                        unempwage_basis: float,action: int,age: float,sattuma,intage: int,g: int ,alkanut_ansiosidonnainen: int,
+                        toe58: int,ove_paid: int,children_under3: int,children_under18: int,basis_wage: float,has_spouse: int,is_spouse: bool):
         '''
         Pysy tilassa äitiysvapaa (5)
         '''
@@ -2845,10 +2856,11 @@ class UnemploymentLargeEnv_v5(gym.Env):
                pinkslip,unemp_after_ra,tyoura,used_unemp_benefit,unempwage_basis,\
                alkanut_ansiosidonnainen,ove_paid,karenssia_jaljella,basis_wage
 
-    def stay_fatherleave(self,wage,paid_wage,pt_action,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
-                        tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
-                        unempwage_basis,action,age,sattuma,intage,g,alkanut_ansiosidonnainen,
-                        toe58,ove_paid,children_under3,children_under18,basis_wage,has_spouse,is_spouse):
+    def stay_fatherleave(self,wage: float,paid_wage: float,pt_action: int,employment_status: int,
+                        kansanelake: float,tyoelake: float,pension: float,time_in_state: float,toe: float,toekesto: float,
+                        tyoura: float,used_unemp_benefit: float,pinkslip: int,unemp_after_ra: float,old_wage: float,unempwage: float,
+                        unempwage_basis: float,action: int,age: float,sattuma,intage: int,g: int ,alkanut_ansiosidonnainen: int,
+                        toe58: int,ove_paid: int,children_under3: int,children_under18: int,basis_wage: float,has_spouse: int,is_spouse: bool):
         '''
         Pysy tilassa isyysvapaa (6)
         '''
@@ -2887,10 +2899,11 @@ class UnemploymentLargeEnv_v5(gym.Env):
                pinkslip,unemp_after_ra,tyoura,used_unemp_benefit,unempwage_basis,\
                alkanut_ansiosidonnainen,ove_paid,karenssia_jaljella,basis_wage
 
-    def stay_kht(self,wage,paid_wage,pt_action,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
-                        tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
-                        unempwage_basis,action,age,sattuma,intage,g,alkanut_ansiosidonnainen,
-                        toe58,ove_paid,children_under3,children_under18,basis_wage,has_spouse,is_spouse):
+    def stay_kht(self,wage: float,paid_wage: float,pt_action: int,employment_status: int,
+                kansanelake: float,tyoelake: float,pension: float,time_in_state: float,toe: float,toekesto: float,
+                tyoura: float,used_unemp_benefit: float,pinkslip: int,unemp_after_ra: float,old_wage: float,unempwage: float,
+                unempwage_basis: float,action: int,age: float,sattuma,intage: int,g: int ,alkanut_ansiosidonnainen: int,
+                toe58: int,ove_paid: int,children_under3: int,children_under18: int,basis_wage: float,has_spouse: int,is_spouse: bool):
         '''
         Pysy tilassa kotihoidontuki (0)
         '''
@@ -2945,10 +2958,11 @@ class UnemploymentLargeEnv_v5(gym.Env):
                pinkslip,unemp_after_ra,tyoura,used_unemp_benefit,unempwage_basis,\
                alkanut_ansiosidonnainen,ove_paid,karenssia_jaljella,basis_wage
 
-    def stay_student(self,wage,paid_wage,pt_action,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
-                        tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
-                        unempwage_basis,action,age,sattuma,intage,g,alkanut_ansiosidonnainen,
-                        toe58,ove_paid,children_under3,children_under18,basis_wage,has_spouse,is_spouse):
+    def stay_student(self,wage: float,paid_wage: float,pt_action: int,employment_status: int,
+                        kansanelake: float,tyoelake: float,pension: float,time_in_state: float,toe: float,toekesto: float,
+                        tyoura: float,used_unemp_benefit: float,pinkslip: int,unemp_after_ra: float,old_wage: float,unempwage: float,
+                        unempwage_basis: float,action: int,age: float,sattuma,intage: int,g: int ,alkanut_ansiosidonnainen: int,
+                        toe58: int,ove_paid: int,children_under3: int,children_under18: int,basis_wage: float,has_spouse: int,is_spouse: bool):
         '''
         Pysy tilassa opiskelija (12)
         '''
@@ -3003,10 +3017,11 @@ class UnemploymentLargeEnv_v5(gym.Env):
                pinkslip,unemp_after_ra,tyoura,used_unemp_benefit,unempwage_basis,\
                alkanut_ansiosidonnainen,ove_paid,karenssia_jaljella,basis_wage
 
-    def stay_oa_parttime(self,wage,paid_wage,pt_action,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
-                        tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
-                        unempwage_basis,action,age,sattuma,intage,g,alkanut_ansiosidonnainen,
-                        toe58,ove_paid,children_under3,children_under18,basis_wage,has_spouse,is_spouse):
+    def stay_oa_parttime(self,wage: float,paid_wage: float,pt_action: int,employment_status: int,
+                        kansanelake: float,tyoelake: float,pension: float,time_in_state: float,toe: float,toekesto: float,
+                        tyoura: float,used_unemp_benefit: float,pinkslip: int,unemp_after_ra: float,old_wage: float,unempwage: float,
+                        unempwage_basis: float,action: int,age: float,sattuma,intage: int,g: int ,alkanut_ansiosidonnainen: int,
+                        toe58: int,ove_paid: int,children_under3: int,children_under18: int,basis_wage: float,has_spouse: int,is_spouse: bool):
         '''
         Pysy tilassa ve+(osa-aikatyö) (0)
         '''
@@ -3051,10 +3066,11 @@ class UnemploymentLargeEnv_v5(gym.Env):
                pinkslip,unemp_after_ra,tyoura,used_unemp_benefit,unempwage_basis,\
                alkanut_ansiosidonnainen,ove_paid,karenssia_jaljella,basis_wage
 
-    def stay_oa_fulltime(self,wage,paid_wage,pt_action,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
-                        tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
-                        unempwage_basis,action,age,sattuma,intage,g,alkanut_ansiosidonnainen,
-                        toe58,ove_paid,children_under3,children_under18,basis_wage,has_spouse,is_spouse):
+    def stay_oa_fulltime(self,wage: float,paid_wage: float,pt_action: int,employment_status: int,
+                        kansanelake: float,tyoelake: float,pension: float,time_in_state: float,toe: float,toekesto: float,
+                        tyoura: float,used_unemp_benefit: float,pinkslip: int,unemp_after_ra: float,old_wage: float,unempwage: float,
+                        unempwage_basis: float,action: int,age: float,sattuma,intage: int,g: int ,alkanut_ansiosidonnainen: int,
+                        toe58: int,ove_paid: int,children_under3: int,children_under18: int,basis_wage: float,has_spouse: int,is_spouse: bool):
         '''
         Pysy tilassa ve+työ (9)
         '''
@@ -3099,10 +3115,11 @@ class UnemploymentLargeEnv_v5(gym.Env):
                pinkslip,unemp_after_ra,tyoura,used_unemp_benefit,unempwage_basis,\
                alkanut_ansiosidonnainen,ove_paid,karenssia_jaljella,basis_wage
 
-    def stay_parttime(self,wage,paid_wage,pt_action,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
-                        tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
-                        unempwage_basis,action,age,sattuma,intage,g,alkanut_ansiosidonnainen,
-                        toe58,ove_paid,children_under3,children_under18,basis_wage,has_spouse,is_spouse):
+    def stay_parttime(self,wage: float,paid_wage: float,pt_action: int,employment_status: int,
+                        kansanelake: float,tyoelake: float,pension: float,time_in_state: float,toe: float,toekesto: float,
+                        tyoura: float,used_unemp_benefit: float,pinkslip: int,unemp_after_ra: float,old_wage: float,unempwage: float,
+                        unempwage_basis: float,action: int,age: float,sattuma,intage: int,g: int ,alkanut_ansiosidonnainen: int,
+                        toe58: int,ove_paid: int,children_under3: int,children_under18: int,basis_wage: float,has_spouse: int,is_spouse: bool):
         '''
         Pysy tilassa osa-aikatyö (0)
         '''
@@ -3176,10 +3193,11 @@ class UnemploymentLargeEnv_v5(gym.Env):
                pinkslip,unemp_after_ra,tyoura,used_unemp_benefit,unempwage_basis,\
                alkanut_ansiosidonnainen,ove_paid,karenssia_jaljella,basis_wage
 
-    def stay_outsider(self,wage,paid_wage,pt_action,employment_status,kansanelake,tyoelake,pension,time_in_state,toe,toekesto,
-                        tyoura,used_unemp_benefit,pinkslip,unemp_after_ra,old_wage,unempwage,
-                        unempwage_basis,action,age,sattuma,intage,g,alkanut_ansiosidonnainen,
-                        toe58,ove_paid,children_under3,children_under18,basis_wage,has_spouse,is_spouse):
+    def stay_outsider(self,wage: float,paid_wage: float,pt_action: int,employment_status: int,
+                        kansanelake: float,tyoelake: float,pension: float,time_in_state: float,toe: float,toekesto: float,
+                        tyoura: float,used_unemp_benefit: float,pinkslip: int,unemp_after_ra: float,old_wage: float,unempwage: float,
+                        unempwage_basis: float,action: int,age: float,sattuma,intage: int,g: int ,alkanut_ansiosidonnainen: int,
+                        toe58: int,ove_paid: int,children_under3: int,children_under18: int,basis_wage: float,has_spouse: int,is_spouse: bool):
         '''
         Pysy tilassa työvoiman ulkopuolella (11)
         '''
@@ -3462,7 +3480,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
             
         return netto,benq,netto_omat,netto_puoliso
 
-    def pension_accrual(self,age,wage,pension,state=1,ove_paid=0):
+    def pension_accrual(self,age: float,wage: float,pension: float,state: int=1,ove_paid: int=0):
         '''
         Eläkkeen karttumisrutiini
         '''
@@ -3522,7 +3540,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
             
         return pension
 
-    def update_wage_reduction_baseline(self,state,wage_reduction,pinkslip,time_in_state,g,initial_reduction=False):
+    def update_wage_reduction_baseline(self,state: int,wage_reduction: float,pinkslip: int,time_in_state: float,g: int,initial_reduction: bool=False):
         '''
         Pidetään kirjaa siitä, kuinka paljon palkkaa alennetaan työttämyyden keston suhteen,
         ja miten siitä palaudutaan
@@ -3556,10 +3574,11 @@ class UnemploymentLargeEnv_v5(gym.Env):
         
         return wage_reduction
 
-    def step_wage_reduction_sigma(self,min_reduction,const,wr):
+    def step_wage_reduction_sigma(self,min_reduction: float,const: float,wr: float) -> float:
         return max(min_reduction,1.0-(1.0-const)*(1.0-wr))
 
-    def update_wage_reduction_sigma(self,state,wage_reduction,pinkslip,time_in_state,g,initial_reduction=False):
+    def update_wage_reduction_sigma(self,state: int,wage_reduction: float,pinkslip: int,time_in_state: float,
+            g: int,initial_reduction: bool=False):
         '''
         Pidetään kirjaa siitä, kuinka paljon palkkaa alennetaan työttämyyden keston suhteen,
         ja miten siitä palaudutaan
@@ -3617,7 +3636,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
 #             
 #         return palkka
 #         
-    def update_family(self,puoliso,age,employment_status,puoliso_tila,sattuma):
+    def update_family(self,puoliso: int,age: float,employment_status: int,puoliso_tila: int,sattuma):
         '''
         Päivitä puolison/potentiaalisen puolison tila & palkka
         Päivitä avioliitto/avoliitto
@@ -3645,7 +3664,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
     
         return puoliso
         
-    def move_to_mort(self,age,children_under3,children_under7,children_under18,g,puoliso,prefnoise):
+    def move_to_mort(self,age: float,children_under3: int,children_under7: int,children_under18: int,g: int,puoliso: int,prefnoise: int):
         #time_in_state+=self.timestep
         if not self.include_mort:
             print('mort not included but emp state 15')
@@ -3751,7 +3770,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
 #############################
         
 
-    def step(self, action, dynprog=False, debug=False):
+    def step(self, action, dynprog: bool=False, debug: bool=False):
         '''
         Open AI interfacen mukainen step-funktio, joka tekee askeleen eteenpäin
         toiminnon action mukaan 
@@ -3831,12 +3850,12 @@ class UnemploymentLargeEnv_v5(gym.Env):
                 puoliso=0
             
             # siirtymät, tässä disability_intensity iässä age+1, koska ensin svpäivärahakausi
-            move_prob=self.disability_intensity[intage+1,g,main_empstate]+self.birth_intensity[intage,g]\
-                +self.student_inrate[intage,g]+self.outsider_inrate[intage,g]
+            dis=self.disability_intensity[intage+1,g,main_empstate]
+            move_prob=dis+self.birth_intensity[intage,g]+self.student_inrate[intage,g]+self.outsider_inrate[intage,g]
 
             if sattuma[0]<move_prob:
                 s2=self.birth_intensity[intage,g]
-                s1=s2+self.disability_intensity[intage,g,main_empstate]
+                s1=s2+dis #self.disability_intensity[intage,g,main_empstate]
                 s3=s1+self.student_inrate[intage,g]
                 #s4=s3+self.outsider_inrate[intage,g]
             
@@ -3902,10 +3921,11 @@ class UnemploymentLargeEnv_v5(gym.Env):
                         moved=True
                         
             # siirtymät, tässä disability_intensity iässä age+1, koska ensin svpäivärahakausi
-            move_prob=self.disability_intensity[intage+1,spouse_g,spouse_empstate]+self.student_inrate[intage,spouse_g]+self.outsider_inrate[intage,spouse_g]
+            dis=self.disability_intensity[intage+1,spouse_g,spouse_empstate]
+            move_prob=dis+self.student_inrate[intage,spouse_g]+self.outsider_inrate[intage,spouse_g]
 
             if sattuma2[0]<move_prob and not spouse_moved and spouse_empstate!=15:
-                s1=self.disability_intensity[intage,spouse_g,spouse_empstate]
+                s1=dis 
                 s3=s1+self.student_inrate[intage,spouse_g]
                 #s4=s3+self.outsider_inrate[intage,g]
             
@@ -4276,7 +4296,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
     
         self.salary_const=0.04*self.timestep # 0.038 työttämyydestä palkka alenee tämän verran vuodessa
         self.salary_const_retirement=0.10*self.timestep # vanhuuseläkkeellä muutos nopeampaa
-        self.salary_const_svpaiva=np.array([0.20,0.14,0.085,0.15,0.10,0.05])*self.timestep # pitkällä svpäivärahalla muutos nopeaa fyysisissä töissä
+        self.salary_const_svpaiva=np.array([0.20,0.14,0.085,0.15,0.08,0.04])*self.timestep # pitkällä svpäivärahalla muutos nopeaa fyysisissä töissä
         self.salary_const_up=0.030*self.timestep # 0.04 työssäolo palauttaa ansioita tämän verran vuodessa
         self.salary_const_up_osaaika=0.030*self.timestep # 0.04 osa-aikainen työssäolo palauttaa ansioita tämän verran vuodessa
         self.salary_const_student=0.01*self.timestep # 0.05 opiskelu pienentää leikkausta tämän verran vuodessa
@@ -4284,25 +4304,25 @@ class UnemploymentLargeEnv_v5(gym.Env):
         
         self.max_mu_age=self.min_retirementage+7.0 # 
         
-        self.men_mu_scale_kokoaika=0.04 #11 #250 #120 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-        self.men_mu_scale_osaaika=0.025 #09 #14 #040 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+        self.men_mu_scale_kokoaika=0.035 #11 #250 #120 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+        self.men_mu_scale_osaaika=0.021 #09 #14 #040 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
         self.men_mu_age=self.min_retirementage#-1.0
-        self.men_kappa_hoitovapaa=0.100 # hyäty hoitovapaalla olosta
+        self.men_kappa_hoitovapaa=0.080 # hyäty hoitovapaalla olosta
         self.men_kappa_ve=0.28
         self.men_kappa_pinkslip_young=0.35
         self.men_kappa_pinkslip_middle=0.10
         self.men_kappa_pinkslip_elderly=0.10
-        self.men_kappa_param=np.array([-0.455, -0.455, -0.470, -0.655, -0.950, -1.435]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
+        self.men_kappa_param=np.array([-0.455, -0.455, -0.490, -0.655, -0.950, -1.435]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
         
-        self.women_mu_scale_kokoaika=0.035 #11 #250 #120 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
-        self.women_mu_scale_osaaika=0.020 #09 #14 #040 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
+        self.women_mu_scale_kokoaika=0.020 #11 #250 #120 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
+        self.women_mu_scale_osaaika=0.013 #09 #14 #040 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
         self.women_mu_age=self.min_retirementage
-        self.women_kappa_hoitovapaa=0.410 # 0.27
+        self.women_kappa_hoitovapaa=0.350 # 0.27
         self.women_kappa_ve=0.27
         self.women_kappa_pinkslip_young=0.35
         self.women_kappa_pinkslip_middle=0.20
         self.women_kappa_pinkslip_elderly=0.25
-        self.women_kappa_param=np.array([-0.243, -0.230, -0.250, -0.375, -0.780, -1.100]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
+        self.women_kappa_param=np.array([-0.253, -0.240, -0.280, -0.375, -0.780, -1.100]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
 
         self.kappa_svpaivaraha=0.5
         
@@ -4401,7 +4421,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
         else:
             return self.women_kappa_pt*pt_factor^(1.0+1.0/self.women_kappa_fii)
         
-    def log_get_kappa(self,age : float,g : int,employment_state : int,pinkslip : int,pt_factor : float):
+    def log_get_kappa(self,age: float,g: int,employment_state: int,pinkslip: int,pt_factor: float):
         # kappa tells how much person values free-time
         if g<3: # miehet
             #kappa_kokoaika=self.men_kappa_fulltime
@@ -4480,7 +4500,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
             
         return kappa  
                     
-    def log_utility(self,income : float,employment_state : int,age,g=0,pinkslip=0,prefnoise=0,spouse=0,debug=False,pt_factor=0):
+    def log_utility(self,income: float,employment_state: int,age,g=0,pinkslip=0,prefnoise=0,spouse=0,debug=False,pt_factor=0):
         '''
         Log-utiliteettifunktio muokattuna lähteestä Määttänen, 2013 & Hakola & Määttänen, 2005
 
@@ -4519,7 +4539,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
         '''
         return ((net)**(1.0-self.CRRA_eta)-1.0)/(1-self.CRRA_eta)
 
-    def CRRA_utility(self,income : float,employment_state : int,age,g=0,pinkslip=0,prefnoise=0,spouse=0,debug=False):
+    def CRRA_utility(self,income: float,employment_state: int,age,g=0,pinkslip=0,prefnoise=0,spouse=0,debug=False):
         '''
         CRRA-utiliteettifunktio 
 
@@ -4731,7 +4751,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
                 if value is not None:
                     self.kappa_pinkslip=value
                     
-    def map_age(self,age : float,start_zero=False):
+    def map_age(self,age: float,start_zero=False):
         if start_zero:
             return int((age)*self.inv_timestep)
         else:
@@ -4766,7 +4786,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
             
         return np.array(self.state,dtype=np.float32)
     
-    def get_initial_state(self,puoliso : int,is_spouse=False,g=-1):    
+    def get_initial_state(self,puoliso: int,is_spouse=False,g=-1):    
         '''
         Alusta tila
         '''
@@ -5123,7 +5143,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
             'additional_tyel_premium {}\nscale_tyel_accrual {}\ninclude_ove {}\n'.format(self.additional_tyel_premium,self.scale_tyel_accrual,self.include_ove)+\
             f'unemp_limit_reemp {self.unemp_limit_reemp}\nmin_salary {self.min_salary}\n')
 
-    def unempright_left(self,emp : int,tis : float,bu : float,ika : float,tyohistoria : float):
+    def unempright_left(self,emp: int,tis: float,bu: float,ika: float,tyohistoria: float):
         '''
         Tilastointia varten lasketaan jäljellä olevat ansiosidonnaiset työttämyysturvapäivät
         '''
@@ -5177,17 +5197,17 @@ class UnemploymentLargeEnv_v5(gym.Env):
         else:
             self.set_kassanjasenyys(0) # self.infostate['kassanjasen']=0
         
-    def infostate_add_child(self,age : float):
+    def infostate_add_child(self,age: float):
         if self.infostate['children_n']<14:
             self.infostate['children_date'][self.infostate['children_n']]=age
             self.infostate['children_n']=self.infostate['children_n']+1
             
-    def infostate_set_enimmaisaika(self,age : float,is_spouse=False):
+    def infostate_set_enimmaisaika(self,age: float,is_spouse=False):
         states,latest,enimaika,palkka,voc_unempbasis,member=self.infostate_vocabulary(is_spouse=is_spouse)
         t=int((age-self.min_age)/self.timestep)
         self.infostate[enimaika]=t
         
-    def update_infostate(self,t : int,state : int,paid_wage : float,basiswage : float,unempbasis : float,is_spouse=False):
+    def update_infostate(self,t: int,state: int,paid_wage: float,basiswage: float,unempbasis: float,is_spouse=False):
         states,latest,enimaika,palkka,voc_unempbasis,member=self.infostate_vocabulary(is_spouse=is_spouse)
     
         self.infostate[states][t]=state
@@ -5209,10 +5229,10 @@ class UnemploymentLargeEnv_v5(gym.Env):
     def get_kassanjasenyys(self):
         return self.infostate['kassanjasen']
 
-    def set_kassanjasenyys(self,value : int):
+    def set_kassanjasenyys(self,value: int):
         self.infostate['kassanjasen']=value
 
-    def infostate_kassanjasenyys_update(self,age : float):
+    def infostate_kassanjasenyys_update(self,age: float):
         if self.infostate['kassanjasen']<1:
             sattuma = np.random.uniform(size=1)
             if sattuma[0]<self.kassanjasenyys_joinrate[self.map_age(age)] and self.randomness:
@@ -5364,7 +5384,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
             
         return toes,toekesto,wage        
         
-    def comp_infostats(self,age : float,is_spouse=False):
+    def comp_infostats(self,age: float,is_spouse=False):
         # laske työssäoloehto tarkasti
         # laske työttämyysturvaan vaikuttavat lasten määrät
         
@@ -5467,7 +5487,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
 
         return wage#,truewage
         
-    def infostate_can_have_children(self,age : float):
+    def infostate_can_have_children(self,age: float):
         children_under1=0
         for k in range(self.infostate['children_n']):
             c_age=age-self.infostate['children_date'][k]
@@ -5601,7 +5621,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
     #    else:
     #        return 0
 
-    def check_toe58(self,age : float,toe : float,tyoura : float,toe58 : int,is_spouse=False):
+    def check_toe58(self,age: float,toe: float,tyoura: float,toe58: int,is_spouse=False):
         '''
         laske työttämyysjaksoa edeltävä työssäoloehto tarkasti
         '''
