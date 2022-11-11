@@ -2272,7 +2272,8 @@ class UnemploymentLargeEnv_v5(gym.Env):
             wage5y,realwage=self.infostate_comp_5y_ave_wage(is_spouse=is_spouse) 
             
             if realwage>self.min_disab_tulevaaika: # oikeus tulevaan aikaan, tosin tässä 5v ajalta laskettuna
-                tyoelake=(tyoelake+self.elinaikakerroin*(pension+self.acc/self.timestep*wage5y*max(0,self.min_retirementage-age)))*self.elakeindeksi
+                basis_wage=self.elinaikakerroin*(pension+self.acc/self.timestep*wage5y*max(0,self.min_retirementage-age))
+                tyoelake=(tyoelake+basis_wage)*self.elakeindeksi
             else:
                 tyoelake=(tyoelake+self.elinaikakerroin*pension)*self.elakeindeksi
             
@@ -4312,7 +4313,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
     
         self.salary_const=0.04*self.timestep # 0.038 työttämyydestä palkka alenee tämän verran vuodessa
         self.salary_const_retirement=0.10*self.timestep # vanhuuseläkkeellä muutos nopeampaa
-        self.salary_const_svpaiva=np.array([0.18,0.14,0.09,0.18,0.10,0.06])*self.timestep # pitkällä svpäivärahalla muutos nopeaa fyysisissä töissä
+        self.salary_const_svpaiva=np.array([0.15,0.12,0.10,0.15,0.12,0.10])*self.timestep # pitkällä svpäivärahalla muutos nopeaa fyysisissä töissä
         self.salary_const_up=0.030*self.timestep # 0.04 työssäolo palauttaa ansioita tämän verran vuodessa
         self.salary_const_up_osaaika=0.030*self.timestep # 0.04 osa-aikainen työssäolo palauttaa ansioita tämän verran vuodessa
         self.salary_const_student=0.01*self.timestep # 0.05 opiskelu pienentää leikkausta tämän verran vuodessa
@@ -4320,25 +4321,25 @@ class UnemploymentLargeEnv_v5(gym.Env):
         
         self.max_mu_age=self.min_retirementage+7.0 # 
         
-        self.men_mu_scale_kokoaika=0.028 #11 #250 #120 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-        self.men_mu_scale_osaaika=0.025 #09 #14 #040 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+        self.men_mu_scale_kokoaika=0.045 #11 #250 #120 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+        self.men_mu_scale_osaaika=0.040 #09 #14 #040 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
         self.men_mu_age=self.min_retirementage
         self.men_kappa_hoitovapaa=0.040 # hyäty hoitovapaalla olosta
-        self.men_kappa_ve=0.30
+        self.men_kappa_ve=0.56
         self.men_kappa_pinkslip_young=0.45
         self.men_kappa_pinkslip_middle=0.20
-        self.men_kappa_pinkslip_elderly=0.25
-        self.men_kappa_param=np.array([-0.460, -0.450, -0.460, -0.620, -0.965, -1.440]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
+        self.men_kappa_pinkslip_elderly=0.20
+        self.men_kappa_param=np.array([-0.445, -0.435, -0.445, -0.600, -0.945, -1.420]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
         
-        self.women_mu_scale_kokoaika=0.020 #11 #250 #120 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
-        self.women_mu_scale_osaaika=0.018 #09 #14 #040 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
+        self.women_mu_scale_kokoaika=0.040 #11 #250 #120 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
+        self.women_mu_scale_osaaika=0.036 #09 #14 #040 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
         self.women_mu_age=self.min_retirementage
         self.women_kappa_hoitovapaa=0.250 # 0.27
-        self.women_kappa_ve=0.24
+        self.women_kappa_ve=0.50
         self.women_kappa_pinkslip_young=0.35
         self.women_kappa_pinkslip_middle=0.20
-        self.women_kappa_pinkslip_elderly=0.25
-        self.women_kappa_param=np.array([-0.265, -0.230, -0.250, -0.380, -0.780, -1.120]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
+        self.women_kappa_pinkslip_elderly=0.20
+        self.women_kappa_param=np.array([-0.260, -0.225, -0.245, -0.380, -0.780, -1.120]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
         #self.women_kappa_param=np.array([-0.257, -0.240, -0.260, -0.375, -0.785, -1.120]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
 
         self.kappa_svpaivaraha=0.5
