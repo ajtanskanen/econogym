@@ -174,7 +174,10 @@ class UnemploymentLargeEnv_v5(gym.Env):
             else:
                 self.log_utility_mort_noove_params()
         else:
-            self.log_utility_nomort_ove_params()
+            if deterministic:
+                self.log_utility_mort_ove_det_params()
+            else:
+                self.log_utility_mort_ove_nondet_params()
         
         self.n_age=self.max_age-self.min_age+1
 
@@ -4393,7 +4396,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
     
         self.salary_const=0.04*self.timestep # 0.038 työttämyydestä palkka alenee tämän verran vuodessa
         self.salary_const_retirement=0.10*self.timestep # vanhuuseläkkeellä muutos nopeampaa
-        self.salary_const_svpaiva=np.array([0.15,0.12,0.10,0.15,0.12,0.10])*self.timestep # pitkällä svpäivärahalla muutos nopeaa fyysisissä töissä
+        self.salary_const_svpaiva=np.array([0.20,0.16,0.12,0.20,0.15,0.12])*self.timestep # pitkällä svpäivärahalla muutos nopeaa fyysisissä töissä
         self.salary_const_up=0.030*self.timestep # 0.04 työssäolo palauttaa ansioita tämän verran vuodessa
         self.salary_const_up_osaaika=0.030*self.timestep # 0.04 osa-aikainen työssäolo palauttaa ansioita tämän verran vuodessa
         self.salary_const_student=0.01*self.timestep # 0.05 opiskelu pienentää leikkausta tämän verran vuodessa
@@ -4401,25 +4404,25 @@ class UnemploymentLargeEnv_v5(gym.Env):
         
         self.max_mu_age=self.min_retirementage+7.0 # 
         
-        self.men_mu_scale_kokoaika=0.12 #11 #250 #120 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-        self.men_mu_scale_osaaika=0.10 #09 #14 #040 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-        self.men_mu_age=self.min_retirementage-0.5
-        self.men_kappa_hoitovapaa=0.040 # hyäty hoitovapaalla olosta
+        self.men_mu_scale_kokoaika=0.11 #11 #250 #120 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+        self.men_mu_scale_osaaika=0.08 #09 #14 #040 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+        self.men_mu_age=self.min_retirementage - 1.0
+        self.men_kappa_hoitovapaa=0.030 # hyäty hoitovapaalla olosta
         self.men_kappa_ve=0.0
-        self.men_kappa_pinkslip_young=0.30
+        self.men_kappa_pinkslip_young=0.40
         self.men_kappa_pinkslip_middle=0.20
         self.men_kappa_pinkslip_elderly=0.20
-        self.men_kappa_param=np.array([-0.495, -0.470, -0.490, -0.635, -0.920, -1.430]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
+        self.men_kappa_param=np.array([-0.465, -0.410, -0.455, -0.640, -0.900, -1.430]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
         
         self.women_mu_scale_kokoaika=0.12 #11 #250 #120 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
         self.women_mu_scale_osaaika=0.10 #09 #14 #040 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
-        self.women_mu_age=self.min_retirementage-0.5
-        self.women_kappa_hoitovapaa=0.250 # 0.27
+        self.women_mu_age=self.min_retirementage - 0.5
+        self.women_kappa_hoitovapaa=0.220 # 0.27
         self.women_kappa_ve=0.0
-        self.women_kappa_pinkslip_young=0.30
+        self.women_kappa_pinkslip_young=0.50
         self.women_kappa_pinkslip_middle=0.20
         self.women_kappa_pinkslip_elderly=0.17
-        self.women_kappa_param=np.array([-0.320, -0.270, -0.295, -0.435, -0.760, -1.150]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
+        self.women_kappa_param=np.array([-0.300, -0.240, -0.280, -0.440, -0.740, -1.150]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
         #self.women_kappa_param=np.array([-0.257, -0.240, -0.260, -0.375, -0.785, -1.120]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
 
         self.kappa_svpaivaraha=0.5
@@ -5880,3 +5883,38 @@ class UnemploymentLargeEnv_v5(gym.Env):
                 
         return list
         
+    def dim_action(self,state):
+        emp,g,pension,wage,age,time_in_state,paid_pension,pink,toe,toekesto,tyohist,used_unemp_benefit,\
+            wage_red,unemp_after_ra,unempwage,unempwage_basis,prefnoise,c3,c7,c18,\
+            unemp_left,oikeus,toe58,ove_paid,jasen,\
+            puoliso,puoliso_tila,spouse_g,puoliso_old_wage,puoliso_pension,\
+            puoliso_wage_reduction,puoliso_paid_pension,puoliso_next_wage,\
+            puoliso_used_unemp_benefit,puoliso_unemp_benefit_left,\
+            puoliso_unemp_after_ra,puoliso_unempwage,puoliso_unempwage_basis,\
+            puoliso_alkanut_ansiosidonnainen,puoliso_toe58,puoliso_toe,\
+            puoliso_toekesto,puoliso_tyohist,puoliso_time_in_state,puoliso_pink,puoliso_ove_paid,\
+            kansanelake,puoliso_kansanelake,tyoelake_maksussa,puoliso_tyoelake_maksussa,\
+            next_wage,main_paid_wage,spouse_paid_wage,pt_act,s_pt_act,main_wage_basis,spouse_wage_basis\
+                =self.states.state_decode(state)    
+                
+        if emp in set([1,8,9,10]):
+            n_acts=4
+            n_pt_acts=3
+        else:
+            n_acts=4
+            n_pt_acts=1
+        
+        if puoliso_tila in set([1,8,9,10]):
+            n_sp_acts=4
+            n_sp_pt_acts=3
+        else:
+            n_sp_acts=4
+            n_sp_pt_acts=1
+        
+        return (n_acts,n_sp_acts,n_pt_acts,n_sp_pt_acts)
+        
+    def set_state(self,state):
+        self.state=state
+        
+    def get_state(self):
+        return(self.state)
