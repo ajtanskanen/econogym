@@ -554,20 +554,24 @@ class UnemploymentLargeEnv_v5(gym.Env):
         #self.get_potential_spousewage=self.wages_spouse.get_potential_wage
         
         # reemployment probability
-        prob_3m,prob_3m_oa=self.rates.get_reemp_prob() # 0.5
-        prob_1y=1-(1-prob_3m)**(1./0.25)
-        self.unemp_reemp_prob=1-(1-prob_1y)**self.timestep # kolmessa kuukaudessa
-        if self.plotdebug:
-            print('unemp_reemp_prob',self.unemp_reemp_prob)
-
-        #prob_3m=0.2
+        prob_ft_3m,prob_pt_3m,prob_3m_oa,parttime_fullemp_prob_3m,fulltime_pt_prob_3m=self.rates.get_reemp_prob() # 0.5
+        prob_1y=1-(1-prob_ft_3m)**(1./0.25)
+        self.unemp_reemp_ft_prob=1-(1-prob_1y)**self.timestep # kolmessa kuukaudessa
+        prob_1y=1-(1-prob_pt_3m)**(1./0.25)
+        self.unemp_reemp_pt_prob=1-(1-prob_1y)**self.timestep # kolmessa kuukaudessa
         prob_1y=1-(1-prob_3m_oa)**(1./0.25)
         self.oa_reemp_prob=1-(1-prob_1y)**self.timestep # kolmessa kuukaudessa
-        
         # moving from parttime work to fulltime work
-        prob_3m=0.5
-        prob_1y=1-(1-prob_3m)**(1./0.25)
+        prob_1y=1-(1-parttime_fullemp_prob_3m)**(1./0.25)
         self.parttime_fullemp_prob=1-(1-prob_1y)**self.timestep # kolmessa kuukaudessa
+        prob_1y=1-(1-fulltime_pt_prob_3m)**(1./0.25)
+        self.fulltime_pt_prob=1-(1-prob_1y)**self.timestep # kolmessa kuukaudessa
+        
+        if self.plotdebug:
+            print('unemp_reemp_ft_prob',self.unemp_reemp_ft_prob)
+            print('unemp_reemp_pt_prob',self.unemp_reemp_pt_prob)
+            print('oa_reemp_prob',self.oa_reemp_prob)
+            print('parttime_fullemp_prob',self.parttime_fullemp_prob)
         
         self.disability_intensity,self.svpaivaraha_disabilityrate,self.svpaivaraha_short3m=self.rates.get_eff_disab_rate_v5()
         self.pinkslip_intensity=self.rates.get_pinkslip_rate()*self.timestep
@@ -2488,9 +2492,12 @@ class UnemploymentLargeEnv_v5(gym.Env):
         karenssia_jaljella=0
         
         # if the aim is to be employed, there is a definite age-dependent probability that a person is reemployed
-        if (action == 1 or action == 3 or (action==2 and children_under3<1 and age < self.min_retirementage) or
-            action == 4) and self.unemp_limit_reemp:
-            if sattuma[7]>self.unemp_reemp_prob[intage] and self.randomness:
+        if (action == 1) and self.unemp_limit_reemp:
+            if sattuma[7]>self.unemp_reemp_pt_prob[intage] and self.randomness:
+                action = 0
+
+        if (action == 3 or (action==2 and children_under3<1 and age < self.min_retirementage) or action == 4) and self.unemp_limit_reemp:
+            if sattuma[7]>self.unemp_reemp_ft_prob[intage] and self.randomness:
                 action = 0
             
         if age>=self.max_unemploymentbenefitage:
@@ -2572,8 +2579,11 @@ class UnemploymentLargeEnv_v5(gym.Env):
         time_in_state+=self.timestep
         karenssia_jaljella=0
                 
-        if (action == 1 or action == 3 or (action==2 and children_under3<1 and age < self.min_retirementage) or action == 4) and self.unemp_limit_reemp:
-            if sattuma[7]>self.unemp_reemp_prob[intage] and self.randomness:
+        if (action == 1) and self.unemp_limit_reemp:
+            if sattuma[7]>self.unemp_reemp_ft_prob[intage] and self.randomness:
+                action = 0
+        if (action == 3 or (action==2 and children_under3<1 and age < self.min_retirementage) or action == 4) and self.unemp_limit_reemp:
+            if sattuma[7]>self.unemp_reemp_pt_prob[intage] and self.randomness:
                 action = 0
 
         if age>=self.max_unemploymentbenefitage:
@@ -2646,10 +2656,13 @@ class UnemploymentLargeEnv_v5(gym.Env):
         time_in_state+=self.timestep
         karenssia_jaljella=0
 
-        if (action == 1 or action == 3 or (action==2 and age < self.min_retirementage) or action == 4) and self.unemp_limit_reemp:
-            if sattuma[7]>self.unemp_reemp_prob[intage] and self.randomness:
+        if (action == 1) and self.unemp_limit_reemp:
+            if sattuma[7]>self.unemp_reemp_ft_prob[intage] and self.randomness:
                 action = 0
-        
+        if (action == 3 or (action==2 and age < self.min_retirementage) or action == 4) and self.unemp_limit_reemp:
+            if sattuma[7]>self.unemp_reemp_pt_prob[intage] and self.randomness:
+                action = 0
+
         if age>=self.max_unemploymentbenefitage:
             employment_status,kansanelake,tyoelake,pension,paid_wage,time_in_state,ove_paid,basis_wage=\
                 self.move_to_retirement(pension,old_wage,age,kansanelake,tyoelake,employment_status,
@@ -2733,7 +2746,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
             pinkslip=0
             
         if action == 3 or (action == 4 and age < self.min_retirementage):
-            if sattuma[7]>self.parttime_fullemp_prob and self.randomness:
+            if sattuma[7]>self.fulltime_pt_prob and self.randomness:
                 action = 0
 
         if action == 0 or action == 5:
@@ -3072,10 +3085,13 @@ class UnemploymentLargeEnv_v5(gym.Env):
             unempwage_basis,alkanut_ansiosidonnainen=0,0
 
         else:
-            if (action == 0 or action == 1 or action == 3 or action == 4 or action == 5) and self.unemp_limit_reemp: # and intage<40:
-                if sattuma[7]>self.unemp_reemp_prob[intage] and self.randomness:
+            if (action == 0) and self.unemp_limit_reemp: # and intage<40:
+                if sattuma[7]>self.unemp_reemp_ft_prob[intage] and self.randomness:
                     action = 2
-        
+            if (action == 3 or action == 4 or action == 5) and self.unemp_limit_reemp: # and intage<40:
+                if sattuma[7]>self.unemp_reemp_pt_prob[intage] and self.randomness:
+                    action = 2
+
             # after at most 10 years, move out of being a student
             if sattuma[5]>=self.student_outrate[intage,g] and time_in_state<10:
                 employment_status = 12 # unchanged
@@ -3130,7 +3146,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
             pinkslip=1
             
         if (action in set ([2,3])) and self.unemp_limit_reemp:
-            if sattuma[7]>self.parttime_fullemp_prob and self.randomness:
+            if sattuma[7]>self.parttime_fullemp_prob[intage] and self.randomness:
                 action = 0
 
         if age>=self.max_retirementage:
@@ -3179,7 +3195,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
             pinkslip=1
             
         if (action in set ([1,2,5])) and self.unemp_limit_reemp:
-            if sattuma[7]>self.parttime_fullemp_prob and self.randomness:
+            if sattuma[7]>self.fulltime_pt_prob and self.randomness:
                 action = 0
 
         if age>=self.max_retirementage:
@@ -3235,7 +3251,7 @@ class UnemploymentLargeEnv_v5(gym.Env):
             pinkslip=0
 
         if (action == 3) or (action == 4 and age<self.min_retirementage):
-            if sattuma[7]>self.parttime_fullemp_prob and self.randomness:
+            if sattuma[7]>self.parttime_fullemp_prob[intage] and self.randomness:
                 action = 0
 
         if action == 0 or action == 5:
@@ -3312,8 +3328,11 @@ class UnemploymentLargeEnv_v5(gym.Env):
             pension = pension * self.palkkakerroin
             tyoelake = tyoelake * self.elakeindeksi
         else:
-            if (action in set ([0,1,4,5])) and self.unemp_limit_reemp:
-                if sattuma[7]>self.unemp_reemp_prob[intage] and self.randomness:
+            if (action in set ([0,1])) and self.unemp_limit_reemp:
+                if sattuma[7]>self.unemp_reemp_ft_prob[intage] and self.randomness:
+                    action = 2
+            if (action in set ([4,5])) and self.unemp_limit_reemp:
+                if sattuma[7]>self.unemp_reemp_pt_prob[intage] and self.randomness:
                     action = 2
         
             if action == 0 or action == 1: # 
@@ -3392,8 +3411,11 @@ class UnemploymentLargeEnv_v5(gym.Env):
                     self.move_to_disab_state(pension,old_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse)
                 pinkslip=0
             else:
-                if (action in set ([0,1,4,5])) and self.unemp_limit_reemp:
-                    if sattuma[7]>self.unemp_reemp_prob[intage] and self.randomness:
+                if (action in set ([0])) and self.unemp_limit_reemp:
+                    if sattuma[7]>self.unemp_reemp_ft_prob[intage] and self.randomness:
+                        action = 2
+                if (action in set ([1,5])) and self.unemp_limit_reemp:
+                    if sattuma[7]>self.unemp_reemp_pt_prob[intage] and self.randomness:
                         action = 2
         
                 if action == 0: # 
@@ -4404,25 +4426,25 @@ class UnemploymentLargeEnv_v5(gym.Env):
         
         self.max_mu_age=self.min_retirementage+7.0 # 
         
-        self.men_mu_scale_kokoaika=0.11 #11 #250 #120 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-        self.men_mu_scale_osaaika=0.08 #09 #14 #040 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
-        self.men_mu_age=self.min_retirementage - 1.0
+        self.men_mu_scale_kokoaika=0.13 #11 #250 #120 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+        self.men_mu_scale_osaaika=0.105 #09 #14 #040 #0.075 # 0.075 #18 # 0.14 # 0.30 # 0.16 # how much penalty is associated with work increase with age after mu_age
+        self.men_mu_age=self.min_retirementage - 0.5
         self.men_kappa_hoitovapaa=0.030 # hyäty hoitovapaalla olosta
         self.men_kappa_ve=0.0
-        self.men_kappa_pinkslip_young=0.40
+        self.men_kappa_pinkslip_young=0.45
         self.men_kappa_pinkslip_middle=0.20
         self.men_kappa_pinkslip_elderly=0.20
-        self.men_kappa_param=np.array([-0.465, -0.410, -0.455, -0.640, -0.900, -1.430]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
+        self.men_kappa_param=np.array([-0.465, -0.405, -0.460, -0.630, -0.890, -1.420]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
         
-        self.women_mu_scale_kokoaika=0.12 #11 #250 #120 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
-        self.women_mu_scale_osaaika=0.10 #09 #14 #040 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
+        self.women_mu_scale_kokoaika=0.13 #11 #250 #120 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
+        self.women_mu_scale_osaaika=0.105 #09 #14 #040 #0.075 # 0.075 # 0how much penalty is associated with work increase with age after mu_age
         self.women_mu_age=self.min_retirementage - 0.5
         self.women_kappa_hoitovapaa=0.220 # 0.27
         self.women_kappa_ve=0.0
         self.women_kappa_pinkslip_young=0.50
         self.women_kappa_pinkslip_middle=0.20
         self.women_kappa_pinkslip_elderly=0.17
-        self.women_kappa_param=np.array([-0.300, -0.240, -0.280, -0.440, -0.740, -1.150]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
+        self.women_kappa_param=np.array([-0.300, -0.235, -0.290, -0.430, -0.740, -1.150]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
         #self.women_kappa_param=np.array([-0.257, -0.240, -0.260, -0.375, -0.785, -1.120]) # osa-aika 10h, 20h, 30h, kokoaika 40h, 50h, 60h
 
         self.kappa_svpaivaraha=0.5
