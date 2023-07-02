@@ -4,12 +4,12 @@ import numpy as np
 import random
 from . util import compare_q_print,crosscheck_print
         
-class Statevector_v5():
+class Statevector_v6():
     '''
     Implements class for handling of state vector for UnemploymentLargeEnv_v5
     '''
-    def __init__(self,n_empl,n_groups,n_parttime_action,include_mort,min_age,max_age,include_preferencenoise,
-                min_retirementage,min_ove_age,get_paid_wage,timestep):
+    def __init__(self,n_empl: int,n_groups: int,n_parttime_action: int,include_mort: bool,min_age: float,max_age: float,include_preferencenoise: bool,
+                min_retirementage: float,min_ove_age: float,get_paid_wage: float,timestep: float):
         self.n_empl=n_empl
         self.n_groups=n_groups
         self.n_empl=n_empl
@@ -27,6 +27,7 @@ class Statevector_v5():
         self.min_ove_age=min_ove_age
         self.get_paid_wage=get_paid_wage
         self.timestep=timestep
+        self.n_states=self.n_empl+self.n_groups+self.n_empl+self.n_parttime_action+self.n_parttime_action+56
         
     def state_encode(self,emp : int,g : int,pension : float,old_wage : float,age : float,time_in_state : float,tyoelake_maksussa : float,pink : int,
                         toe : float,toekesto : float,tyohist : float,next_wage : float,used_unemp_benefit : float,wage_reduction : float,
@@ -43,13 +44,14 @@ class Statevector_v5():
                         main_paid_wage : float,spouse_paid_wage : float,
                         main_pt_action : int, spouse_pt_action : int,
                         main_wage_basis : float,spouse_wage_basis : float,
+                        main_life_left: float,spouse_life_left: float,
                         prefnoise : float):     
         '''
         Tilan koodaus neuroverkkoa varten. Arvot skaalataan ja tilat one-hot-enkoodataan
 
         Käytetään, jos kuolleisuus ei mukana
         '''
-        n_states=self.n_empl+self.n_groups+self.n_empl+self.n_parttime_action+self.n_parttime_action+54
+        n_states=self.n_empl+self.n_groups+self.n_empl+self.n_parttime_action+self.n_parttime_action+56
         if self.include_preferencenoise:
             d=np.zeros(n_states)
         else:
@@ -107,7 +109,10 @@ class Statevector_v5():
             d[states5+14]=(unempwage-self.wagescale)/self.wagescale
             d[states5+15]=(unempwage_basis-self.wagescale)/self.wagescale
 
-        d[states5+2]=(age-(self.max_age+self.min_age)/2)/20
+        age_scale = (self.max_age-self.min_age)/2
+        age_mid = (self.max_age+self.min_age)/2
+        age_dur = 2*age_mid
+        d[states5+2]=(age-age_mid)/age_scale
         d[states5+3]=(time_in_state-10)/10
         if age>=self.min_retirementage:
             retaged=1
@@ -117,7 +122,7 @@ class Statevector_v5():
         d[states5+5]=pink # irtisanottu vai ei 
         d[states5+6]=toe-14/12 # työssäoloehto **
         d[states5+7]=(tyohist-10)/20 # tyohistoria: 300/400 pv
-        d[states5+8]=(self.min_retirementage-age)/(self.max_age-self.min_age)
+        d[states5+8]=(self.min_retirementage-age)/age_dur
         d[states5+9]=unemp_benefit_left-1
         d[states5+11]=used_unemp_benefit-1
         d[states5+12]=wage_reduction
@@ -162,11 +167,95 @@ class Statevector_v5():
         d[states5+48]=(spouse_paid_wage-self.wagescale)/self.wagescale # vastainen eläke
         d[states5+49]=(main_wage_basis-self.wagescale)/self.wagescale # vastainen eläke
         d[states5+50]=(spouse_wage_basis-self.wagescale)/self.wagescale # vastainen eläke
-        
+
+        age_maxdur = (100-self.min_age)/2
+        d[states5+51]=(main_life_left-age_maxdur)/age_maxdur # elinaikaa jäljellä
+        d[states5+52]=(spouse_life_left-age_maxdur)/age_maxdur # 
+
         if self.include_preferencenoise:
-            d[states5+51]=prefnoise
+            d[states5+53]=prefnoise
             
         return d
+
+    def get_state_name(self):
+        if self.include_preferencenoise:
+            d=np.empty(self.n_states, dtype='U256')
+        else:
+            d=np.empty(self.n_states+1, dtype='U256')
+                    
+        states=self.n_empl
+        states2=states+self.n_groups
+        states3=states2+self.n_empl
+        states4=states3+2+self.n_parttime_action
+        states5=states4+2+self.n_parttime_action
+        d[0]='emp'
+        d[0:states]='emp'
+        d[states:states2]='group'
+        d[states2:states3]='puoliso_tila'
+        d[(states3+2):states4]='main_pt_action'
+            
+        d[(states4+2):states5]='spouse_pt_action'
+        d[states5]='pension'
+        d[states5+1]='old_wage'
+        d[states5+4]='tyoelake_maksussa'
+        d[states5+10]='next_wage'
+        d[states5+14]='unempwage'
+        d[states5+15]='unempwage_basis'
+        d[states5+2]='age'
+        d[states5+3]='time_in_state'
+
+        d[states5+5]='pink'
+        d[states5+6]='toe'
+        d[states5+7]='tyohist'
+        d[states5+8]='self.min_retirementage'
+        d[states5+9]='unemp_benefit_left'
+        d[states5+11]='used_unemp_benefit'
+        d[states5+12]='wage_reduction'
+        d[states5+13]='unemp_after_ra'
+        d[states5+16]='retaged'
+        d[states5+17]='alkanut_ansiosidonnainen'
+        d[states5+18]='children_under3'
+        d[states5+19]='children_under7'
+        d[states5+20]='children_under18'
+        d[states5+21]='toe58'
+        d[states5+22]='ove_paid'
+        d[states5+23]='over_ove_age'
+        
+        d[states5+24]='kassanjasenyys'
+        d[states5+25]='toekesto'
+        d[states5+26]='puoliso'
+        
+        d[states5+27]='puoliso_old_wage'
+        d[states5+28]='puoliso_pension'
+        d[states5+29]='puoliso_wage_reduction'
+        d[states5+30]='puoliso_tyoelake_maksussa'
+        d[states5+31]='puoliso_next_wage'
+        d[states5+32]='puoliso_used_unemp_benefit'
+        d[states5+33]='puoliso_unemp_benefit_left'
+        d[states5+34]='puoliso_unemp_after_ra'
+        d[states5+35]='puoliso_unempwage'
+        d[states5+36]='puoliso_unempwage_basis'
+        d[states5+37]='puoliso_alkanut_ansiosidonnainen'
+        d[states5+38]='puoliso_toe58'
+        d[states5+39]='puoliso_toe'
+        d[states5+40]='puoliso_toekesto'
+        d[states5+41]='puoliso_tyoura'
+        d[states5+42]='puoliso_time_in_state'
+        d[states5+43]='puoliso_pinkslip'
+        d[states5+44]='puoliso_ove_paid'
+        d[states5+45]='kansanelake'
+        d[states5+46]='puoliso_kansanelake'
+        d[states5+47]='main_paid_wage'
+        d[states5+48]='spouse_paid_wage'
+        d[states5+49]='main_wage_basis'
+        d[states5+50]='spouse_wage_basis'
+        d[states5+51]='main_life_left'
+        d[states5+52]='spouse_life_left'
+
+        if self.include_preferencenoise:
+            d[states5+53]='prefnoise'
+            
+        return d        
 
     def get_spouse_g(self,g : int):
         '''
@@ -234,7 +323,11 @@ class Statevector_v5():
             unempwage=vec[pos+14]*self.wagescale+self.wagescale 
             unempwage_basis=vec[pos+15]*self.wagescale+self.wagescale 
 
-        age=vec[pos+2]*20+(self.max_age+self.min_age)/2
+        age_scale = (self.max_age-self.min_age)/2
+        age_mid = (self.max_age+self.min_age)/2
+        age_dur = 2*age_mid
+
+        age=vec[pos+2]*age_scale+age_mid
         time_in_state=vec[pos+3]*10+10
         pink=int(vec[pos+5]) # irtisanottu vai ei 
         toe=vec[pos+6]+14/12 # työssäoloehto, kesto
@@ -281,8 +374,12 @@ class Statevector_v5():
         main_basis_wage=vec[pos+49]*self.wagescale+self.wagescale
         spouse_basis_wage=vec[pos+50]*self.wagescale+self.wagescale
 
+        age_maxdur = (100-self.min_age)/2
+        main_life_left=vec[pos+51]*age_maxdur+age_maxdur
+        spouse_life_left=vec[pos+52]*age_maxdur+age_maxdur
+
         if self.include_preferencenoise:
-            prefnoise=vec[pos+51]
+            prefnoise=vec[pos+53]
         else:
             prefnoise=0
         #else:
@@ -305,9 +402,11 @@ class Statevector_v5():
                puoliso_toe,puoliso_toekesto,puoliso_tyoura,puoliso_time_in_state,puoliso_pinkslip,puoliso_ove_paid,\
                kansanelake,puoliso_kansanelake,tyoelake_maksussa,puoliso_tyoelake_maksussa,next_wage,\
                main_paid_wage,spouse_paid_wage,pt_act,sp_pt_act,\
-               main_basis_wage,spouse_basis_wage
+               main_basis_wage,spouse_basis_wage,\
+               main_life_left,spouse_life_left
+                
                               
-    def random_init_state(self,minage=18,maxage=70):
+    def random_init_state(self,minage: float=18,maxage: float=70):
         emp=random.randint(0,15)
         g=np.random.randint(0,6)
         pension=np.random.uniform(0,80_000)
@@ -364,6 +463,7 @@ class Statevector_v5():
         spouse_pt_action=np.random.randint(0,2)
         main_paid_wage,main_pt_factor=self.get_paid_wage(old_wage,emp,main_pt_action)
         spouse_paid_wage,spouse_pt_factor=self.get_paid_wage(puoliso_old_wage,puoliso_tila,spouse_pt_action)
+        main_life_left,spouse_life_left=np.random.uniform(0,100.0),np.random.uniform(0,100.0)
         
         if age<63.5:
             if puoliso_tila in set([2,8,9]):
@@ -390,6 +490,7 @@ class Statevector_v5():
                 main_paid_wage,spouse_paid_wage,
                 main_pt_action,spouse_pt_action,
                 main_wage_basis,spouse_wage_basis,
+                main_life_left,spouse_life_left,
                 prefnoise)
                             
         return vec
@@ -454,6 +555,8 @@ class Statevector_v5():
             spouse_paid_wage,spouse_pt_factor=self.get_paid_wage(puoliso_old_wage,puoliso_tila,spouse_pt_action)
             main_wage_basis=np.random.uniform(0,50000)
             spouse_wage_basis=np.random.uniform(0,50000)
+            main_life_left=np.random.uniform(0,100)
+            spouse_life_left=np.random.uniform(0,100)
         
             vec=self.state_encode(emp,g,pension,old_wage,age,time_in_state,tyoelake_maksussa,pink,
                                 toe,toekesto,tyohist,next_wage,used_unemp_benefit,wage_reduction,
@@ -469,6 +572,7 @@ class Statevector_v5():
                                 main_paid_wage,spouse_paid_wage,
                                 main_pt_action,spouse_pt_action,
                                 main_wage_basis,spouse_wage_basis,
+                                main_life_left,spouse_life_left,
                                 prefnoise)
                                 
             emp2,g2,pension2,wage2,age2,time_in_state2,paid_pension2,pink2,toe2,toekesto2,\
@@ -481,7 +585,8 @@ class Statevector_v5():
                 p2_toekesto,p2_tyoura,p2_time_in_state,p2_pinkslip,p2_ove_paid,\
                 kansanelake2,puoliso_kansanelake2,tyoelake_maksussa2,puoliso_tyoelake_maksussa2,next_wage2,\
                 main_paid_wage2,spouse_paid_wage2,pt_act2,s_pt_act2,\
-                main_wage_basis2,spouse_wage_basis2\
+                main_wage_basis2,spouse_wage_basis2,\
+                main_life_left2,spouse_life_left2\
                 =self.state_decode(vec)
                 
             self.check_state(emp,g,pension,old_wage,age,time_in_state,paid_pension,pink,
@@ -509,7 +614,7 @@ class Statevector_v5():
                                 p2_toe,p2_toekesto,p2_tyoura,p2_time_in_state,p2_pinkslip,p2_ove_paid,
                                 kansanelake2,puoliso_kansanelake2,tyoelake_maksussa2,puoliso_tyoelake_maksussa2,
                                 next_wage2,main_paid_wage2,spouse_paid_wage2,pt_act2,s_pt_act2,
-                                main_wage_basis2,spouse_wage_basis2)
+                                main_wage_basis2,spouse_wage_basis2,main_life_left,spouse_life_left,main_life_left2,spouse_life_left2)
         
     def check_state(self,emp,g,pension,old_wage,age,time_in_state,paid_pension,pink,
                     toe,tyohist,next_wage,used_unemp_benefit,wage_reduction,
@@ -536,7 +641,8 @@ class Statevector_v5():
                     p2_unemp_after_ra,p2_unempwage,p2_unempwage_basis,p2_alkanut_ansiosidonnainen,p2_toe58,
                     p2_toe,p2_toekesto,p2_tyoura,p2_time_in_state,p2_pinkslip,p2_ove_paid,
                     kansanelake2,puoliso_kansanelake2,tyoelake_maksussa2,puoliso_tyoelake_maksussa2,
-                    next_wage2,old_paid2,spouse_old_paid2,pt_act2,s_pt_act2,main_wage_basis2,spouse_wage_basis2):
+                    next_wage2,old_paid2,spouse_old_paid2,pt_act2,s_pt_act2,main_wage_basis2,spouse_wage_basis2,
+                    main_life_left,spouse_life_left,main_life_left2,spouse_life_left2):
         if not emp==emp2:  
             print('emp: {} vs {}'.format(emp,emp2))
         if not g==g2:  
@@ -646,6 +752,10 @@ class Statevector_v5():
             print('main_wage_basis: {} vs {}'.format(main_wage_basis,main_wage_basis2))
         if not math.isclose(spouse_wage_basis,spouse_wage_basis2):  
             print('spouse_wage_basis: {} vs {}'.format(spouse_wage_basis,spouse_wage_basis2))
+        if not math.isclose(main_life_left,main_life_left2):  
+            print('main_life_left: {} vs {}'.format(main_life_left,main_life_left2))
+        if not math.isclose(spouse_life_left,spouse_life_left2):  
+            print('spouse_life_left: {} vs {}'.format(spouse_life_left,spouse_life_left2))
     
     def check_state_vec(self,vec1,vec2):
         emp2,g2,pension2,old_wage2,age2,time_in_state2,paid_pension2,pink2,toe2,toekesto2,\
@@ -659,7 +769,7 @@ class Statevector_v5():
             kansanelake2,p2_kansanelake,tyoelake_maksussa2,p2_tyoelake_maksussa,next_wage2,\
             main_paid_wage2,spouse_paid_wage2,\
             pt_act2,s_pt_act2,\
-            main_wage_basis2,spouse_wage_basis2\
+            main_wage_basis2,spouse_wage_basis2,main_life_left2,spouse_life_left2\
             =self.state_decode(vec2)
 
         emp,g,pension,old_wage,age,time_in_state,paid_pension,pink,toe,toekesto,\
@@ -673,7 +783,7 @@ class Statevector_v5():
             kansanelake,p_kansanelake,tyoelake_maksussa,p_tyoelake_maksussa,next_wage,\
             main_paid_wage,spouse_paid_wage,\
             pt_act,s_pt_act,\
-            main_wage_basis,spouse_wage_basis\
+            main_wage_basis,spouse_wage_basis,main_life_left,spouse_life_left\
             =self.state_decode(vec1)
     
         if not emp==emp2:  
@@ -811,7 +921,7 @@ class Statevector_v5():
             puoliso_ove_paid,kansanelake,puoliso_kansanelake,tyoelake_maksussa,\
             puoliso_tyoelake_maksussa,next_wage,\
             main_paid_wage,spouse_paid_wage,main_pt_action,spouse_pt_action,\
-            main_wage_basis,spouse_wage_basis\
+            main_wage_basis,spouse_wage_basis,main_life_left,spouse_life_left\
                 =self.state_decode(vec)           
 
         return self.state_encode(puoliso_tila,spouse_g,puoliso_pension,puoliso_wage,age,puoliso_time_in_state,
@@ -830,6 +940,7 @@ class Statevector_v5():
             spouse_paid_wage,main_paid_wage,
             spouse_pt_action,main_pt_action,
             spouse_wage_basis,main_wage_basis,
+            spouse_life_left,main_life_left,
             prefnoise)
             
     def set_state_limits(self,debug=True):
@@ -880,6 +991,8 @@ class Statevector_v5():
         tr_max=(68-self.min_age)/(self.max_age-self.min_age)
         left_min=-1
         left_max=1
+        lleftmin=-2
+        lleftmax=2
         
         low=[]
         high=[]
@@ -910,7 +1023,7 @@ class Statevector_v5():
             state_min, # ove aged
             state_min, # kassan jäsen 0/1
             toe_min, # uuden toen laskenta
-            state_min # on puolisoa tai ei
+            state_min, # on puolisoa tai ei
             ]
         
         low_end=[wage_min, # puoliso old wage
@@ -936,7 +1049,9 @@ class Statevector_v5():
             wage_min, # main_paid_wage
             wage_min, # spouse_paid_wage
             wage_min, # main_wage_basis
-            wage_min # spouse_wage_basis
+            wage_min, # spouse_wage_basis
+            lleftmin,
+            lleftmin
             ] 
             
         high_mid = [
@@ -987,12 +1102,14 @@ class Statevector_v5():
             tis_max,
             state_max,
             state_max,
-            paid_pension_max, # kansaneläke
-            paid_pension_max, # kansaneläke
+            paid_pension_max, #kansaneläke
+            paid_pension_max, #kansaneläke
             wage_max, # main_paid_wage
             wage_max, # spouse_paid_wage
             wage_max, # main_wage_basis
-            wage_max # spouse_wage_basis
+            wage_max, # spouse_wage_basis
+            lleftmax, # left
+            lleftmax  # puoliso left
             ]
                     
         for k in range(self.n_empl):

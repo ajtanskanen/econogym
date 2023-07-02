@@ -68,3 +68,7 @@ def print_q(a,alku=None):
             
     print('')
         
+def test_var(v1,v2,vname):
+    if not math.isclose(v1,v2):  
+        print(f'{vname}: {v1} vs {v2}')
+

@@ -11,7 +11,8 @@ import math
 from scipy.interpolate import interp1d
 
 class Wages_v1():
-    def __init__(self,year=2018,silent=True,max_age=70,n_groups=6,timestep=0.25,min_age=18,inv_timestep=0,min_retirementage=65,min_salary=2_000):
+    def __init__(self,year: int=2018,silent: bool=True,max_age: float=70,n_groups: int=6,timestep: float=0.25,min_age: float=18,
+                 inv_timestep: float=0,min_retirementage: float=65,min_salary: float=2_000):
         self.year=year
         self.max_age=max_age
         self.min_age=min_age
@@ -24,7 +25,7 @@ class Wages_v1():
         
         self.setup_salaries()
 
-    def map_age(self,age,start_zero=False):
+    def map_age(self,age,start_zero: bool=False):
         if start_zero:
             return int((age)*self.inv_timestep)
         else:
@@ -104,7 +105,7 @@ class Wages_v1():
         return palkat_ika_miehet,palkat_ika_naiset,g_r
         
     
-    def wage_process_TK_v4(self,w,a0=3300*12,a1=3300*12,g=1):
+    def wage_process_TK_v4(self,w: float,a0: float=3300*12,a1: float=3300*12,g: int=1):
         '''
         Palkkaprosessi muokattu lähteestä Määttänen, 2013 
         '''
@@ -123,7 +124,7 @@ class Wages_v1():
 
         return wt
                 
-    def compute_salary(self,group=1,debug=False,initial_salary=None):
+    def compute_salary(self,group: int=1,debug: bool=False,initial_salary: float=None):
         '''
         Alussa ajettava funktio, joka tekee palkat yhtä episodia varten
         '''
@@ -177,7 +178,7 @@ class Wages_v1():
                 
         self.salary=salary
 
-    def get_wage(self,age,reduction):
+    def get_wage(self,age: float,reduction: float):
         '''
         palkka age-ikäiselle time_in_state-vähennyksellä työllistymispalkkaan, step-kohtaisesti, ei vuosikohtaisesti
         '''
@@ -187,7 +188,7 @@ class Wages_v1():
         else:
             return 0
             
-    def get_potential_wage(self,age):
+    def get_potential_wage(self,age: float):
         '''
         palkka age-ikäiselle ILMAN time_in_state-vähennystä työllistymispalkkaan, step-kohtaisesti, ei vuosikohtaisesti
         '''
