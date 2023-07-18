@@ -27,7 +27,7 @@ class Statevector_v7():
         self.min_ove_age=min_ove_age
         self.get_paid_wage=get_paid_wage
         self.timestep=timestep
-        self.n_states=self.n_empl+self.n_groups+self.n_empl+self.n_parttime_action+self.n_parttime_action+58+3
+        self.n_states=self.n_empl+self.n_groups+self.n_empl+self.n_parttime_action+self.n_parttime_action+58+3+4
         
     def state_encode(self,emp : int,g : int,pension : float,old_wage : float,age : float,time_in_state : float,tyoelake_maksussa : float,
                         pink : int,toe : float,toekesto : float,tyohist : float,next_wage : float,used_unemp_benefit : float,
@@ -47,6 +47,8 @@ class Statevector_v7():
                         main_life_left: float,spouse_life_left: float,
                         main_until_disab: float,spouse_until_disab: float,
                         time_to_marriage: float,time_to_divorce: float,until_birth: float,
+                        main_until_student: float,spouse_until_student: float,
+                        main_until_outsider: float,spouse_until_outsider: float,
                         prefnoise : float):     
         '''
         Tilan koodaus neuroverkkoa varten. Arvot skaalataan ja tilat one-hot-enkoodataan
@@ -179,9 +181,13 @@ class Statevector_v7():
         d[states5+55]=(time_to_marriage-age_maxdur)/age_maxdur # 
         d[states5+56]=(time_to_divorce-age_maxdur)/age_maxdur # 
         d[states5+57]=(until_birth-age_maxdur)/age_maxdur # 
+        d[states5+58]=(main_until_student-age_maxdur)/age_maxdur # elinaikaa jäljellä
+        d[states5+59]=(spouse_until_student-age_maxdur)/age_maxdur # 
+        d[states5+60]=(main_until_outsider-age_maxdur)/age_maxdur # elinaikaa jäljellä
+        d[states5+61]=(spouse_until_outsider-age_maxdur)/age_maxdur # 
 
         if self.include_preferencenoise:
-            d[states5+58]=prefnoise
+            d[states5+62]=prefnoise
             
         return d
 
@@ -264,9 +270,14 @@ class Statevector_v7():
         d[states5+55]='time_to_marriage'
         d[states5+56]='time_to_divorce'
         d[states5+57]='until_birth'
+        d[states5+58]='main_until_student'
+        d[states5+59]='spouse_until_student'
+        d[states5+60]='main_until_outsider'
+        d[states5+61]='spouse_until_outsider'
+
 
         if self.include_preferencenoise:
-            d[states5+58]='prefnoise'
+            d[states5+62]='prefnoise'
             
         return d        
 
@@ -396,9 +407,13 @@ class Statevector_v7():
         time_to_marriage=vec[pos+55]*age_maxdur+age_maxdur
         time_to_divorce=vec[pos+56]*age_maxdur+age_maxdur
         until_birth=vec[pos+57]*age_maxdur+age_maxdur
+        main_until_student=vec[pos+58]*age_maxdur+age_maxdur
+        spouse_until_student=vec[pos+59]*age_maxdur+age_maxdur
+        main_until_outsider=vec[pos+60]*age_maxdur+age_maxdur
+        spouse_until_outsider=vec[pos+61]*age_maxdur+age_maxdur
 
         if self.include_preferencenoise:
-            prefnoise=vec[pos+58]
+            prefnoise=vec[pos+62]
         else:
             prefnoise=0
         #else:
@@ -423,7 +438,8 @@ class Statevector_v7():
                main_paid_wage,spouse_paid_wage,pt_act,sp_pt_act,\
                main_basis_wage,spouse_basis_wage,\
                main_life_left,spouse_life_left,main_until_disab,spouse_until_disab,\
-               time_to_marriage,time_to_divorce,until_birth
+               time_to_marriage,time_to_divorce,until_birth,\
+               main_until_student,spouse_until_student,main_until_outsider,spouse_until_outsider
                 
                               
     def random_init_state(self,minage: float=18,maxage: float=70):
@@ -487,6 +503,10 @@ class Statevector_v7():
         main_until_disab,spouse_until_disab=np.random.uniform(0,100.0),np.random.uniform(0,100.0)
         time_to_marriage,time_to_divorce=np.random.uniform(0,100.0),np.random.uniform(0,100.0)
         until_birth=np.random.uniform(0,100.0)
+        main_until_student=np.random.uniform(0,100.0)
+        spouse_until_student=np.random.uniform(0,100.0)
+        main_until_outsider=np.random.uniform(0,100.0)
+        spouse_until_outsider=np.random.uniform(0,100.0)
         
         if age<63.5:
             if puoliso_tila in set([2,8,9]):
@@ -516,6 +536,7 @@ class Statevector_v7():
                 main_life_left,spouse_life_left,
                 main_until_disab,spouse_until_disab,
                 time_to_marriage,time_to_divorce,until_birth,
+                main_until_student,spouse_until_student,main_until_outsider,spouse_until_outsider,
                 prefnoise)
                             
         return vec
@@ -586,6 +607,10 @@ class Statevector_v7():
             spouse_until_disab=np.random.uniform(0,100)
             time_to_marriage,time_to_divorce=np.random.uniform(0,100.0),np.random.uniform(0,100.0)
             until_birth=np.random.uniform(0,100.0)
+            main_until_student=np.random.uniform(0,100.0)
+            spouse_until_student=np.random.uniform(0,100.0)
+            main_until_outsider=np.random.uniform(0,100.0)
+            spouse_until_outsider=np.random.uniform(0,100.0)
         
             vec=self.state_encode(emp,g,pension,old_wage,age,time_in_state,tyoelake_maksussa,pink,
                                 toe,toekesto,tyohist,next_wage,used_unemp_benefit,wage_reduction,
@@ -604,6 +629,7 @@ class Statevector_v7():
                                 main_life_left,spouse_life_left,
                                 main_until_disab,spouse_until_disab,
                                 time_to_marriage,time_to_divorce,until_birth,
+                                main_until_student,spouse_until_student,main_until_outsider,spouse_until_outsider,
                                 prefnoise)
                                 
             emp2,g2,pension2,wage2,age2,time_in_state2,paid_pension2,pink2,toe2,toekesto2,\
@@ -618,7 +644,8 @@ class Statevector_v7():
                 main_paid_wage2,spouse_paid_wage2,pt_act2,s_pt_act2,\
                 main_wage_basis2,spouse_wage_basis2,\
                 main_life_left2,spouse_life_left2,\
-                main_until_disab2,spouse_until_disab2,time_to_marriage2,time_to_divorce2,until_birth2\
+                main_until_disab2,spouse_until_disab2,time_to_marriage2,time_to_divorce2,until_birth2,\
+                main_until_student2,spouse_until_student2,main_until_outsider2,spouse_until_outsider2\
                 =self.state_decode(vec)
                 
             self.check_state(emp,g,pension,old_wage,age,time_in_state,paid_pension,pink,
@@ -650,7 +677,11 @@ class Statevector_v7():
                                 main_life_left,spouse_life_left,main_life_left2,spouse_life_left2,
                                 main_until_disab,spouse_until_disab,main_until_disab2,spouse_until_disab2,
                                 time_to_marriage,time_to_divorce,time_to_marriage2,time_to_divorce2,
-                                until_birth,until_birth2)
+                                until_birth,until_birth2,
+                                main_until_student,main_until_student2,
+                                spouse_until_student,spouse_until_student2,
+                                main_until_outsider,main_until_outsider2,
+                                spouse_until_outsider,spouse_until_outsider2)
         
     def check_state(self,emp,g,pension,old_wage,age,time_in_state,paid_pension,pink,
                     toe,tyohist,next_wage,used_unemp_benefit,wage_reduction,
@@ -680,7 +711,11 @@ class Statevector_v7():
                     next_wage2,old_paid2,spouse_old_paid2,pt_act2,s_pt_act2,main_wage_basis2,spouse_wage_basis2,
                     main_life_left,spouse_life_left,main_life_left2,spouse_life_left2,
                     main_until_disab,spouse_until_disab,main_until_disab2,spouse_until_disab2,
-                    time_to_marriage,time_to_divorce,time_to_marriage2,time_to_divorce2,until_birth,until_birth2):
+                    time_to_marriage,time_to_divorce,time_to_marriage2,time_to_divorce2,until_birth,until_birth2,
+                    main_until_student,main_until_student2,
+                    spouse_until_student,spouse_until_student2,
+                    main_until_outsider,main_until_outsider2,
+                    spouse_until_outsider,spouse_until_outsider2):
                     
         if not emp==emp2:  
             print('emp: {} vs {}'.format(emp,emp2))
@@ -781,24 +816,20 @@ class Statevector_v7():
             print('spouse_pt_action: {} vs {}'.format(spouse_pt_action,s_pt_act2))
         if not math.isclose(main_wage_basis,main_wage_basis2):  
             print('main_wage_basis: {} vs {}'.format(main_wage_basis,main_wage_basis2))
-        if not math.isclose(spouse_wage_basis,spouse_wage_basis2):  
-            print('spouse_wage_basis: {} vs {}'.format(spouse_wage_basis,spouse_wage_basis2))
-        if not math.isclose(main_life_left,main_life_left2):  
-            print('main_life_left: {} vs {}'.format(main_life_left,main_life_left2))
-        if not math.isclose(spouse_life_left,spouse_life_left2):  
-            print('spouse_life_left: {} vs {}'.format(spouse_life_left,spouse_life_left2))
-        if not math.isclose(main_until_disab,main_until_disab2):  
-            print('main_until_disab: {} vs {}'.format(main_until_disab,main_until_disab2))
-        if not math.isclose(spouse_until_disab,spouse_until_disab2):  
-            print('spouse_until_disab: {} vs {}'.format(spouse_until_disab,spouse_until_disab2))
-        if not math.isclose(time_to_divorce,time_to_divorce2):  
-            print('time_to_divorce: {} vs {}'.format(time_to_divorce,time_to_divorce2))
-        if not math.isclose(time_to_marriage,time_to_marriage2):  
-            print('time_to_marriage: {} vs {}'.format(time_to_marriage,time_to_marriage2))
-        if not math.isclose(until_birth,until_birth2):  
-            print('until_birth: {} vs {}'.format(until_birth,until_birth2))
+        self.test_var(spouse_wage_basis,spouse_wage_basis2,'spouse_wage_basis')
+        self.test_var(main_life_left,main_life_left2,'main_life_left')
+        self.test_var(spouse_life_left,spouse_life_left2,'spouse_life_left')
+        self.test_var(main_until_disab,main_until_disab2,'main_until_disab')
+        self.test_var(spouse_until_disab,spouse_until_disab2,'spouse_until_disab')
+        self.test_var(time_to_marriage,time_to_marriage2,'time_to_marriage')
+        self.test_var(time_to_divorce,time_to_divorce2,'time_to_divorce')
+        self.test_var(until_birth,until_birth2,'until_birth')
+        self.test_var(main_until_student,main_until_student2,'main_until_student')
+        self.test_var(spouse_until_student,spouse_until_student2,'spouse_until_student')
+        self.test_var(main_until_outsider,main_until_outsider2,'main_until_outsider')
+        self.test_var(spouse_until_outsider,spouse_until_outsider2,'spouse_until_outsider')
 
-    def test_var(v1,v2,vname):
+    def test_var(self,v1,v2,vname):
         if not math.isclose(v1,v2):  
             print(f'{vname}: {v1} vs {v2}')
     
@@ -815,7 +846,8 @@ class Statevector_v7():
             main_paid_wage2,spouse_paid_wage2,\
             pt_act2,s_pt_act2,\
             main_wage_basis2,spouse_wage_basis2,main_life_left2,spouse_life_left2,\
-            main_until_disab2,spouse_until_disab2,time_to_marriage2,time_to_divorce2,until_birth2\
+            main_until_disab2,spouse_until_disab2,time_to_marriage2,time_to_divorce2,until_birth2,\
+            main_until_student2,spouse_until_student2,main_until_outsider2,spouse_until_outsider2\
                 = self.state_decode(vec2)
 
         emp,g,pension,old_wage,age,time_in_state,paid_pension,pink,toe,toekesto,\
@@ -830,7 +862,7 @@ class Statevector_v7():
             main_paid_wage,spouse_paid_wage,\
             pt_act,s_pt_act,\
             main_wage_basis,spouse_wage_basis,main_life_left,spouse_life_left,main_until_disab,spouse_until_disab,\
-            time_to_marriage,time_to_divorce,until_birth\
+            time_to_marriage,time_to_divorce,until_birth,main_until_student,spouse_until_student,main_until_outsider,spouse_until_outsider\
                 = self.state_decode(vec1)
     
         if not emp==emp2:  
@@ -940,16 +972,17 @@ class Statevector_v7():
             print('main_wage_basis: {} vs {}'.format(main_wage_basis,main_wage_basis2))
         if not math.isclose(spouse_wage_basis,spouse_wage_basis2):  
             print('spouse_wage_basis: {} vs {}'.format(spouse_wage_basis,spouse_wage_basis2))
-        if not math.isclose(main_until_disab,main_until_disab2):  
-            print('main_until_disab: {} vs {}'.format(main_until_disab,main_until_disab2))
-        if not math.isclose(spouse_until_disab,spouse_until_disab2):  
-            print('spouse_until_disab: {} vs {}'.format(spouse_until_disab,spouse_until_disab2))
-        if not math.isclose(time_to_divorce,time_to_divorce2):  
-            print('time_to_divorce: {} vs {}'.format(time_to_divorce,time_to_divorce2))
-        if not math.isclose(time_to_marriage,time_to_marriage2):  
-            print('time_to_marriage: {} vs {}'.format(time_to_marriage,time_to_marriage2))
-        if not math.isclose(until_birth,until_birth2):  
-            print('until_birth: {} vs {}'.format(until_birth,until_birth2))
+        self.test_var(spouse_life_left,spouse_life_left2,'spouse_life_left')
+        self.test_var(main_until_disab,main_until_disab2,'main_until_disab')
+        self.test_var(spouse_until_disab,spouse_until_disab2,'spouse_until_disab')
+        self.test_var(time_to_marriage,time_to_marriage2,'time_to_marriage')
+        self.test_var(time_to_divorce,time_to_divorce2,'time_to_divorce')
+        self.test_var(until_birth,until_birth2,'until_birth')
+        self.test_var(main_until_student,main_until_student2,'main_until_student')
+        self.test_var(spouse_until_student,spouse_until_student2,'spouse_until_student')
+        self.test_var(main_until_outsider,main_until_outsider2,'main_until_outsider')
+        self.test_var(spouse_until_outsider,spouse_until_outsider2,'spouse_until_outsider')
+
 
     def setup_state_encoding(self):
         self.state_encoding=np.zeros((self.n_empl,self.n_empl))
@@ -979,7 +1012,7 @@ class Statevector_v7():
             puoliso_tyoelake_maksussa,next_wage,\
             main_paid_wage,spouse_paid_wage,main_pt_action,spouse_pt_action,\
             main_wage_basis,spouse_wage_basis,main_life_left,spouse_life_left,spouse_until_disab,main_until_disab,\
-            time_to_marriage,time_to_divorce,until_child\
+            time_to_marriage,time_to_divorce,until_child,main_until_student,spouse_until_student,main_until_outsider,spouse_until_outsider\
                 =self.state_decode(vec)           
 
         return self.state_encode(puoliso_tila,spouse_g,puoliso_pension,puoliso_wage,age,puoliso_time_in_state,
@@ -1001,6 +1034,7 @@ class Statevector_v7():
             spouse_life_left,main_life_left,
             spouse_until_disab,main_until_disab,
             time_to_marriage,time_to_divorce,until_child,
+            main_until_student,spouse_until_student,main_until_outsider,spouse_until_outsider,
             prefnoise)
             
     def set_state_limits(self,debug=True):
@@ -1116,6 +1150,10 @@ class Statevector_v7():
             lleftmin,
             lleftmin,
             lleftmin,
+            lleftmin,
+            lleftmin,
+            lleftmin,
+            lleftmin,
             lleftmin
             ] 
             
@@ -1173,6 +1211,10 @@ class Statevector_v7():
             wage_max, # spouse_paid_wage
             wage_max, # main_wage_basis
             wage_max, # spouse_wage_basis
+            lleftmax, # left
+            lleftmax,  # puoliso left
+            lleftmax, # left
+            lleftmax,  # puoliso left
             lleftmax, # left
             lleftmax,  # puoliso left
             lleftmax, # left
