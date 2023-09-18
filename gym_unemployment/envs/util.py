@@ -14,6 +14,8 @@ def compare_q_print(q,q2,omat='omat_',puoliso='puoliso_'):
         if key in q and key in q2:
             if not math.isclose(q[key],q2[key]):
                 print(f'{key}: {q[key]:.2f} vs {q2[key]:.2f}')
+            elif q[key]>0 or q2[key]>0:
+                print(f'{key}: {q[key]:.2f} vs {q2[key]:.2f}')
         else:
             if key in q:
                 print(key,' not in q2')

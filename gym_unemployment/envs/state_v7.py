@@ -342,7 +342,7 @@ class Statevector_v7():
         else:
             pension=vec[pos]*self.pensionscale+self.pensionscale
             wage=vec[pos+1]*self.wagescale+self.wagescale 
-            next_wage=vec[pos+10]*self.wagescale+self.wagescale 
+            next_wage=vec[pos+10]*self.wagescale+self.wagescale
             tyoelake_maksussa=vec[pos+4]*self.pensionscale+self.pensionscale
             unempwage=vec[pos+14]*self.wagescale+self.wagescale 
             unempwage_basis=vec[pos+15]*self.wagescale+self.wagescale 
@@ -497,8 +497,8 @@ class Statevector_v7():
         puoliso_paid_pension=puoliso_kansanelake+puoliso_tyoelake_maksussa
         main_pt_action=np.random.randint(0,2)
         spouse_pt_action=np.random.randint(0,2)
-        main_paid_wage,main_pt_factor=self.get_paid_wage(old_wage,emp,main_pt_action)
-        spouse_paid_wage,spouse_pt_factor=self.get_paid_wage(puoliso_old_wage,puoliso_tila,spouse_pt_action)
+        main_paid_wage,main_pt_factor,_=self.get_paid_wage(old_wage,emp,main_pt_action)
+        spouse_paid_wage,spouse_pt_factor,_=self.get_paid_wage(puoliso_old_wage,puoliso_tila,spouse_pt_action)
         main_life_left,spouse_life_left=np.random.uniform(0,100.0),np.random.uniform(0,100.0)
         main_until_disab,spouse_until_disab=np.random.uniform(0,100.0),np.random.uniform(0,100.0)
         time_to_marriage,time_to_divorce=np.random.uniform(0,100.0),np.random.uniform(0,100.0)
@@ -597,8 +597,8 @@ class Statevector_v7():
             spouse_pt_action=np.random.randint(0,3)
             old_paid=np.random.uniform(0,50000)
             spouse_old_paid=np.random.uniform(0,50000)
-            main_paid_wage,main_pt_factor=self.get_paid_wage(old_wage,emp,main_pt_action)
-            spouse_paid_wage,spouse_pt_factor=self.get_paid_wage(puoliso_old_wage,puoliso_tila,spouse_pt_action)
+            main_paid_wage,main_pt_factor,_=self.get_paid_wage(old_wage,emp,main_pt_action)
+            spouse_paid_wage,spouse_pt_factor,_=self.get_paid_wage(puoliso_old_wage,puoliso_tila,spouse_pt_action)
             main_wage_basis=np.random.uniform(0,50000)
             spouse_wage_basis=np.random.uniform(0,50000)
             main_life_left=np.random.uniform(0,100)
@@ -1034,7 +1034,7 @@ class Statevector_v7():
             spouse_life_left,main_life_left,
             spouse_until_disab,main_until_disab,
             time_to_marriage,time_to_divorce,until_child,
-            main_until_student,spouse_until_student,main_until_outsider,spouse_until_outsider,
+            spouse_until_student,main_until_student,spouse_until_outsider,main_until_outsider,
             prefnoise)
             
     def set_state_limits(self,debug=True):
@@ -1073,7 +1073,7 @@ class Statevector_v7():
         state_max=1
         ben_min=-1
         ben_max=2
-        wr_min=0
+        wr_min=-0.1
         wr_max=1
         pref_min=-5
         pref_max=5
@@ -1251,3 +1251,4 @@ class Statevector_v7():
         high=np.array(high,dtype=np.float32)            
         
         return low,high
+        
