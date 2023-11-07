@@ -11,7 +11,7 @@ class Statevector_v7():
     def __init__(self,n_empl: int,n_groups: int,n_parttime_action: int,include_mort: bool,min_age: float,max_age: float,include_preferencenoise: bool,
                 min_retirementage: float,min_ove_age: float,get_paid_wage: float,timestep: float):
         self.n_empl=n_empl
-        self.n_groups=n_groups
+        self.n_groups=n_groups # 3 per gender (6 in total)
         self.n_empl=n_empl
         self.n_parttime_action=n_parttime_action
         self.include_mort=include_mort
@@ -27,9 +27,9 @@ class Statevector_v7():
         self.min_ove_age=min_ove_age
         self.get_paid_wage=get_paid_wage
         self.timestep=timestep
-        self.n_states=self.n_empl+self.n_groups+self.n_empl+self.n_parttime_action+self.n_parttime_action+58+3+4
+        self.n_states=self.n_empl+self.n_groups+self.n_groups+self.n_empl+self.n_parttime_action+self.n_parttime_action+58+3+4
         
-    def state_encode(self,emp : int,g : int,pension : float,old_wage : float,age : float,time_in_state : float,tyoelake_maksussa : float,
+    def state_encode(self,emp : int,g : int,p_g: int,pension : float,old_wage : float,age : float,time_in_state : float,tyoelake_maksussa : float,
                         pink : int,toe : float,toekesto : float,tyohist : float,next_wage : float,used_unemp_benefit : float,
                         wage_reduction : float,unemp_after_ra : float,unempwage : float,unempwage_basis : float,
                         children_under3 : int,children_under7 : int,children_under18 : int,
@@ -70,6 +70,9 @@ class Statevector_v7():
 
         states2=states+self.n_groups
         d[states:states2]=self.group_encoding[g,:]
+
+        d[states2:states2+self.n_groups]=self.group_encoding[p_g-3,:]
+        states2=states2+self.n_groups
         
         states3=states2+self.n_empl
         d[states2:states3]=self.spousestate_encoding[puoliso_tila,:]        
@@ -281,18 +284,18 @@ class Statevector_v7():
             
         return d        
 
-    def get_spouse_g(self,g : int):
-        '''
-        Gives spouse group
-        The assumption here is that spouse's gender is different (for simplicity) and
-        that otherwise the group is the same (for simplicity)
-        '''
-        if g>2:
-            spouse_g=g-3
-        else:
-            spouse_g=g+3
+    # def get_spouse_g(self,g : int):
+    #     '''
+    #     Gives spouse group
+    #     The assumption here is that spouse's gender is different (for simplicity) and
+    #     that otherwise the group is the same (for simplicity)
+    #     '''
+    #     if g>2:
+    #         spouse_g=g-3
+    #     else:
+    #         spouse_g=g+3
             
-        return spouse_g
+    #     return spouse_g
 
     def get_onehot(self,vec,a,n,desc):
         g=-1
@@ -320,7 +323,9 @@ class Statevector_v7():
         pos+=self.n_empl
 
         g=self.get_onehot(vec,pos,self.n_groups,'g')
-        spouse_g=self.get_spouse_g(g)
+        #spouse_g=self.get_spouse_g(g)
+        pos+=self.n_groups
+        spouse_g=self.get_onehot(vec,pos,self.n_groups,'p_g')+3
         pos+=self.n_groups
 
         puoliso_tila=self.get_onehot(vec,pos,self.n_empl,'s_emp')
@@ -425,10 +430,10 @@ class Statevector_v7():
         #    else:
         #        prefnoise=0
 
-        return int(emp),g,pension,wage,age,time_in_state,paid_pension,pink,toe,toekesto,\
+        return int(emp),g,spouse_g,pension,wage,age,time_in_state,paid_pension,pink,toe,toekesto,\
                tyohist,used_unemp_benefit,wage_reduction,unemp_after_ra,\
                unempwage,unempwage_basis,prefnoise,children_under3,children_under7,children_under18,\
-               unemp_left,alkanut_ansiosidonnainen,toe58,ove_paid,kassanjasen,puoliso,puoliso_tila,spouse_g,\
+               unemp_left,alkanut_ansiosidonnainen,toe58,ove_paid,kassanjasen,puoliso,puoliso_tila,\
                puoliso_old_wage,puoliso_pension,puoliso_wage_reduction,puoliso_paid_pension,puoliso_next_wage,\
                puoliso_used_unemp_benefit,puoliso_unemp_benefit_left,\
                puoliso_unemp_after_ra,puoliso_unempwage,puoliso_unempwage_basis,\
@@ -444,7 +449,8 @@ class Statevector_v7():
                               
     def random_init_state(self,minage: float=18,maxage: float=70):
         emp=random.randint(0,15)
-        g=np.random.randint(0,6)
+        g=np.random.randint(0,3)
+        p_g=np.random.randint(0,3)
         pension=np.random.uniform(0,80_000)
         old_wage=np.random.uniform(0,80_000)
         age=np.random.randint(minage/self.timestep,maxage/self.timestep-1)*self.timestep
@@ -518,7 +524,7 @@ class Statevector_v7():
             tyoelake_maksussa=0
             puoliso_tyoelake_maksussa=0
         
-        vec=self.state_encode(emp,g,pension,old_wage,age,time_in_state,tyoelake_maksussa,pink,
+        vec=self.state_encode(emp,g,p_g,pension,old_wage,age,time_in_state,tyoelake_maksussa,pink,
                 toe,toekesto,tyohist,next_wage,used_unemp_benefit,wage_reduction,
                 unemp_after_ra,unempwage,unempwage_basis,
                 children_under3,children_under7,children_under18,
@@ -544,7 +550,8 @@ class Statevector_v7():
     def unit_test_code_decode(self):
         for k in range(10):
             emp=random.randint(0,15)
-            g=np.random.randint(0,6)
+            g=np.random.randint(0,3)
+            p_g=np.random.randint(0,3)
             pension=np.random.uniform(0,80_000)
             old_wage=np.random.uniform(0,80_000)
             age=np.random.randint(0,70)
@@ -612,7 +619,7 @@ class Statevector_v7():
             main_until_outsider=np.random.uniform(0,100.0)
             spouse_until_outsider=np.random.uniform(0,100.0)
         
-            vec=self.state_encode(emp,g,pension,old_wage,age,time_in_state,tyoelake_maksussa,pink,
+            vec=self.state_encode(emp,g,p_g,pension,old_wage,age,time_in_state,tyoelake_maksussa,pink,
                                 toe,toekesto,tyohist,next_wage,used_unemp_benefit,wage_reduction,
                                 unemp_after_ra,unempwage,unempwage_basis,children_under3,
                                 children_under7,children_under18,unemp_benefit_left,alkanut_ansiosidonnainen,
@@ -632,11 +639,11 @@ class Statevector_v7():
                                 main_until_student,spouse_until_student,main_until_outsider,spouse_until_outsider,
                                 prefnoise)
                                 
-            emp2,g2,pension2,wage2,age2,time_in_state2,paid_pension2,pink2,toe2,toekesto2,\
+            emp2,g2,p2_g,pension2,wage2,age2,time_in_state2,paid_pension2,pink2,toe2,toekesto2,\
                 tyohist2,used_unemp_benefit2,wage_reduction2,unemp_after_ra2,\
                 unempwage2,unempwage_basis2,prefnoise2,\
                 children_under3_2,children_under7_2,children_under18_2,unemp_benefit_left2,\
-                alkanut_ansiosidonnainen2,toe58_2,ove_paid_2,jasen_2,p2,p2_tila,p2_g,p2_old_wage,p2_pension,\
+                alkanut_ansiosidonnainen2,toe58_2,ove_paid_2,jasen_2,p2,p2_tila,p2_old_wage,p2_pension,\
                 p2_wage_reduction,p2_paid_pension,p2_next_wage,p2_used_unemp_benefit,p2_unemp_benefit_left,\
                 p2_unemp_after_ra,p2_unempwage,p2_unempwage_basis,p2_alkanut_ansiosidonnainen,p2_toe58,p2_toe,\
                 p2_toekesto,p2_tyoura,p2_time_in_state,p2_pinkslip,p2_ove_paid,\
@@ -648,7 +655,7 @@ class Statevector_v7():
                 main_until_student2,spouse_until_student2,main_until_outsider2,spouse_until_outsider2\
                 =self.state_decode(vec)
                 
-            self.check_state(emp,g,pension,old_wage,age,time_in_state,paid_pension,pink,
+            self.check_state(emp,g,p_g,pension,old_wage,age,time_in_state,paid_pension,pink,
                                 toe,tyohist,next_wage,used_unemp_benefit,wage_reduction,
                                 unemp_after_ra,unempwage,unempwage_basis,
                                 prefnoise,children_under3,children_under7,children_under18,
@@ -661,7 +668,7 @@ class Statevector_v7():
                                 puoliso_toe,puoliso_toekesto,puoliso_tyoura,puoliso_time_in_state,puoliso_pinkslip,puoliso_ove_paid,
                                 kansanelake,puoliso_kansanelake,tyoelake_maksussa,puoliso_tyoelake_maksussa,
                                 main_paid_wage,spouse_paid_wage,main_pt_action,spouse_pt_action,main_wage_basis,spouse_wage_basis,
-                                emp2,g2,pension2,wage2,age2,time_in_state2,paid_pension2,pink2,toe2,
+                                emp2,g2,p2_g,pension2,wage2,age2,time_in_state2,paid_pension2,pink2,toe2,
                                 tyohist2,used_unemp_benefit2,wage_reduction2,unemp_after_ra2,
                                 unempwage2,unempwage_basis2,prefnoise2,
                                 children_under3_2,children_under7_2,children_under18_2,
@@ -683,7 +690,7 @@ class Statevector_v7():
                                 main_until_outsider,main_until_outsider2,
                                 spouse_until_outsider,spouse_until_outsider2)
         
-    def check_state(self,emp,g,pension,old_wage,age,time_in_state,paid_pension,pink,
+    def check_state(self,emp,g,p_g,pension,old_wage,age,time_in_state,paid_pension,pink,
                     toe,tyohist,next_wage,used_unemp_benefit,wage_reduction,
                     unemp_after_ra,unempwage,unempwage_basis,
                     prefnoise,children_under3,children_under7,children_under18,
@@ -697,7 +704,7 @@ class Statevector_v7():
                     kansanelake,puoliso_kansanelake,tyoelake_maksussa,puoliso_tyoelake_maksussa,
                     old_paid,spouse_old_paid,main_pt_action,spouse_pt_action,
                     main_wage_basis,spouse_wage_basis,
-                    emp2,g2,pension2,old_wage2,age2,time_in_state2,paid_pension2,pink2,toe2,
+                    emp2,g2,p2_g,pension2,old_wage2,age2,time_in_state2,paid_pension2,pink2,toe2,
                     tyohist2,used_unemp_benefit2,wage_reduction2,unemp_after_ra2,
                     unempwage2,unempwage_basis2,prefnoise2,
                     children_under3_2,children_under7_2,children_under18_2,
@@ -721,6 +728,8 @@ class Statevector_v7():
             print('emp: {} vs {}'.format(emp,emp2))
         if not g==g2:  
             print('g: {} vs {}'.format(g,g2))
+        if not p_g==p2_g:  
+            print('p_g: {} vs {}'.format(p_g,p2_g))
         test_var(pension,pension2,'pension')
         test_var(old_wage,old_wage2,'old_wage')
         if not age==age2:  
@@ -834,11 +843,11 @@ class Statevector_v7():
             print(f'{vname}: {v1} vs {v2}')
     
     def check_state_vec(self,vec1,vec2):
-        emp2,g2,pension2,old_wage2,age2,time_in_state2,paid_pension2,pink2,toe2,toekesto2,\
+        emp2,g2,p2_g,pension2,old_wage2,age2,time_in_state2,paid_pension2,pink2,toe2,toekesto2,\
             tyohist2,used_unemp_benefit2,wage_reduction2,unemp_after_ra2,\
             unempwage2,unempwage_basis2,prefnoise2,\
             children_under3_2,children_under7_2,children_under18_2,unemp_benefit_left2,\
-            alkanut_ansiosidonnainen2,toe58_2,ove_paid_2,jasen_2,p2,p2_tila,p2_g,p2_old_wage,p2_pension,\
+            alkanut_ansiosidonnainen2,toe58_2,ove_paid_2,jasen_2,p2,p2_tila,p2_old_wage,p2_pension,\
             p2_wage_reduction,p2_paid_pension,p2_next_wage,p2_used_unemp_benefit,p2_unemp_benefit_left,\
             p2_unemp_after_ra,p2_unempwage,p2_unempwage_basis,p2_alkanut_ansiosidonnainen,p2_toe58,p2_toe,\
             p2_toekesto,p2_tyoura,p2_time_in_state,p2_pinkslip,p2_ove_paid,\
@@ -850,11 +859,11 @@ class Statevector_v7():
             main_until_student2,spouse_until_student2,main_until_outsider2,spouse_until_outsider2\
                 = self.state_decode(vec2)
 
-        emp,g,pension,old_wage,age,time_in_state,paid_pension,pink,toe,toekesto,\
+        emp,g,p_g,pension,old_wage,age,time_in_state,paid_pension,pink,toe,toekesto,\
             tyohist,used_unemp_benefit,wage_reduction,unemp_after_ra,\
             unempwage,unempwage_basis,prefnoise,\
             children_under3,children_under7,children_under18,unemp_benefit_left,\
-            alkanut_ansiosidonnainen,toe58,ove_paid,jasen,puoliso,p_tila,p_g,p_old_wage,p_pension,\
+            alkanut_ansiosidonnainen,toe58,ove_paid,jasen,puoliso,p_tila,p_old_wage,p_pension,\
             p_wage_reduction,p_paid_pension,p_next_wage,p_used_unemp_benefit,p_unemp_benefit_left,\
             p_unemp_after_ra,p_unempwage,p_unempwage_basis,p_alkanut_ansiosidonnainen,p_toe58,p_toe,\
             p_toekesto,p_tyoura,p_time_in_state,p_pinkslip,p_ove_paid,\
@@ -869,6 +878,8 @@ class Statevector_v7():
             print('emp: {} vs {}'.format(emp,emp2))
         if not g==g2:  
             print('g: {} vs {}'.format(g,g2))
+        if not p_g==p2_g:  
+            print('p_g: {} vs {}'.format(p_g,p2_g))
         if not math.isclose(pension,pension2):  
             print('pension: {} vs {}'.format(pension,pension2))
         if not math.isclose(old_wage,old_wage2):  
@@ -999,11 +1010,11 @@ class Statevector_v7():
             self.ptstate_encoding[s,s]=1
 
     def swap_spouses(self,vec):
-        employment_status,g,pension,wage,age,time_in_state,paid_pension,pinkslip,toe,\
+        employment_status,g,spouse_g,pension,wage,age,time_in_state,paid_pension,pinkslip,toe,\
             toekesto,tyoura,used_unemp_benefit,wage_reduction,unemp_after_ra,unempwage,\
             unempwage_basis,prefnoise,children_under3,children_under7,children_under18,\
             unemp_left,alkanut_ansiosidonnainen,toe58,ove_paid,jasen,\
-            puoliso,puoliso_tila,spouse_g,puoliso_wage,puoliso_pension,puoliso_wage_reduction,\
+            puoliso,puoliso_tila,puoliso_wage,puoliso_pension,puoliso_wage_reduction,\
             puoliso_paid_pension,puoliso_next_wage,puoliso_used_unemp_benefit,\
             puoliso_unemp_benefit_left,puoliso_unemp_after_ra,puoliso_unempwage,\
             puoliso_unempwage_basis,puoliso_alkanut_ansiosidonnainen,puoliso_toe58,\
@@ -1015,7 +1026,12 @@ class Statevector_v7():
             time_to_marriage,time_to_divorce,until_child,main_until_student,spouse_until_student,main_until_outsider,spouse_until_outsider\
                 =self.state_decode(vec)           
 
-        return self.state_encode(puoliso_tila,spouse_g,puoliso_pension,puoliso_wage,age,puoliso_time_in_state,
+        if g>=3:
+            g=g-3
+        if spouse_g>=3:
+            spouse_g=spouse_g-3
+
+        return self.state_encode(puoliso_tila,spouse_g,g,puoliso_pension,puoliso_wage,age,puoliso_time_in_state,
             puoliso_tyoelake_maksussa,puoliso_pinkslip,puoliso_toe,puoliso_toekesto,puoliso_tyoura,puoliso_next_wage,puoliso_used_unemp_benefit,
             puoliso_wage_reduction,puoliso_unemp_after_ra,puoliso_unempwage,puoliso_unempwage_basis,
             children_under3,children_under7,children_under18,
@@ -1227,6 +1243,9 @@ class Statevector_v7():
         for k in range(self.n_empl):
             low.append(state_min)
             high.append(state_max)
+        for k in range(self.n_groups):
+            low.append(group_min)
+            high.append(group_max)
         for k in range(self.n_groups):
             low.append(group_min)
             high.append(group_max)
