@@ -45,6 +45,11 @@ register(
     entry_point='gym_unemployment.envs:UnemploymentLargeEnv_v7',
 )
 
+register(
+    id='Qunemployment-v7',
+    entry_point='gym_unemployment.envs:QUnemploymentLargeEnv_v7',
+)
+
 
 #register(
 #    id='unemploymentEK-v0',

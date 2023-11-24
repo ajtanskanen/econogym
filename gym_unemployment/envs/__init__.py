@@ -7,7 +7,7 @@ from gym_unemployment.envs.unemployment_v3 import UnemploymentLargeEnv_v3
 from gym_unemployment.envs.unemployment_v4 import UnemploymentLargeEnv_v4
 from gym_unemployment.envs.unemployment_v5 import UnemploymentLargeEnv_v5
 from gym_unemployment.envs.unemployment_v6 import UnemploymentLargeEnv_v6
-from gym_unemployment.envs.unemployment_v7 import UnemploymentLargeEnv_v7
+from gym_unemployment.envs.unemployment_v7 import UnemploymentLargeEnv_v7,QUnemploymentLargeEnv_v7
 #from gym_unemployment.envs.unemployment_ek_v0 import UnemploymentEKEnv
 #from gym_unemployment.envs.unemployment_ek_v1 import UnemploymentEKLargeEnv
 from gym_unemployment.envs.unemployment_ek_v3 import UnemploymentEKLargeEnv_v3

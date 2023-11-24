@@ -748,7 +748,7 @@ class Rates():
         
         min_age=18
         max_spv=71
-        in_m=self.get_w(0,1.5,1.0)
+        in_m=self.get_w(0,1.5,1.0) # 
         out_m=self.get_w(0,0.8,1.0)
         in_n=self.get_w(0,1.25,1.0)
         out_n=self.get_w(0,0.85,1.0)
@@ -995,7 +995,7 @@ class Rates():
         max_spv=71
         in_m=self.get_w(0,1.5,1.0)
         out_m=self.get_w(0,0.8,1.0)
-        in_n=self.get_w(0,1.5,1.0)
+        in_n=self.get_w(0,1.25,1.0)
         out_n=self.get_w(0,0.85,1.0)
         
         inrate[min_age:max_spv,0]=1.5*miehet_in
@@ -1802,7 +1802,7 @@ class Rates():
         dfactor=np.array([0.75,1.05,0.,0.75,1.05,0.])
         dfactor[2]=self.get_w(0,dfactor[0],dfactor[1])
         dfactor[5]=self.get_w(1,dfactor[3],dfactor[4])
-        dfactor *= 1.1
+        dfactor *= 1.1 # scaling??
             
         ### ['syntyneet in']
         if self.year==2018:
@@ -2187,8 +2187,8 @@ class Rates():
         '''
         # reemployment to fulltime work
         reemp_ft=np.zeros((100,6))
-        reemp_ft[0:25,0]=0.29 # miehet, suorittavia töitä löytyy hyvin nuorena, vanhempana huonommin
-        reemp_ft[25:30,0]=0.29
+        reemp_ft[0:25,0]=0.30 # miehet, suorittavia töitä löytyy hyvin nuorena, vanhempana huonommin
+        reemp_ft[25:30,0]=0.35
         reemp_ft[30:50,0]=0.30
         reemp_ft[50:55,0]=0.25
         reemp_ft[55:60,0]=0.20
@@ -2196,8 +2196,8 @@ class Rates():
         reemp_ft[65:self.max_retage,0]=0.10
         reemp_ft[self.max_retage:100,0]=0.05
 
-        reemp_ft[0:25,1]=0.23 # miehet
-        reemp_ft[25:30,1]=0.27
+        reemp_ft[0:25,1]=0.25 # miehet
+        reemp_ft[25:30,1]=0.30
         reemp_ft[30:50,1]=0.30
         reemp_ft[50:55,1]=0.25
         reemp_ft[55:60,1]=0.20

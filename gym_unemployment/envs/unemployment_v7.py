@@ -44,7 +44,7 @@ from scipy.interpolate import interp1d
 from . util import compare_q_print,crosscheck_print,test_var
 from . wages_v1 import Wages_v1
 from . state_v7 import Statevector_v7
-from . infostate_v5 import Infostate
+#from . infostate_v5 import Infostate
 
 # class StayDict(dict):
 #     '''
@@ -142,11 +142,19 @@ class UnemploymentLargeEnv_v7(gym.Env):
         '''
         super().__init__()
 
+        #self.reward_range = [0,100]
+
         #print('init start v5')
 
         self.setup_default_params()
         gamma=0.92
-                
+
+        # No render mode set
+        self.render_mode = None
+
+        # No render mode set
+        self.reward_range = (0,10)
+
         # sets parameters based on kwargs
         self.set_parameters(**kwargs)
         
@@ -285,7 +293,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
 
         #print('init done v5')
             
-    def map_save_action(self,sav_act: int):
+    def map_save_action(self,sav_act: int) -> float:
         if sav_act>0:
             s=(sav_act-self.mid_sav_act)/100*2
         else:
@@ -386,7 +394,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
         self.nainen_jatkaa_kotihoidontuelle=0.8 # 50 % koko äitiysvapaan käyttäneistä menee myös kotihoindotuelle
         self.aitiysvapaa_pois=0.02 # per 3 kk
         self.tyohistoria_tyottputki=10.0 # vuotta. vähimmäistyöura putkeenpääsylle (oikeasti 5 v ed. 20 v aikana; tässä työura 35 v, josta 10 v)
-        self.kht_kesto=2.0 # kotihoidontuen kesto 2 v
+        self.kht_kesto=2.0 # kotihoidontuen kesto 2 v, ei tsekata tarkkaan. (vain se että on alle 3v lapsi)
         self.tyohistoria_vaatimus=3.0 # 3 vuotta
         self.tyohistoria_vaatimus500=10.0 # p.o. 5 vuotta 20v aikana; 10v tarkoittaa, että 18-38 välin ollut töissä + 5v/20v 
         self.ansiopvraha_kesto400=400 # päivää
@@ -562,8 +570,8 @@ class UnemploymentLargeEnv_v7(gym.Env):
         #print('self.group_weights',self.group_weights)
 
         kassanjasenyys_joinrate,kassanjasenyys_rate = self.rates.get_kassanjasenyys_rate()
-        self.infostats=Infostate(self.n_time,self.timestep,self.min_age,kassanjasenyys_joinrate=kassanjasenyys_joinrate,
-            kassanjasenyys_rate=kassanjasenyys_rate,include_halftoe = self.include_halftoe,min_toewage = self.min_toewage)
+        #self.infostats=Infostate(self.n_time,self.timestep,self.min_age,kassanjasenyys_joinrate=kassanjasenyys_joinrate,
+        #    kassanjasenyys_rate=kassanjasenyys_rate,include_halftoe = self.include_halftoe,min_toewage = self.min_toewage)
 
         #self.palkat_ika_miehet,self.palkat_ika_naiset,self.g_r = self.rates.setup_salaries_v4(self.min_retirementage)
         self.palkat_ika_miehet,self.palkat_ika_naiset,self.g_r = self.rates.setup_salaries_v4(self.min_retirementage)
@@ -881,7 +889,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
         Päivitä puolison/potentiaalisen puolison tila 
         Päivitä avioliitto/avoliitto
         '''        
-        intage=int(np.floor(age))
+        intage = int(np.floor(age))
         end = self.max_age
         num = int(np.ceil(end-intage+2)/self.timestep)
         sattuma = np.random.uniform(size=num)
@@ -972,8 +980,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
             medlifeleft[g] /= n
             mednpv[g] /= n
             print(f'{g}: ll {medlifeleft[g]} vs med {npv0[g]}')            
-            print(f'{g}: ll_npv {mednpv[g]} vs med_npv {npv_gpension[g]}')            
-
+            print(f'{g}: ll_npv {mednpv[g]} vs med_npv {npv_gpension[g]}')
 
     def setup_children(self,p : dict,puoliso: int,employment_state: int,spouse_empstate: int,
                     children_under3: int,children_under7: int,children_under18: int,lapsikorotus_lapsia: int) -> None:
@@ -1065,7 +1072,6 @@ class UnemploymentLargeEnv_v7(gym.Env):
         p[alku+'elakkeella'] = 0
         p[alku+'sairauspaivarahalla'] = 0
         p[alku+'disabled'] = 0
-
         p[alku+'tyoaika'] = 0
         
         if employment_state==15:
@@ -1234,8 +1240,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
         else:
             print('Unknown employment_state ',employment_state)
         
-        p[alku+'elake_maksussa'] = p[alku+'tyoelake']+p[alku+'kansanelake']
-            
+        p[alku+'elake_maksussa'] = p[alku+'tyoelake']+p[alku+'kansanelake']  
         p['ansiopvrahan_suojaosa'] = 1
         p['ansiopvraha_lapsikorotus'] = 1
 
@@ -2901,8 +2906,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
                     action = 3
                 else:
                     action = 0
-
-        if (action == 3 or (action==2 and children_under3<1 and age < self.min_retirementage) or action == 4) and self.unemp_limit_reemp:
+        elif (action == 3 or (action==2 and children_under3<1 and age < self.min_retirementage) or action == 4) and self.unemp_limit_reemp:
             if sattuma[7]>self.unemp_reemp_pt_prob[intage,g] and self.randomness:
                 action = 0
             
@@ -2995,7 +2999,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
                     action = 3
                 else:
                     action = 0
-        if (action == 3 or (action==2 and children_under3<1 and age < self.min_retirementage) or action == 4) and self.unemp_limit_reemp:
+        elif (action == 3 or (action==2 and children_under3<1 and age < self.min_retirementage) or action == 4) and self.unemp_limit_reemp:
             if sattuma[7]>self.unemp_reemp_pt_prob[intage,g] and self.randomness:
                 action = 0
 
@@ -3071,15 +3075,16 @@ class UnemploymentLargeEnv_v7(gym.Env):
         time_in_state += self.timestep
         karenssia_jaljella=0
 
-        if (action == 1) and self.unemp_limit_reemp:
-            if sattuma[7]>self.unemp_reemp_ft_prob[intage,g] and self.randomness:
+        if action>0:
+            if (action == 1) and self.unemp_limit_reemp:
+                if sattuma[7]>self.unemp_reemp_ft_prob[intage,g] and self.randomness:
+                    if sattuma[7]>self.unemp_reemp_pt_prob[intage,g] and self.randomness:
+                        action = 3
+                    else:
+                        action = 0
+            elif (action == 3 or (action==2 and age < self.min_retirementage) or action == 4) and self.unemp_limit_reemp:
                 if sattuma[7]>self.unemp_reemp_pt_prob[intage,g] and self.randomness:
-                    action = 3
-                else:
                     action = 0
-        if (action == 3 or (action==2 and age < self.min_retirementage) or action == 4) and self.unemp_limit_reemp:
-            if sattuma[7]>self.unemp_reemp_pt_prob[intage,g] and self.randomness:
-                action = 0
 
         if age >= self.max_unemploymentbenefitage:
             employment_status,kansanelake,tyoelake,pension,paid_wage,time_in_state,ove_paid,basis_wage,until_student,until_outsider=\
@@ -3096,7 +3101,6 @@ class UnemploymentLargeEnv_v7(gym.Env):
             used_unemp_benefit += self.timestep
             if age >= self.min_retirementage:
                 unemp_after_ra += self.timestep
-                
         elif action == 1:
             employment_status,pension,tyoelake,paid_wage,time_in_state,tyoura,pinkslip,basis_wage=\
                 self.move_to_work(raw_wage,pt_action,pension,tyoelake,age,time_in_state,tyoura,pinkslip)
@@ -3471,23 +3475,29 @@ class UnemploymentLargeEnv_v7(gym.Env):
         '''
         karenssia_jaljella=0
 
-        if (action == 0) and (time_in_state>self.kht_kesto or children_under3<1): # jos etuus loppuu, siirtymä satunnaisesti
+        if action == 2 and self.unemp_limit_reemp:
+            if sattuma[7]<self.unemp_reemp_ft_prob[intage,g] and self.randomness:
+                action = 2
+            elif sattuma[7]<self.unemp_reemp_pt_prob[intage,g] and self.randomness:
+                action = 3
+            else:
+                action = 1
+        elif action == 3 and self.unemp_limit_reemp:
+            if sattuma[7]>self.unemp_reemp_pt_prob[intage,g] and self.randomness:
+                action = 1
+
+        if (action == 0) and (time_in_state>self.kht_kesto or children_under3<1) and not self.perustulo: # jos etuus loppuu ja yritys jäädä etuudelle, siirtymä satunnaisesti
             if self.randomness:
                 s=sattuma[5] #np.random.uniform()
             else:
                 s=0
-                
             if s<1/3:
                 action=1
             elif s<2/3:
-                action=2
+               action=2
             else:
                 action=3
                 
-        #if (action == 2 or action == 5 or action == 3) and self.unemp_limit_reemp:
-        #    if sattuma[7]>self.unemp_reemp_prob[intage] and self.randomness:
-        #        action = 1
-
         if age >= self.min_retirementage: # ve
             employment_status,kansanelake,tyoelake,pension,paid_wage,time_in_state,ove_paid,basis_wage,until_student,until_outsider=\
                 self.move_to_retirement(pension,age,kansanelake,tyoelake,employment_status,
@@ -3554,7 +3564,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
                             action = 3
                         else:
                             action = 2
-                if (action in {3,4,5}) and self.unemp_limit_reemp: # and intage<40:
+                elif (action in {3,4,5}) and self.unemp_limit_reemp: # and intage<40:
                     if sattuma[7]>self.student_reemp_pt_prob[intage,g] and self.randomness:
                         action = 2
 
@@ -3815,7 +3825,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
                         action = 4
                     else:
                         action = 2
-            if (action in {4,5}) and self.unemp_limit_reemp:
+            elif (action in {4,5}) and self.unemp_limit_reemp:
                 if sattuma[7]>self.unemp_reemp_pt_prob[intage,g] and self.randomness:
                     action = 2
         
@@ -3906,7 +3916,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
                 if (action in {0}) and self.unemp_limit_reemp:
                     if sattuma[7]>self.unemp_reemp_pt_prob[intage,g]: # here we use part-time probability to compensate for the lack of knowledge about employment status
                         action = 2
-                if (action in {1,5}) and self.unemp_limit_reemp:
+                elif (action in {1,5}) and self.unemp_limit_reemp:
                     if sattuma[7]>self.unemp_reemp_pt_prob[intage,g] and self.randomness:
                         action = 2
         
@@ -4894,7 +4904,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
         benq['netto'] = benq[omat+'netto']+benq[puoliso+'netto']
         benq['etuustulo_netto'] = benq[omat+'etuustulo_netto']+benq[puoliso+'etuustulo_netto']
         benq['eq'] = benq[omat+'eq']+benq[puoliso+'eq']
-        benq['multiplier'] = (benq[omat+'multiplier']+benq[puoliso+'multiplier'])/2
+        #benq['multiplier'] = (benq[omat+'multiplier']+benq[puoliso+'multiplier'])/2
 
     #  Perussetti, tuottaa korkean elastisuuden
 
@@ -4919,11 +4929,11 @@ class UnemploymentLargeEnv_v7(gym.Env):
         self.salary_const_up_40=1.0*self.salary_const_up # 0.04 työssäolo palauttaa ansioita tämän verran vuodessa
         self.salary_const_up_50=1.0*self.salary_const_up # 0.04 työssäolo palauttaa ansioita tämän verran vuodessa
         self.salary_const_up_60=1.0*self.salary_const_up # 0.04 työssäolo palauttaa ansioita tämän verran vuodessa
-        self.salary_const_up_osaaika=0.030*self.timestep # 0.04 osa-aikainen työssäolo palauttaa ansioita tämän verran vuodessa
+        self.salary_const_up_osaaika=0.025*self.timestep # 0.04 osa-aikainen työssäolo palauttaa ansioita tämän verran vuodessa
         self.salary_const_up_osaaika40=1.0*self.salary_const_up_osaaika # 0.04 työssäolo palauttaa ansioita tämän verran vuodessa
         self.salary_const_up_osaaika50=1.0*self.salary_const_up_osaaika # 0.04 työssäolo palauttaa ansioita tämän verran vuodessa
         self.salary_const_up_osaaika60=1.0*self.salary_const_up_osaaika # 0.04 työssäolo palauttaa ansioita tämän verran vuodessa
-        self.salary_const_student=0.015*self.timestep # 0.05 opiskelu pienentää leikkausta tämän verran vuodessa
+        self.salary_const_student=0.025*self.timestep # 0.05 opiskelu pienentää leikkausta tämän verran vuodessa
         self.salary_const_student_final=0.05 # 0.05 opiskelu pienentää leikkausta tämän verran vuodessa
         
         self.max_mu_age = self.min_retirementage+15.0 # 
@@ -4935,11 +4945,11 @@ class UnemploymentLargeEnv_v7(gym.Env):
         self.men_kappa_hoitovapaa=0.010 # hyöty henkilölle hoitovapaalla olosta
         self.men_kappa_under_3y=0.010
         self.men_kappa_ve=0.0
-        self.men_kappa_pinkslip_young=0.05
+        self.men_kappa_pinkslip_young=0.15
         self.men_kappa_pinkslip_middle=0.10
         self.men_kappa_pinkslip_elderly=0.15
         self.men_kappa_pinkslip_putki=0.25
-        self.men_kappa_param=np.array([-0.400, -0.430, -0.480, -0.540, -0.660, -1.350]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
+        self.men_kappa_param=np.array([-0.390, -0.420, -0.470, -0.530, -0.650, -1.350]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
                                 # delta      0.020   0.090   0.75  0.125  0.300
         self.men_student_kappa_param=np.array([0.05, 0.0, -0.05, -100.0, -100.0, -100.0]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
         
@@ -4950,7 +4960,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
         self.women_kappa_hoitovapaa=0.090 # 0.170 # 0.27
         self.women_kappa_under_3y=0.010
         self.women_kappa_ve=0.0
-        self.women_kappa_pinkslip_young=0.0
+        self.women_kappa_pinkslip_young=0.15
         self.women_kappa_pinkslip_middle=0.25
         self.women_kappa_pinkslip_elderly=0.15
         self.women_kappa_pinkslip_putki=0.25
@@ -5190,7 +5200,16 @@ class UnemploymentLargeEnv_v7(gym.Env):
         for key, value in kwarg.items():
             if key=='ben':
                 if value is not None:
-                    self.custom_ben=fin_benefits.BenefitsHO # value
+                    if value=='benefitsHO':
+                        self.custom_ben=fin_benefits.BenefitsHO
+                    elif value=='benefits':
+                        self.custom_ben=fin_benefits.Benefits
+                    elif value=='basicIncomeBenefits':
+                        self.ben = fin_benefits.BasicIncomeBenefits
+                    elif value=='benefitsUC':
+                        self.ben = fin_benefits.BenefitsUC
+                    else:
+                        print('ERROR: unknown ben')
             if key=='step':
                 if value is not None:
                     self.timestep=value
@@ -5885,6 +5904,9 @@ class UnemploymentLargeEnv_v7(gym.Env):
         '''
         Ei käytässä
         '''
+
+        self.infostate = None
+
         if self.viewer:
             self.viewer.close()
             self.viewer = None
@@ -6565,6 +6587,11 @@ class UnemploymentLargeEnv_v7(gym.Env):
     def get_mortstate(self) -> int:
         return 15
 
+    def close(self):
+        '''
+        Free stuff
+        '''
+        pass
 
     def get_actions(self,action):
         emp_action=int(action[0])
@@ -6585,3 +6612,170 @@ class UnemploymentLargeEnv_v7(gym.Env):
             spouse_pt_action=0
 
         return emp_action,emp_savaction,main_pt_action,spouse_action,spouse_savaction,spouse_pt_action
+
+class QUnemploymentLargeEnv_v7(gym.Env):
+    '''
+    Wrapper that consider actions as a single action
+    '''
+
+    def __init__(self,**kwargs) -> None:
+        super().__init__()
+        self.actualenv=UnemploymentLargeEnv_v7(**kwargs)
+        self.include_savings=False
+        self.n_actions=self.actualenv.n_actions
+        self.n_spouse_actions=self.actualenv.n_spouse_actions
+        self.n_parttime_action=self.actualenv.n_parttime_action
+        n_actions = self.n_actions*self.n_spouse_actions*self.n_parttime_action*self.n_parttime_action
+        self.action_space = spaces.Discrete(n_actions)                    
+        self.observation_space = self.actualenv.observation_space
+        self.states = self.actualenv.states
+
+    def step(self, action: int, dynprog: bool=False, debug: bool=False):
+        '''
+        Open AI interfacen mukainen step-funktio, joka tekee askeleen eteenpäin
+        toiminnon action mukaan 
+
+        Keskeinen funktio simuloinnissa
+        '''
+        act = self.get_Qactions(action)
+        return self.actualenv.step(act, dynprog, debug)
+
+    def get_Qactions(self,action):
+        act = action//(self.n_spouse_actions*self.n_parttime_action*self.actualenv.n_parttime_action)
+        action_left = action - act*self.n_spouse_actions*self.n_parttime_action*self.n_parttime_action
+        emp_action = act
+        act = action_left//(self.n_parttime_action*self.n_parttime_action)
+        action_left -= act*self.n_parttime_action*self.n_parttime_action
+        spouse_action = act
+
+        emp_savaction=0
+        spouse_savaction=0
+        
+        act = action_left//self.n_parttime_action
+        action_left -= act*self.n_parttime_action
+        main_pt_action = act
+        act = action_left
+        spouse_pt_action=act
+
+        return np.array([emp_action,spouse_action,main_pt_action,spouse_pt_action],dtype=int)
+
+    def reset(self,init=None):
+        return self.actualenv.reset(init=init)
+
+    def close(self):
+        self.actualenv.close()
+        
+    def set_state(self,state):
+        self.actualenv.set_state(state)
+        
+    def get_state(self):
+        return self.actualenv.get_state()
+
+    def get_retirementage(self) -> float:
+        return self.actualenv.get_retirementage()
+
+    def get_n_states(self):
+        '''
+        returns number of the employment state & number of actions
+        '''
+        return self.actualenv.get_n_states()
+        
+    def get_lc_version(self) -> int:
+        '''
+        returns the version of life-cycle model's episodestate used
+        '''
+        return self.actualenv.get_lc_version()
+
+    def unempright_left(self,emp: int,tis: float,bu: float,ika: float,tyohistoria: float):
+        return self.actualenv.unempright_left(emp=emp,tis=tis,bu=bu,ika=ika,tyohistoria=tyohistoria)
+
+    def get_mortstate(self) -> int:
+        return self.actualenv.get_mortstate()
+
+    def seed(self, seed: int =None):
+    #    '''
+    #    Open AI interfacen mukainen seed-funktio, joka alustaa satunnaisluvut
+    #    '''
+        return self.actualenv.env_seed(init_seed=seed)
+
+    def env_seed(self, move_seed=None,init_seed=None):
+        return self.actualenv.env_seed(init_seed=seed)
+
+
+# class Q2UnemploymentLargeEnv_v7(gym.Env):
+#     '''
+#     Wrapper that consider actions as a single action
+#     '''
+
+#     def __init__(self,**kwargs) -> None:
+#         super().__init__()
+#         self.actualenv=UnemploymentLargeEnv_v7(**kwargs)
+#         self.include_savings=False
+#         self.n_actions=self.actualenv.n_actions
+#         self.n_spouse_actions=self.actualenv.n_spouse_actions
+#         self.n_parttime_action=self.actualenv.n_parttime_action
+#         n_actions = self.n_actions*self.n_parttime_action
+#         self.action_space = spaces.MultiDiscrete([n_actions,n_actions])                 
+#         self.observation_space = self.actualenv.observation_space
+
+#     def step(self, action: int, dynprog: bool=False, debug: bool=False):
+#         '''
+#         Open AI interfacen mukainen step-funktio, joka tekee askeleen eteenpäin
+#         toiminnon action mukaan 
+
+#         Keskeinen funktio simuloinnissa
+#         '''
+#         act = self.get_Qactions(action)
+#         return self.actualenv.step(act, dynprog, debug)
+
+#     def get_Qactions(self,action):
+#         act1 = action[0]//self.n_parttime_action
+#         action_left1 = action[0] - act1*self.n_parttime_action
+#         emp_action1 = act1
+#         act2 = action[1]//self.n_parttime_action
+#         action_left2 = action[1] - act2*self.n_parttime_action
+#         emp_action2 = act2
+
+#         emp_savaction=0
+#         spouse_savaction=0
+        
+#         return np.array([emp_action1,emp_action2,main_pt_action,spouse_pt_action],dtype=int)
+
+#     def reset(self,init=None):
+#         return self.actualenv.reset(init=init)
+
+#     def close(self):
+#         self.actualenv.close()
+        
+#     def set_state(self,state):
+#         self.actualenv.set_state(state)
+        
+#     def get_state(self):
+#         return self.actualenv.get_state()
+
+#     def get_retirementage(self) -> float:
+#         return self.actualenv.get_retirementage()
+
+#     def get_n_states(self):
+#         '''
+#         returns number of the employment state & number of actions
+#         '''
+#         return self.actualenv.get_n_states()
+        
+#     def get_lc_version(self) -> int:
+#         '''
+#         returns the version of life-cycle model's episodestate used
+#         '''
+#         return self.actualenv.get_lc_version()
+
+#     def get_mortstate(self) -> int:
+#         return self.actualenv.get_mortstate()
+
+#     def seed(self, seed: int =None):
+#     #    '''
+#     #    Open AI interfacen mukainen seed-funktio, joka alustaa satunnaisluvut
+#     #    '''
+#         return self.actualenv.env_seed(init_seed=seed)
+
+#     def env_seed(self, move_seed=None,init_seed=None):
+#         return self.actualenv.env_seed(init_seed=seed)
