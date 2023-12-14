@@ -1802,8 +1802,9 @@ class Rates():
         dfactor=np.array([0.75,1.05,0.,0.75,1.05,0.])
         dfactor[2]=self.get_w(0,dfactor[0],dfactor[1])
         dfactor[5]=self.get_w(1,dfactor[3],dfactor[4])
-        dfactor *= 1.1 # scaling??
-            
+        
+        #dfactor *= 1.1 # scaling??
+        
         ### ['syntyneet in']
         if self.year==2018:
             naiset_in=np.array([0.005739483446489816,0.01204777804550618,0.02120820376646518,0.02927337500840223,0.03535270256900702,0.04428300694883133,0.05292453691030204,0.06543048769384845,0.07394656308851225,0.08182598655969685,0.09255092200239633,0.09812680544387861,0.103030303030303,0.1064510062065074,0.1006063605989358,0.09108074087394354,0.08510948905109489,0.07493702770780857,0.06358821291663008,0.05299650307488243,0.04334668174731758,0.03475377624953948,0.02497915830425788,0.01688726608854405,0.01189278199615772,0.006698594547218831,0.003744586630197649,0.001880039046964822,0.00101597533632287,0.000538521086466292,0.0002292226078983561,0.000129680661371373,9.041591320072333e-05,5.942653394740752e-05,5.931725835631877e-05,2.966742813065535e-05,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0])
@@ -1829,15 +1830,19 @@ class Rates():
         else:
             print("Error: Unknown year in ['syntyneet in']")
             
-        bdata=naiset_in[:55-18]
+        bdata = naiset_in[:55-18]
+
+        # lasten välillä vuosi, mistä syystä nostetaan syntyvyyttä vastaavasti
+        bonus = 1.0 + 1.0/(40.0-18.0)
 
         for g in range(self.n_groups):
-            birth[18:55,g]=bdata*dfactor[g]
+            birth[18:55,g] = bdata*dfactor[g]*bonus
 
         # syntyvyys on lasten määrä suhteessa naisten määrään
         # ei siis tarvetta kertoa kahdella, vaikka isät pääsevät isyysvapaalle
 
-        birth=1-(1-birth)**self.timestep
+        #birth=1-(1-birth)**self.timestep
+        birth = birth * self.timestep # siirtymiä ei tapahdu mallissa sukupuolten välillä
 
         return birth                                                 
         
@@ -2188,7 +2193,7 @@ class Rates():
         # reemployment to fulltime work
         reemp_ft=np.zeros((100,6))
         reemp_ft[0:25,0]=0.30 # miehet, suorittavia töitä löytyy hyvin nuorena, vanhempana huonommin
-        reemp_ft[25:30,0]=0.35
+        reemp_ft[25:30,0]=0.40
         reemp_ft[30:50,0]=0.30
         reemp_ft[50:55,0]=0.25
         reemp_ft[55:60,0]=0.20
@@ -2197,7 +2202,7 @@ class Rates():
         reemp_ft[self.max_retage:100,0]=0.05
 
         reemp_ft[0:25,1]=0.25 # miehet
-        reemp_ft[25:30,1]=0.30
+        reemp_ft[25:30,1]=0.35
         reemp_ft[30:50,1]=0.30
         reemp_ft[50:55,1]=0.25
         reemp_ft[55:60,1]=0.20
@@ -2244,7 +2249,7 @@ class Rates():
         # reemployment to parttime work
         reemp_pt=np.zeros((100,6))
         reemp_pt[0:25,0]=0.9 # miehet
-        reemp_pt[25:30,0]=0.90
+        reemp_pt[25:30,0]=0.95
         reemp_pt[30:50,0]=0.80
         reemp_pt[50:55,0]=0.60
         reemp_pt[55:60,0]=0.50
@@ -2253,7 +2258,7 @@ class Rates():
         reemp_pt[self.max_retage:100,0]=0.05
 
         reemp_pt[0:25,1]=0.9 # miehet
-        reemp_pt[25:30,1]=0.90
+        reemp_pt[25:30,1]=0.95
         reemp_pt[30:50,1]=0.80
         reemp_pt[50:55,1]=0.60
         reemp_pt[55:60,1]=0.55
