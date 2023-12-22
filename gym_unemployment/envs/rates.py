@@ -1379,15 +1379,15 @@ class Rates():
              # uusitalon selvityksestä Työkyvyttömyyden vuoksi menetetty työura
              # skaalattu alaspäin, jotta tk:laisten kokonaismäärä menee paremmin oikein
             #dfactor=np.array([1.15,0.95,0.,1.1,0.95,0.])
-            dfactor=np.array([1.20,1.2,0.,1.2,1.2,0.])
+            dfactor=np.array([1.30,1.15,0.,1.3,1.15,0.])
             dfactor[2]=self.get_w(0,dfactor[0],dfactor[1])
             dfactor[5]=self.get_w(1,dfactor[3],dfactor[4])
             
-            tyot=0.1
+            tyot=0.2
             base=1.0/(1.0*(1-tyot)+2.0*tyot)
             unemp=2.00*base
             unempfactor=np.array([unemp,base,base,base,unemp,base,base,base,base,base,base,base,base,unemp,base,0.0])
-            
+
         if not self.silent:
             #print(f'disability rate from year {self.year}')
             print(f'disability rate from year {self.year}',dfactor)
@@ -1802,7 +1802,7 @@ class Rates():
         dfactor=np.array([0.75,1.05,0.,0.75,1.05,0.])
         dfactor[2]=self.get_w(0,dfactor[0],dfactor[1])
         dfactor[5]=self.get_w(1,dfactor[3],dfactor[4])
-        
+
         #dfactor *= 1.1 # scaling??
         
         ### ['syntyneet in']

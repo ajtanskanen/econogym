@@ -696,7 +696,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
             
         return npv_pension,npv_gpension
 
-    def comp_life_left(self,g: int,age: float) -> float:
+    def comp_time_until_v2(self,age: float,intensity,max_age: float=50,initial: bool=False,min_time: float=0.0) -> float:
 
         '''
         simuloidaan npv jokaiselle erikseen kauanko elinaikaa min_age:n jälkeen henkilöllä on.
@@ -705,57 +705,137 @@ class UnemploymentLargeEnv_v7(gym.Env):
         npv <- diskontattu
         npv0 <- ei ole diskontattu
         '''
-        alive = True
-        num = int(np.ceil(100-self.min_age+2)/self.timestep)
-        sattuma = np.random.uniform(size=num)
-        x = age
-        k = 0
-        while alive and x<100: #+self.timestep:
-            if sattuma[k]>self.mort_intensity[int(np.floor(x)),g]:
-                k += 1
-                x += self.timestep
-            else:
-                alive = False
+        docont = True
+        sattuma = random.uniform(0,1)
+        x = age + self.timestep
+        b = intensity[int(np.floor(x))]
+        while docont and x < max_age: 
+            if sattuma <= b:
+                docont = False
+                break
+
+            x += self.timestep
+            b += (1-b)*intensity[int(np.floor(x))]
                 
-        if self.plotdebug and True:
-            print(f'For age {age} group {g} comp_life_left x: {x-age}')
-
-        #return (x-age)/self.timestep
-        return x-age
-
-    def comp_until_disab(self,g: int,age: float,state: int=0) -> float:
-
-        '''
-        simuloidaan npv jokaiselle erikseen kauanko elinaikaa min_age:n jälkeen henkilöllä on.
-        hyvin yksinkertainen toteutus. Tulos on vuosina.
-        
-        npv <- diskontattu
-        npv0 <- ei ole diskontattu
-        '''
-        intage=int(np.floor(age))
-        alive = True
-        end = self.max_age
-        num = int(np.ceil(end-intage+2)/self.timestep)
-        sattuma = np.random.uniform(size=num)
-        x = age
-        k = 0
-        while alive and x < end: #+self.timestep:
-            # tässä disability_intensity iässä ~ age+1, koska ensin svpäivärahakausi
-            if sattuma[k] > self.disability_intensity[int(np.ceil(x)),g,1]:
-                k += 1
-                x += self.timestep
-            else:
-                alive = False
-                
-        if alive:
+        if docont:
             x = 100
 
-        x -= age
+        #ret = max(1,x-age+self.timestep)
+        if initial:
+            ret = x-age#+self.timestep
+        else:
+            ret = max(min_time,x-age) #+self.timestep)
 
         if self.plotdebug and True:
-            print(f'For age {age} group {g} comp_until_disab x: {x}')
+            print(f'For age {age} and group {g} comp_until_birth x: {ret}')
 
-        return x
+        return ret
+
+    def comp_life_left(self,g: int,age: float) -> float:
+        '''
+        simuloidaan npv jokaiselle erikseen kauanko elinaikaa min_age:n jälkeen henkilöllä on.
+        hyvin yksinkertainen toteutus. Tulos on vuosina.
+        '''
+
+        ret = self.comp_time_until_v2(age,self.mort_intensity[:,g],max_age=self.max_age,initial=False,min_time=0.0)
+        if self.plotdebug and True:
+            print(f'For age {age} group {g} comp_life_left x: {ret}')
+        return ret
+
+        # alive = True
+        # num = int(np.ceil(100-self.min_age+2)/self.timestep)
+        # sattuma = np.random.uniform(size=num)
+        # x = age
+        # k = 0
+        # while alive and x<100: #+self.timestep:
+        #     if sattuma[k]>self.mort_intensity[int(np.floor(x)),g]:
+        #         k += 1
+        #         x += self.timestep
+        #     else:
+        #         alive = False
+        #         break
+                
+        # if self.plotdebug and True:
+        #     print(f'For age {age} group {g} comp_life_left x: {x-age}')
+
+        # #return (x-age)/self.timestep
+        # return x-age
+
+    def comp_until_disab(self,g: int,age: float,state: int=1) -> float:
+
+        '''
+        simuloidaan npv jokaiselle erikseen kauanko elinaikaa min_age:n jälkeen henkilöllä on.
+        hyvin yksinkertainen toteutus. Tulos on vuosina.
+        
+        npv <- diskontattu
+        npv0 <- ei ole diskontattu
+        '''
+        time = self.comp_time_until_v2(age,self.disability_intensity[:,g,state],max_age=self.max_age,initial=False,min_time=0.0)
+        if self.plotdebug and True:
+            print(f'For age {age} group {g} comp_until_disab x: {time}')
+        
+        return time
+
+        # intage=int(np.floor(age))
+        # alive = True
+        # end = self.max_age
+        # num = int(np.ceil(end-intage+2)/self.timestep)
+        # sattuma = np.random.uniform(size=num)
+        # x = age
+        # k = 0
+        # while alive and x < end: #+self.timestep:
+        #     # tässä disability_intensity iässä ~ age+1, koska ensin svpäivärahakausi
+        #     if sattuma[k] > self.disability_intensity[int(np.ceil(x)),g,1]:
+        #         k += 1
+        #         x += self.timestep
+        #     else:
+        #         alive = False
+        #         break
+                
+        # if alive:
+        #     x = 100
+
+        # x -= age
+
+        # if self.plotdebug and True:
+        #     print(f'For age {age} group {g} comp_until_disab x: {x}')
+
+        # return x
+
+    def comp_until_birth_v0(self,g: int,age: float,initial: bool=False) -> float:
+
+        '''
+        simuloidaan npv jokaiselle erikseen kauanko elinaikaa min_age:n jälkeen henkilöllä on.
+        hyvin yksinkertainen toteutus. Tulos on vuosina.
+        
+        npv <- diskontattu
+        npv0 <- ei ole diskontattu
+        '''
+        nobirth = True
+        end = 50
+        num = int(np.ceil(end-self.min_age+2)/self.timestep)
+        sattuma = np.random.uniform(size=num)
+        x = age+self.timestep
+        k = 0
+        while nobirth and x < end: 
+            if sattuma[k] <= self.birth_intensity[int(np.floor(x)),g]:
+                nobirth = False
+                break
+            k += 1
+            x += self.timestep
+                
+        if nobirth:
+            x = 100
+        
+        if initial:
+            ret = x-age
+        else:
+            ret = max(x-age,1)
+
+        if self.plotdebug and True:
+            print(f'For age {age} and group {g} comp_until_birth: {ret}')
+
+        return ret
 
     def comp_until_birth(self,g: int,age: float,initial: bool=False) -> float:
 
@@ -766,69 +846,56 @@ class UnemploymentLargeEnv_v7(gym.Env):
         npv <- diskontattu
         npv0 <- ei ole diskontattu
         '''
-        nobirth = True
-        end = 50
-        num = int(np.ceil(end-self.min_age+2)/self.timestep)
-        sattuma = np.random.uniform(size=num)
-        x = age
-        k = 0
-        while nobirth and x < end: 
-            if sattuma[k] > self.birth_intensity[int(np.floor(x)),g]:
-                k += 1
-                x += self.timestep
-            else:
-                nobirth = False
-                
-        if nobirth:
-            x = 100
-        else:
-            if x < age+1 and not initial:
-                x = age+1 
-
-        x -= age
-
+        ret = self.comp_time_until_v2(age,self.birth_intensity[:,g],max_age=50,initial=initial,min_time=1.0)
         if self.plotdebug and True:
-            print(f'For age {age} and group {g} comp_until_birth x: {x}')
+            print(f'For age {age} and group {g} comp_until_birth x: {ret}')
 
-        return x
+        return ret
 
-    def comp_until_birth_v2(self,g: int,age: float,initial: bool=False) -> float:
+        # nobirth = True
+        # end = 50
+        # #num = int(np.ceil(end-self.min_age+2)/self.timestep)
+        # #sattuma = np.random.uniform(size=1)
+        # sattuma = random.uniform(0,1)
+        # x = age
+        # b = 0
+        # while nobirth and x < end: 
+        #     if sattuma <= b:
+        #         nobirth = False
+        #         break
 
-        '''
-        simuloidaan npv jokaiselle erikseen kauanko elinaikaa min_age:n jälkeen henkilöllä on.
-        hyvin yksinkertainen toteutus. Tulos on vuosina.
-        
-        npv <- diskontattu
-        npv0 <- ei ole diskontattu
-        '''
-        nobirth = True
-        end = 50
-        num = int(np.ceil(end-self.min_age+2)/self.timestep)
-        #sattuma = np.random.uniform(size=1)
-        sattuma = random.uniform(0,1)
-        x = age
-        b = 0
-        while nobirth and x < end: 
-            b += self.birth_intensity[int(np.floor(x)),g]
-            if sattuma > b:
-                x += self.timestep
-            else:
-                nobirth = False
+        #     b += (1-b)*self.birth_intensity[int(np.floor(x)),g]
+        #     x += self.timestep
                 
-        if nobirth:
-            x = 100
-        else:
-            if x < age+1 and not initial:
-                x = age+1 
+        # if nobirth:
+        #     x = 100
 
-        x -= age
+        # ret = max(1,x-age+self.timestep)
 
-        if self.plotdebug and True:
-            print(f'For age {age} and group {g} comp_until_birth x: {x}')
+        # if self.plotdebug and True:
+        #     print(f'For age {age} and group {g} comp_until_birth x: {x}')
 
-        return x        
+        # return ret
 
     def comp_time_to_marriage(self, puoliso: int,age: float,g: int, p_g: int) -> float:
+        '''
+        Päivitä puolison/potentiaalisen puolison tila 
+        Päivitä avioliitto/avoliitto
+        '''        
+        if puoliso>0:
+            x_d = self.comp_time_until_v2(age,self.divorce_rate[:],max_age=100,initial=False,min_time=0.0)
+            if self.plotdebug and True:
+                print(f'For age {age} and group {g} time_to_divorce x: {x_d}')
+            x_m = 100
+        else:
+            x_m = self.comp_time_until_v2(age,self.marriage_matrix[:,g,p_g-3],max_age=100,initial=False,min_time=0.0)
+            if self.plotdebug and True:
+                print(f'For age {age} and group {g} time_to_marriage d_m: {x_m}')
+            x_d = 100
+
+        return x_m,x_d        
+
+    def comp_time_to_marriage_v0(self, puoliso: int,age: float,g: int, p_g: int) -> float:
         '''
         Päivitä puolison/potentiaalisen puolison tila 
         Päivitä avioliitto/avoliitto
@@ -849,6 +916,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
                     x_d += self.timestep
                 else:
                     married = False
+                    break
                     
             if married:
                 x_d=100
@@ -866,6 +934,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
                     x_m += self.timestep
                 else:
                     single = False
+                    break
 
             if single:
                 x_m=100
@@ -879,6 +948,22 @@ class UnemploymentLargeEnv_v7(gym.Env):
         return x_m,x_d
 
     def comp_time_to_study(self,state: int,age: float,group: int) -> float:
+        '''
+        Päivitä puolison/potentiaalisen puolison tila 
+        Päivitä avioliitto/avoliitto
+        '''
+        
+        if state == 12: # opiskelija
+            x_m = self.comp_time_until_v2(age,self.student_outrate[:,group],max_age=self.max_age,initial=False,min_time=0.0)
+        else:
+            x_m = self.comp_time_until_v2(age,self.student_inrate[:,group],max_age=self.max_age,initial=False,min_time=0.0)
+
+        if self.plotdebug and True:
+            print(f'For age {age} time_to_student x_m: {x_m}')
+
+        return x_m        
+
+    def comp_time_to_study_v0(self,state: int,age: float,group: int) -> float:
         '''
         Päivitä puolison/potentiaalisen puolison tila 
         Päivitä avioliitto/avoliitto
@@ -899,6 +984,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
                     x_m += self.timestep
                 else:
                     student = False
+                    break
                     
             if student:
                 x_m=100
@@ -914,6 +1000,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
                     x_m += self.timestep
                 else:
                     notstudent = False
+                    break
 
             if notstudent:
                 x_m=100
@@ -926,6 +1013,21 @@ class UnemploymentLargeEnv_v7(gym.Env):
         return x_m
 
     def comp_time_to_outsider(self,state: int,age: float,group: int) -> float:
+        '''
+        Päivitä aika outsideriksi/pois outsideristä
+        '''        
+        
+        if state == 11: # outsider
+            x_m = self.comp_time_until_v2(age,self.outsider_outrate[:,group],max_age=self.max_age,initial=False,min_time=0.0)
+        else:
+            x_m = self.comp_time_until_v2(age,self.outsider_inrate[:,group],max_age=self.max_age,initial=False,min_time=0.0)
+
+        if self.plotdebug and True:
+            print(f'For age {age} time_to_outsider x_m: {x_m}')
+
+        return x_m
+
+    def comp_time_to_outsider_v0(self,state: int,age: float,group: int) -> float:
         '''
         Päivitä puolison/potentiaalisen puolison tila 
         Päivitä avioliitto/avoliitto
@@ -945,6 +1047,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
                     x_m += self.timestep
                 else:
                     outsider = False
+                    break
                     
             if outsider:
                 x_m=100
@@ -960,6 +1063,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
                     x_m += self.timestep
                 else:
                     notoutsider = False
+                    break
 
             if notoutsider:
                 x_m=100
@@ -971,57 +1075,57 @@ class UnemploymentLargeEnv_v7(gym.Env):
 
         return x_m
 
-    def test_life_left(self,n: int=100000):
-        npv0=np.zeros(self.n_groups)
+    # def test_life_left(self,n: int=100000):
+    #     npv0=np.zeros(self.n_groups)
 
-        startage = self.min_age
-        for g in range(self.n_groups):
-            cpsum0=1.0
-            for x in np.arange(100,startage,-self.timestep):
-                m = self.mort_intensity[int(np.floor(x)),g]
-                cpsum0=m*1+(1-m)*(1+cpsum0) # no discount
-            npv0[g] = cpsum0
+    #     startage = self.min_age
+    #     for g in range(self.n_groups):
+    #         cpsum0=1.0
+    #         for x in np.arange(100,startage,-self.timestep):
+    #             m = self.mort_intensity[int(np.floor(x)),g]
+    #             cpsum0=m*1+(1-m)*(1+cpsum0) # no discount
+    #         npv0[g] = cpsum0
 
-        medlifeleft=np.zeros(self.n_groups)
-        for g in range(self.n_groups):
-            age=startage
-            for k in range(n):
-                #age=np.randint(100)
-                lifeleft = self.comp_life_left(g,age)/self.timestep
-                medlifeleft[g] += lifeleft
-            medlifeleft[g] /= n
-            print(f'll {medlifeleft[g]} vs med {npv0[g]}')
+    #     medlifeleft=np.zeros(self.n_groups)
+    #     for g in range(self.n_groups):
+    #         age=startage
+    #         for k in range(n):
+    #             #age=np.randint(100)
+    #             lifeleft = self.comp_life_left(g,age)/self.timestep
+    #             medlifeleft[g] += lifeleft
+    #         medlifeleft[g] /= n
+    #         print(f'll {medlifeleft[g]} vs med {npv0[g]}')
 
-    def test_life_left_v2(self,n: int=100000):
-        npv0=np.zeros(self.n_groups)
+    # def test_life_left_v2(self,n: int=100000):
+    #     npv0=np.zeros(self.n_groups)
 
-        startage = self.max_age
-        npv0=np.zeros(self.n_groups)
-        npv_gpension=np.zeros(self.n_groups)
+    #     startage = self.max_age
+    #     npv0=np.zeros(self.n_groups)
+    #     npv_gpension=np.zeros(self.n_groups)
 
-        for g in range(self.n_groups):
-            cpsum0=1.0
-            cpsum_gpension=1.0
-            for x in np.arange(100,self.max_age,-self.timestep):
-                m=self.mort_intensity[int(np.floor(x)),g]
-                cpsum0=m*1+(1-m)*(1+cpsum0) # no discount
-                cpsum_gpension=m*1+(1-m)*(1+cpsum_gpension*self.elakeindeksi)  # gamma + pension indexing discount
-            npv0[g]=cpsum0
-            npv_gpension[g]=cpsum_gpension
+    #     for g in range(self.n_groups):
+    #         cpsum0=1.0
+    #         cpsum_gpension=1.0
+    #         for x in np.arange(100,self.max_age,-self.timestep):
+    #             m=self.mort_intensity[int(np.floor(x)),g]
+    #             cpsum0=m*1+(1-m)*(1+cpsum0) # no discount
+    #             cpsum_gpension=m*1+(1-m)*(1+cpsum_gpension*self.elakeindeksi)  # gamma + pension indexing discount
+    #         npv0[g]=cpsum0
+    #         npv_gpension[g]=cpsum_gpension
 
-        medlifeleft=np.zeros(self.n_groups)
-        mednpv=np.zeros(self.n_groups)
-        npv=self.comp_npv()
-        for g in range(self.n_groups):
-            age=startage
-            for k in range(n):
-                lifeleft = self.comp_life_left(g,age)/self.timestep
-                mednpv[g] += npv[int(lifeleft)]
-                medlifeleft[g] += lifeleft
-            medlifeleft[g] /= n
-            mednpv[g] /= n
-            print(f'{g}: ll {medlifeleft[g]} vs med {npv0[g]}')            
-            print(f'{g}: ll_npv {mednpv[g]} vs med_npv {npv_gpension[g]}')
+    #     medlifeleft=np.zeros(self.n_groups)
+    #     mednpv=np.zeros(self.n_groups)
+    #     npv=self.comp_npv()
+    #     for g in range(self.n_groups):
+    #         age=startage
+    #         for k in range(n):
+    #             lifeleft = self.comp_life_left(g,age)/self.timestep
+    #             mednpv[g] += npv[int(lifeleft)]
+    #             medlifeleft[g] += lifeleft
+    #         medlifeleft[g] /= n
+    #         mednpv[g] /= n
+    #         print(f'{g}: ll {medlifeleft[g]} vs med {npv0[g]}')            
+    #         print(f'{g}: ll_npv {mednpv[g]} vs med_npv {npv_gpension[g]}')
 
     def setup_children(self,p : dict,puoliso: int,employment_state: int,spouse_empstate: int,
                     children_under3: int,children_under7: int,children_under18: int,lapsikorotus_lapsia: int) -> None:
@@ -1060,7 +1164,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
         
             if employment_state==5: # äitiysvapaa
                 p['lapsia_paivahoidossa'] = 0
-            elif employment_state==6: # äitiysvapaa
+            elif employment_state==6: # isyysvapaa
                 p['lapsia_paivahoidossa'] = 0
             elif employment_state in set([0,4,13]):
                 p['lapsia_paivahoidossa'] = 0
@@ -3333,7 +3437,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
         if pension>0:
             if age >= self.max_retirementage:
                 tyoelake = tyoelake+self.scale_pension(pension,age,scale=False)/self.elakeindeksi
-                pension = 0           
+                pension = 0
             else:
                 pension = pension*self.palkkakerroin
             
@@ -3973,7 +4077,6 @@ class UnemploymentLargeEnv_v7(gym.Env):
                     self.move_to_disab_state(pension,old_paid_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse)
                 pinkslip = 0
             else:
-                until_disab = self.comp_until_disab(g,age)
                 until_outsider = self.comp_time_to_outsider(0,age,g) # state 0 is not 11
                 until_student = self.comp_time_to_study(0,age,g)
 
@@ -4026,6 +4129,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
                         self.move_to_parttime(raw_wage,pt_action,pension,tyoelake,age,tyoura,time_in_state)
                 else:
                     print('error 19: ',action)
+                until_disab = self.comp_until_disab(g,age,employment_status)
                     
         return employment_status,kansanelake,tyoelake,pension,time_in_state,\
                pinkslip,unemp_after_ra,tyoura,used_unemp_benefit,unempwage_basis,\
@@ -4895,7 +4999,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
     def update_times(self,age,main_empstate,spouse_empstate,until_birth,main_life_left,spouse_life_left,main_until_disab,spouse_until_disab,
                      main_until_student,spouse_until_student,main_until_outsider,spouse_until_outsider):
 
-        if age<=55 and (main_empstate not in {3,15} and spouse_empstate not in {3,15}):
+        if age<=55 and spouse_empstate not in {3,15}:
             until_birth -= self.timestep
 
         if main_empstate != 15:
@@ -5016,7 +5120,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
         self.men_kappa_pinkslip_middle=0.10
         self.men_kappa_pinkslip_elderly=0.15
         self.men_kappa_pinkslip_putki=0.25
-        self.men_kappa_param=np.array([-0.390, -0.420, -0.470, -0.550, -0.650, -1.350]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
+        self.men_kappa_param=np.array([-0.390, -0.420, -0.470, -0.565, -0.650, -1.350]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
                                 # delta      0.020   0.090   0.75  0.125  0.300
         self.men_student_kappa_param=np.array([0.05, 0.0, -0.05, -100.0, -100.0, -100.0]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
         
@@ -5031,7 +5135,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
         self.women_kappa_pinkslip_middle=0.25
         self.women_kappa_pinkslip_elderly=0.15
         self.women_kappa_pinkslip_putki=0.25
-        self.women_kappa_param=np.array([-0.235, -0.250, -0.300, -0.375, -0.475, -1.150]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
+        self.women_kappa_param=np.array([-0.235, -0.250, -0.300, -0.385, -0.475, -1.150]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
                                 # delta      0.005   0.060   0.105   0.115    0.220
         self.women_student_kappa_param=np.array([0.05, 0.0, -0.05, -100.0, -100.0, -100.0]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
 
@@ -5691,7 +5795,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
             kassanjasenyys = self.get_kassanjasenyys()
 
         lleft = self.comp_life_left(group,age)
-        until_disab = self.comp_until_disab(group,age)
+        until_disab = self.comp_until_disab(group,age,employment_state)
         until_student = self.comp_time_to_study(employment_state,age,group)
         until_outsider = self.comp_time_to_outsider(employment_state,age,group)
                     
@@ -5722,7 +5826,6 @@ class UnemploymentLargeEnv_v7(gym.Env):
             main_until_student,main_until_outsider\
              = self.get_initial_state(puoliso)
         
-        until_child = self.comp_until_birth(group,age,initial=True)
         self.main_dis_wage5y=0
         self.spouse_dis_wage5y=0
 
@@ -5736,6 +5839,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
             spouse_until_student,spouse_until_outsider\
              = self.get_initial_state(puoliso,is_spouse=True,init_g=group)
             
+        until_child = self.comp_until_birth(spouse_g,age,initial=True)
         time_to_marriage,time_to_divorce = self.comp_time_to_marriage(puoliso,age,group,spouse_g)
 
         # tarvitseeko alkutilassa laskea muita tietoja uusiksi? ei kait
@@ -6056,7 +6160,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
         sattuma = random.uniform(0,1)
         t=int((age-self.min_age)/self.timestep)
         
-        if sattuma[0]<self.kassanjasenyys_rate[t]:
+        if sattuma<self.kassanjasenyys_rate[t]:
             self.set_kassanjasenyys(1) #self.infostate['kassanjasen'] = 1
         else:
             self.set_kassanjasenyys(0) # self.infostate['kassanjasen'] = 0
@@ -6100,7 +6204,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
     def infostate_kassanjasenyys_update(self,age: float):
         if self.infostate['kassanjasen']<1:
             sattuma = random.uniform(0,1)
-            if sattuma[0]<self.kassanjasenyys_joinrate[self.map_age(age)] and self.randomness:
+            if sattuma<self.kassanjasenyys_joinrate[self.map_age(age)] and self.randomness:
                 self.set_kassanjasenyys(1)
         
     def comp_toe_wage_nykytila(self,is_spouse:bool =False):
@@ -6422,9 +6526,6 @@ class UnemploymentLargeEnv_v7(gym.Env):
         states,latest,enimaika,palkka,voc_unempbasis,member,voc_wagebasis = self.infostate_vocabulary(is_spouse=is_spouse)
         
         lstate=int(self.infostate[states][self.infostate[latest]])
-        
-        #if lstate!=0:
-        #    return 0
         
         nt=0
         t2=max(0,self.infostate[enimaika]-1)
