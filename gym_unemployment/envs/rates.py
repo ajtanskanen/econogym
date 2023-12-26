@@ -258,9 +258,17 @@ class Rates():
         else:
             print('Unknown year',year)
 
-        mort=1-(1-mort)**self.timestep
+        smort = np.zeros((121,self.n_groups,self.n_empl))
 
-        return mort
+        for e in range(16):
+            smort[:101,:,e] = mort[:,:]
+
+        smort[:101,:,3] = 2.0 * mort[:,:]
+        smort[101:121,:,:] = smort[100,:,:]
+
+        smort=1-(1-smort)**self.timestep
+
+        return smort
 
 
     def get_mort_rate_1980(self,year=1980,debug=False):
@@ -1836,13 +1844,19 @@ class Rates():
         bonus = 1.0 + 1.0/(40.0-18.0)
 
         for g in range(self.n_groups):
-            birth[18:55,g] = bdata*dfactor[g]*bonus
+            birth[18:55,g] = bdata*dfactor[g]*bonus*1.1
 
         # syntyvyys on lasten määrä suhteessa naisten määrään
         # ei siis tarvetta kertoa kahdella, vaikka isät pääsevät isyysvapaalle
 
+        # pitääkö skaalata vai ei??
         #birth=1-(1-birth)**self.timestep
+
+        # jos allaolevan rivin kommentoi, lasten määrä 15-kertaistuu. Miksi?
         birth = birth * self.timestep # siirtymiä ei tapahdu mallissa sukupuolten välillä
+
+        # tämä nelinkertaistaa lasten määrän, miksi?
+        #birth *= 2
 
         return birth                                                 
         
