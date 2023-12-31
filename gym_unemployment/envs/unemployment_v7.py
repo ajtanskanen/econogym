@@ -2005,31 +2005,32 @@ class UnemploymentLargeEnv_v7(gym.Env):
             # tilat [13,0,1,10,3,11,12] siis [tmtuki,ansiosidonnainen,kokoaikatyö,osaaikatyö,työvoimanulkopuolella,opiskelija]
             # lasketaan painotetut kertoimet eri tulotasoille
             # työttämät miehet, osuus väestästä
-            m_tyoton=0.020639
+            # työttämät miehet, osuus väestästä
+            m_tyoton=0.018869
             m1,m2,m3 = self.rates.get_wees(0,1.27,1.0,m_tyoton)
-            # työttömät naiset, osuus väestästä
-            w_tyoton=0.016
+            # työttämät naiset, osuus väestästä
+            w_tyoton=0.0160433
             w1,w2,w3 = self.rates.get_wees(1,1.2,1.0,w_tyoton)
 
             # työlliset, miehet
-            om=0.25765    # miehet töissä + opiskelija
+            om= 0.28022   # miehet töissä 
             om1,om2,om3 = self.rates.get_wees(0,1.25,1.0,om)
-            # työlliset naiset
-            ow=0.359
+            # työlliset, naiset
+            ow=0.3858752 
             ow1,ow2,ow3 = self.rates.get_wees(1,1.2,1.0,ow)
             
             # työvoiman ulkopuolella, miehet
-            m_tyovoimanulkop=0.037
+            m_tyovoimanulkop=0.034 
             um1,um2,um3 = self.rates.get_wees(0,1.3,1.0,m_tyovoimanulkop)
             # työvoiman ulkopuolella, naiset
-            w_tyovoimanulkop=0.033 
+            w_tyovoimanulkop= 0.0290785
             uw1,uw2,uw3 = self.rates.get_wees(1,1.2,1.0,w_tyovoimanulkop)
             
             # työkyvyttömät, miehet
-            md=0.009649
+            md= 0.0057823 
             md1,md2,md3 = self.rates.get_wees(0,1.3,1.0,md)
             # työkyvyttömät, naiset
-            wd=0.00662
+            wd=0.009292 
             wd1,wd2,wd3 = self.rates.get_wees(1,1.2,1.0,wd)
             
             # 13,0,1,10,3,11,12
@@ -2044,31 +2045,31 @@ class UnemploymentLargeEnv_v7(gym.Env):
             # lasketaan painotetut kertoimet eri tulotasoille
             
             # työttämät miehet, osuus väestästä
-            m_tyoton=0.023992
+            m_tyoton=0.018869
             m1,m2,m3 = self.rates.get_wees(0,1.27,1.0,m_tyoton)
             # työttämät naiset, osuus väestästä
-            w_tyoton=0.016 
+            w_tyoton=0.0160433
             w1,w2,w3 = self.rates.get_wees(1,1.2,1.0,w_tyoton)
 
             # työlliset, miehet
-            om=0.25765  # miehet töissä + opiskelija
+            om= 0.28022   # miehet töissä 
             om1,om2,om3 = self.rates.get_wees(0,1.25,1.0,om)
             # työlliset, naiset
-            ow=0.359 
+            ow=0.3858752 
             ow1,ow2,ow3 = self.rates.get_wees(1,1.2,1.0,ow)
             
             # työvoiman ulkopuolella, miehet
-            m_tyovoimanulkop=0.031 
+            m_tyovoimanulkop=0.034 
             um1,um2,um3 = self.rates.get_wees(0,1.3,1.0,m_tyovoimanulkop)
             # työvoiman ulkopuolella, naiset
-            w_tyovoimanulkop=0.0243329 
+            w_tyovoimanulkop= 0.0290785
             uw1,uw2,uw3 = self.rates.get_wees(1,1.2,1.0,w_tyovoimanulkop)
             
             # työkyvyttömät, miehet
-            md=0.009649
+            md= 0.0057823 
             md1,md2,md3 = self.rates.get_wees(0,1.3,1.0,md)
             # työkyvyttömät, naiset
-            wd=0.00669
+            wd=0.009292 
             wd1,wd2,wd3 = self.rates.get_wees(1,1.2,1.0,wd)
             
             # 13,0,1,10,3,11,12
@@ -2082,31 +2083,31 @@ class UnemploymentLargeEnv_v7(gym.Env):
             # tilat [13,0,1,10,3,11,12] siis [tmtuki,ansiosidonnainen,kokoaikatyö,osaaikatyö,työvoimanulkopuolella,opiskelija]
             # lasketaan painotetut kertoimet eri tulotasoille
             # työttämät miehet, osuus väestästä
-            m_tyoton=0.023992
+            m_tyoton=0.018869
             m1,m2,m3 = self.rates.get_wees(0,1.27,1.0,m_tyoton)
             # työttämät naiset, osuus väestästä
-            w_tyoton=0.016 
+            w_tyoton=0.0160433
             w1,w2,w3 = self.rates.get_wees(1,1.2,1.0,w_tyoton)
 
             # työlliset, miehet
-            om=0.25765   # miehet töissä + opiskelija
+            om= 0.28022   # miehet töissä 
             om1,om2,om3 = self.rates.get_wees(0,1.25,1.0,om)
             # työlliset, naiset
-            ow=0.359 
+            ow=0.3858752 
             ow1,ow2,ow3 = self.rates.get_wees(1,1.2,1.0,ow)
             
             # työvoiman ulkopuolella, miehet
-            m_tyovoimanulkop=0.031 
+            m_tyovoimanulkop=0.034 
             um1,um2,um3 = self.rates.get_wees(0,1.3,1.0,m_tyovoimanulkop)
             # työvoiman ulkopuolella, naiset
-            w_tyovoimanulkop=0.0243329
+            w_tyovoimanulkop= 0.0290785
             uw1,uw2,uw3 = self.rates.get_wees(1,1.2,1.0,w_tyovoimanulkop)
             
             # työkyvyttömät, miehet
-            md=0.009649
+            md= 0.0057823 
             md1,md2,md3 = self.rates.get_wees(0,1.3,1.0,md)
             # työkyvyttömät, naiset
-            wd=0.006
+            wd=0.009292 
             wd1,wd2,wd3 = self.rates.get_wees(1,1.2,1.0,wd)
             
             # 13,0,1,10,3,11,12
@@ -2120,31 +2121,32 @@ class UnemploymentLargeEnv_v7(gym.Env):
             # tilat [13,0,1,10,3,11,12] siis [tmtuki,ansiosidonnainen,kokoaikatyö,osaaikatyö,työvoimanulkopuolella,opiskelija]
             # lasketaan painotetut kertoimet eri tulotasoille
             # työttämät miehet, osuus väestästä
-            m_tyoton=0.023992
+            # työttämät miehet, osuus väestästä
+            m_tyoton=0.018869
             m1,m2,m3 = self.rates.get_wees(0,1.27,1.0,m_tyoton)
             # työttämät naiset, osuus väestästä
-            w_tyoton=0.0205056 
+            w_tyoton=0.0160433
             w1,w2,w3 = self.rates.get_wees(1,1.2,1.0,w_tyoton)
 
             # työlliset, miehet
-            om=0.21306   # miehet töissä + opiskelija
+            om= 0.28022   # miehet töissä 
             om1,om2,om3 = self.rates.get_wees(0,1.25,1.0,om)
             # työlliset, naiset
-            ow=0.2732093 
+            ow=0.3858752 
             ow1,ow2,ow3 = self.rates.get_wees(1,1.2,1.0,ow)
             
             # työvoiman ulkopuolella, miehet
-            m_tyovoimanulkop=0.031 
+            m_tyovoimanulkop=0.034 
             um1,um2,um3 = self.rates.get_wees(0,1.3,1.0,m_tyovoimanulkop)
             # työvoiman ulkopuolella, naiset
-            w_tyovoimanulkop=0.027
+            w_tyovoimanulkop= 0.0290785
             uw1,uw2,uw3 = self.rates.get_wees(1,1.2,1.0,w_tyovoimanulkop)
             
             # työkyvyttömät, miehet
-            md=0.009
+            md= 0.0057823 
             md1,md2,md3 = self.rates.get_wees(0,1.3,1.0,md)
             # työkyvyttömät, naiset
-            wd=0.006
+            wd=0.009292 
             wd1,wd2,wd3 = self.rates.get_wees(1,1.2,1.0,wd)
             
             # 13,0,1,10,3,11,12
@@ -5113,22 +5115,22 @@ class UnemploymentLargeEnv_v7(gym.Env):
         self.men_mu_scale_kokoaika_before=0.075 # 0.130 # 0.0595 # 0.065 # how much penalty is associated with work increase with age after mu_age
         self.men_mu_scale_kokoaika_after=0.035 # 0.130 # 0.0595 # 0.065 # how much penalty is associated with work increase with age after mu_age
         #self.men_mu_scale_osaaika=0.085 #0.010 # how much penalty is associated with work increase with age after mu_age
-        self.men_mu_age = self.min_retirementage - 5.0 # 1.75 # 1.0
+        self.men_mu_age = self.min_retirementage - 5.0
         self.men_kappa_hoitovapaa=0.015 # hyöty henkilölle hoitovapaalla olosta
         self.men_kappa_under_3y=0.015
         self.men_kappa_ve=0.0
-        self.men_kappa_pinkslip_young=0.15
+        self.men_kappa_pinkslip_young=0.25
         self.men_kappa_pinkslip_middle=0.10
         self.men_kappa_pinkslip_elderly=0.15
         self.men_kappa_pinkslip_putki=0.25
-        self.men_kappa_param=np.array([-0.390, -0.420, -0.470, -0.565, -0.650, -1.350]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
+        self.men_kappa_param=np.array([-0.390, -0.415, -0.465, -0.565, -0.650, -1.300]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
                                 # delta      0.020   0.090   0.75  0.125  0.300
         self.men_student_kappa_param=np.array([0.05, 0.0, -0.05, -100.0, -100.0, -100.0]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
         
-        self.women_mu_scale_kokoaika_before=0.070  #0.150 # 0.0785 #0.085 # how much penalty is associated with work increase with age after mu_age
-        self.women_mu_scale_kokoaika_after=0.020  #0.150 # 0.0785 #0.085 # how much penalty is associated with work increase with age after mu_age
+        self.women_mu_scale_kokoaika_before=0.065  #0.150 # 0.0785 #0.085 # how much penalty is associated with work increase with age after mu_age
+        self.women_mu_scale_kokoaika_after=0.015  #0.150 # 0.0785 #0.085 # how much penalty is associated with work increase with age after mu_age
         #self.women_mu_scale_osaaika=0.105 # 0.020 # how much penalty is associated with work increase with age after mu_age
-        self.women_mu_age = self.min_retirementage - 5.0 #2.5 # 1.5
+        self.women_mu_age = self.min_retirementage - 5.0
         self.women_kappa_hoitovapaa=0.10 # 0.170 # 0.27
         self.women_kappa_under_3y=0.020
         self.women_kappa_ve=0.0
@@ -5136,7 +5138,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
         self.women_kappa_pinkslip_middle=0.25
         self.women_kappa_pinkslip_elderly=0.15
         self.women_kappa_pinkslip_putki=0.25
-        self.women_kappa_param=np.array([-0.235, -0.250, -0.300, -0.385, -0.475, -1.150]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
+        self.women_kappa_param=np.array([-0.230, -0.250, -0.300, -0.375, -0.475, -1.200]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
                                 # delta      0.005   0.060   0.105   0.115    0.220
         self.women_student_kappa_param=np.array([0.05, 0.0, -0.05, -100.0, -100.0, -100.0]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
 
@@ -5662,9 +5664,9 @@ class UnemploymentLargeEnv_v7(gym.Env):
         maxred=-0.02 
 
         if employment_state==0:
-            wage_reduction=random.uniform(0.0,0.35)
+            wage_reduction=random.uniform(maxred,0.30)
         elif employment_state==13:
-            wage_reduction=random.uniform(0.10,0.45) # 20-70
+            wage_reduction=random.uniform(0.05,0.40) # 20-70
         elif employment_state==1:
             wage_reduction=random.uniform(maxred,0.10) # 20-70
         elif employment_state in {5,6,7}:
@@ -5674,7 +5676,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
         elif employment_state==12:
             wage_reduction=random.uniform(maxred,0.30)
         elif employment_state==11:
-            wage_reduction=random.uniform(0.10,0.50) # 15-50
+            wage_reduction=random.uniform(0.10,0.60) # 15-50
         elif employment_state==3:
             wage_reduction=0.60
             pension=0
