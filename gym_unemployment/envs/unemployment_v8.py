@@ -1,6 +1,6 @@
 """
 
-    unemployment_v7
+    unemployment_v8
 
 
     Gym module implementing the Finnish social security including earnings-related components,
@@ -20,6 +20,7 @@
     v6 modifies v5 so that the length of life is known at birth
     v7 adds time until disability, time until marriage/divorce, time until having a child as a state variable
     - this should improve fit
+    v8 revised fit
 
     fully random events still include:
     - next salary
@@ -29,8 +30,6 @@
     genders are here fixed: main is a man and spouse is a woman (to be improved later)
     - this enables a smaller state space
     - more flexible groups available
-
-    - error: kansanelake lasketaan kahteen kertaan työeläkkeen päälle benefitissä! FIXME
 
 """
 
@@ -56,7 +55,7 @@ from . state_v7 import Statevector_v7
 #         return 'Unknown state '+key
 
 
-class UnemploymentLargeEnv_v7(gym.Env):
+class UnemploymentLargeEnv_v8(gym.Env):
     """
     Description:
         The Finnish Unemployment Pension Scheme 
@@ -454,7 +453,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
         self.include_takuuelake=True
         self.preferencenoise_std=0.1
         self.silent=False
-        self.include_emtr=True
+        self.include_emtr=False
         
         self.additional_income_tax=0
         self.additional_income_tax_high=0
@@ -486,11 +485,11 @@ class UnemploymentLargeEnv_v7(gym.Env):
         
     def set_annual_params(self,year: int) -> None:
         # arvot tammikuun lukuja inflaation vuosimuutoksessa, https://pxweb2.stat.fi/PxWeb/pxweb/fi/StatFin/StatFin__khi/statfin_khi_pxt_122p.px/table/tableViewLayout1/
-        inflation_raw = np.array([1.0,1.011,1.010,1.009,1.044,1.084,1.022]) # 2018 2019 2020 2021 2022 2023 2024
+        inflation_raw = np.array([1.0,1.011,1.010,1.009,1.044,1.084,1.014,1.021,1.020,1.020]) # 2018 2019 2020 2021 2022 2023 2024 2025 2026 2027
         self.inflation = np.cumprod(inflation_raw)
         self.inflationfactor = self.inflation[year-2018]
 
-        salaryinflation_raw=np.array([1.0,1.021243,1.01987,1.021732,1.024266,1.023242,1.03145]) # 2018 2019 2020 2021 2022 2023 2024
+        salaryinflation_raw=np.array([1.0,1.021243,1.01987,1.021732,1.024266,1.023242,1.03145,1.032,1.032,1.032]) # 2018 2019 2020 2021 2022 2023 2024 2025 2026 2027
         self.salaryinflation=np.cumprod(salaryinflation_raw)
         self.salaryinflationfactor = self.salaryinflation[year-2018]
         if year<2023:
@@ -558,7 +557,19 @@ class UnemploymentLargeEnv_v7(gym.Env):
         elif year==2024:
             self.min_retirementage_putki=65.0
             self.min_retirementage=65
-            self.max_retirementage=69
+            self.max_retirementage=70
+        elif year==2025:
+            self.min_retirementage_putki=65.0
+            self.min_retirementage=65
+            self.max_retirementage=70
+        elif year==2026:
+            self.min_retirementage_putki=65.0
+            self.min_retirementage=65
+            self.max_retirementage=70
+        elif year==2027:
+            self.min_retirementage_putki=65.0
+            self.min_retirementage=65
+            self.max_retirementage=70
         else:
             error('retirement_age')
             
@@ -629,16 +640,22 @@ class UnemploymentLargeEnv_v7(gym.Env):
             self.elinaikakerroin=0.94419
         elif self.year==2024:
             self.elinaikakerroin=0.94419
+        elif self.year==2025:
+            self.elinaikakerroin=0.94419
+        elif self.year==2026:
+            self.elinaikakerroin=0.94419
+        elif self.year==2027:
+            self.elinaikakerroin=0.94419
         else:
             print('unknown year',self.year)
         
-        self.disability_intensity,self.svpaivaraha_disabilityrate,self.svpaivaraha_short3m = self.rates.get_eff_disab_rate_v7()
+        self.disability_intensity,self.svpaivaraha_disabilityrate,self.svpaivaraha_short3m = self.rates.get_eff_disab_rate_v8()
         #self.pinkslip_intensity = self.rates.get_pinkslip_rate()*self.timestep
         self.pinkslip_intensity = self.rates.get_pinkslip_rate_v7()*self.timestep
         self.birth_intensity = self.rates.get_birth_rate_v7(symmetric=False)
         self.mort_intensity = self.rates.get_mort_rate_v7(self.year) #get_mort_rate()
-        self.student_inrate,self.student_outrate = self.rates.get_student_rate_v7() # myös armeijassa olevat tässä
-        self.outsider_inrate,self.outsider_outrate = self.rates.get_outsider_rate_v7(self.max_retirementage)
+        self.student_inrate,self.student_outrate = self.rates.get_student_rate_v8() # myös armeijassa olevat tässä
+        self.outsider_inrate,self.outsider_outrate = self.rates.get_outsider_rate_v8(self.max_retirementage)
         self.divorce_rate = self.rates.get_divorce_rate()
         self.marriage_rate, self.marriage_matrix = self.rates.get_marriage_rate()
 
@@ -1884,10 +1901,10 @@ class UnemploymentLargeEnv_v7(gym.Env):
             # tilat [13,0,1,10,3,11,12] siis [tmtuki,ansiosidonnainen,kokoaikatyö,osaaikatyö,työvoimanulkopuolella,opiskelija]
             # lasketaan painotetut kertoimet eri tulotasoille
             
-            # työttämät miehet, osuus väestästä
+            # työttömät miehet, osuus väestästä
             m_tyoton=0.019
             m1,m2,m3 = self.rates.get_wees(0,1.27,1.0,m_tyoton)
-            # työttämät naiset, osuus väestästä
+            # työttömät naiset, osuus väestästä
             w_tyoton=0.01609
             w1,w2,w3 = self.rates.get_wees(1,1.2,1.0,w_tyoton)
 
@@ -1912,9 +1929,9 @@ class UnemploymentLargeEnv_v7(gym.Env):
             wd=0.00730
             wd1,wd2,wd3 = self.rates.get_wees(1,1.2,1.0,wd)
             
-            # opiskelijat+työlliset+muut työvoiman ulkop+työttämät, miehet
+            # opiskelijat+työlliset+muut työvoiman ulkop+työttömät, miehet
             ym=0.686+om+m_tyovoimanulkop+m_tyoton # miehet töissä + opiskelija
-            # opiskelijat+työlliset+muut työvoiman ulkop+työttämät, naiset
+            # opiskelijat+työlliset+muut työvoiman ulkop+työttömät, naiset
             yw=0.6076+ow+w_tyovoimanulkop+w_tyoton
             
             # 13,0,1,10,3,11,12
@@ -1927,10 +1944,10 @@ class UnemploymentLargeEnv_v7(gym.Env):
         elif self.year==2019: # 
             # tilat [13,0,1,10,3,11,12] siis [tmtuki,ansiosidonnainen,kokoaikatyö,osaaikatyö,työvoimanulkopuolella,opiskelija]
             # lasketaan painotetut kertoimet eri tulotasoille
-            # työttämät miehet, osuus väestästä
+            # työttömät miehet, osuus väestästä
             m_tyoton=0.02133
             m1,m2,m3 = self.rates.get_wees(0,1.27,1.0,m_tyoton)
-            # työttämät naiset, osuus väestästä
+            # työttömät naiset, osuus väestästä
             w_tyoton=0.0165347 
             w1,w2,w3 = self.rates.get_wees(1,1.2,1.0,w_tyoton)
 
@@ -1966,10 +1983,10 @@ class UnemploymentLargeEnv_v7(gym.Env):
         elif self.year==2020: # 
             # tilat [13,0,1,10,3,11,12] siis [tmtuki,ansiosidonnainen,kokoaikatyö,osaaikatyö,työvoimanulkopuolella,opiskelija]
             # lasketaan painotetut kertoimet eri tulotasoille
-            # työttämät miehet, osuus väestästä
+            # työttömät miehet, osuus väestästä
             m_tyoton=0.02399
             m1,m2,m3 = self.rates.get_wees(0,1.27,1.0,m_tyoton)
-            # työttämät naiset, osuus väestästä
+            # työttömät naiset, osuus väestästä
             w_tyoton=0.02051
             w1,w2,w3 = self.rates.get_wees(1,1.2,1.0,w_tyoton)
 
@@ -2004,11 +2021,11 @@ class UnemploymentLargeEnv_v7(gym.Env):
         elif self.year==2021: 
             # tilat [13,0,1,10,3,11,12] siis [tmtuki,ansiosidonnainen,kokoaikatyö,osaaikatyö,työvoimanulkopuolella,opiskelija]
             # lasketaan painotetut kertoimet eri tulotasoille
-            # työttämät miehet, osuus väestästä
-            # työttämät miehet, osuus väestästä
+            # työttömät miehet, osuus väestästä
+            # työttömät miehet, osuus väestästä
             m_tyoton=0.018869
             m1,m2,m3 = self.rates.get_wees(0,1.27,1.0,m_tyoton)
-            # työttämät naiset, osuus väestästä
+            # työttömät naiset, osuus väestästä
             w_tyoton=0.0160433
             w1,w2,w3 = self.rates.get_wees(1,1.2,1.0,w_tyoton)
 
@@ -2027,10 +2044,10 @@ class UnemploymentLargeEnv_v7(gym.Env):
             uw1,uw2,uw3 = self.rates.get_wees(1,1.2,1.0,w_tyovoimanulkop)
             
             # työkyvyttömät, miehet
-            md= 0.0057823 
+            md = 0.0057823 
             md1,md2,md3 = self.rates.get_wees(0,1.3,1.0,md)
             # työkyvyttömät, naiset
-            wd=0.009292 
+            wd = 0.009292 
             wd1,wd2,wd3 = self.rates.get_wees(1,1.2,1.0,wd)
             
             # 13,0,1,10,3,11,12
@@ -2044,32 +2061,32 @@ class UnemploymentLargeEnv_v7(gym.Env):
             # tilat [13,0,1,10,3,11,12] siis [tmtuki,ansiosidonnainen,kokoaikatyö,osaaikatyö,työvoimanulkopuolella,opiskelija]
             # lasketaan painotetut kertoimet eri tulotasoille
             
-            # työttämät miehet, osuus väestästä
-            m_tyoton=0.018869
+            # työttömät miehet, osuus väestästä
+            m_tyoton = 0.018869
             m1,m2,m3 = self.rates.get_wees(0,1.27,1.0,m_tyoton)
-            # työttämät naiset, osuus väestästä
-            w_tyoton=0.0160433
+            # työttömät naiset, osuus väestästä
+            w_tyoton = 0.0160433
             w1,w2,w3 = self.rates.get_wees(1,1.2,1.0,w_tyoton)
 
             # työlliset, miehet
-            om= 0.28022   # miehet töissä 
+            om = 0.28022   # miehet töissä 
             om1,om2,om3 = self.rates.get_wees(0,1.25,1.0,om)
             # työlliset, naiset
-            ow=0.3858752 
+            ow = 0.3858752 
             ow1,ow2,ow3 = self.rates.get_wees(1,1.2,1.0,ow)
             
             # työvoiman ulkopuolella, miehet
-            m_tyovoimanulkop=0.034 
+            m_tyovoimanulkop = 0.0344
             um1,um2,um3 = self.rates.get_wees(0,1.3,1.0,m_tyovoimanulkop)
             # työvoiman ulkopuolella, naiset
-            w_tyovoimanulkop= 0.0290785
+            w_tyovoimanulkop = 0.0290785
             uw1,uw2,uw3 = self.rates.get_wees(1,1.2,1.0,w_tyovoimanulkop)
             
             # työkyvyttömät, miehet
-            md= 0.0057823 
+            md = 0.009292
             md1,md2,md3 = self.rates.get_wees(0,1.3,1.0,md)
             # työkyvyttömät, naiset
-            wd=0.009292 
+            wd = 0.0057823 
             wd1,wd2,wd3 = self.rates.get_wees(1,1.2,1.0,wd)
             
             # 13,0,1,10,3,11,12
@@ -2082,10 +2099,10 @@ class UnemploymentLargeEnv_v7(gym.Env):
         elif self.year==2023: # PÄIVITÄ
             # tilat [13,0,1,10,3,11,12] siis [tmtuki,ansiosidonnainen,kokoaikatyö,osaaikatyö,työvoimanulkopuolella,opiskelija]
             # lasketaan painotetut kertoimet eri tulotasoille
-            # työttämät miehet, osuus väestästä
+            # työttömät miehet, osuus väestästä
             m_tyoton=0.018869
             m1,m2,m3 = self.rates.get_wees(0,1.27,1.0,m_tyoton)
-            # työttämät naiset, osuus väestästä
+            # työttömät naiset, osuus väestästä
             w_tyoton=0.0160433
             w1,w2,w3 = self.rates.get_wees(1,1.2,1.0,w_tyoton)
 
@@ -2104,10 +2121,10 @@ class UnemploymentLargeEnv_v7(gym.Env):
             uw1,uw2,uw3 = self.rates.get_wees(1,1.2,1.0,w_tyovoimanulkop)
             
             # työkyvyttömät, miehet
-            md= 0.0057823 
+            md= 0.009292 
             md1,md2,md3 = self.rates.get_wees(0,1.3,1.0,md)
             # työkyvyttömät, naiset
-            wd=0.009292 
+            wd=0.0057823
             wd1,wd2,wd3 = self.rates.get_wees(1,1.2,1.0,wd)
             
             # 13,0,1,10,3,11,12
@@ -2120,11 +2137,11 @@ class UnemploymentLargeEnv_v7(gym.Env):
         elif self.year==2024: # PÄIVITÄ
             # tilat [13,0,1,10,3,11,12] siis [tmtuki,ansiosidonnainen,kokoaikatyö,osaaikatyö,työvoimanulkopuolella,opiskelija]
             # lasketaan painotetut kertoimet eri tulotasoille
-            # työttämät miehet, osuus väestästä
-            # työttämät miehet, osuus väestästä
+            # työttömät miehet, osuus väestästä
+            # työttömät miehet, osuus väestästä
             m_tyoton=0.018869
             m1,m2,m3 = self.rates.get_wees(0,1.27,1.0,m_tyoton)
-            # työttämät naiset, osuus väestästä
+            # työttömät naiset, osuus väestästä
             w_tyoton=0.0160433
             w1,w2,w3 = self.rates.get_wees(1,1.2,1.0,w_tyoton)
 
@@ -2143,10 +2160,10 @@ class UnemploymentLargeEnv_v7(gym.Env):
             uw1,uw2,uw3 = self.rates.get_wees(1,1.2,1.0,w_tyovoimanulkop)
             
             # työkyvyttömät, miehet
-            md= 0.0057823 
+            md= 0.009292
             md1,md2,md3 = self.rates.get_wees(0,1.3,1.0,md)
             # työkyvyttömät, naiset
-            wd=0.009292 
+            wd=0.0057823
             wd1,wd2,wd3 = self.rates.get_wees(1,1.2,1.0,wd)
             
             # 13,0,1,10,3,11,12
@@ -2155,7 +2172,45 @@ class UnemploymentLargeEnv_v7(gym.Env):
             initial_weight[2,:] = [m3*4/5,m3*1/5,0.68*om3,0.32*om3,md3,um3,1-om3-um3-m3-md3]
             initial_weight[3,:] = [w1*4/5,w1*1/5,0.44*ow1,0.56*ow1,wd1,uw1,1-ow1-uw1-w1-wd1]
             initial_weight[4,:] = [w2*4/5,w2*1/5,0.44*ow2,0.56*ow2,wd2,uw2,1-ow2-uw2-w2-wd2]
-            initial_weight[5,:] = [w3*4/5,w3*1/5,0.44*ow3,0.56*ow3,wd3,uw3,1-ow3-uw3-w3-wd3]                  
+            initial_weight[5,:] = [w3*4/5,w3*1/5,0.44*ow3,0.56*ow3,wd3,uw3,1-ow3-uw3-w3-wd3]     
+        elif self.year==2025: # PÄIVITÄ
+            # tilat [13,0,1,10,3,11,12] siis [tmtuki,ansiosidonnainen,kokoaikatyö,osaaikatyö,työvoimanulkopuolella,opiskelija]
+            # lasketaan painotetut kertoimet eri tulotasoille
+            # työttömät miehet, osuus väestästä
+            m_tyoton=0.018869
+            m1,m2,m3 = self.rates.get_wees(0,1.27,1.0,m_tyoton)
+            # työttömät naiset, osuus väestästä
+            w_tyoton=0.0160433
+            w1,w2,w3 = self.rates.get_wees(1,1.2,1.0,w_tyoton)
+
+            # työlliset, miehet
+            om= 0.28022   # miehet töissä 
+            om1,om2,om3 = self.rates.get_wees(0,1.25,1.0,om)
+            # työlliset, naiset
+            ow=0.3858752 
+            ow1,ow2,ow3 = self.rates.get_wees(1,1.2,1.0,ow)
+            
+            # työvoiman ulkopuolella, miehet
+            m_tyovoimanulkop=0.034 
+            um1,um2,um3 = self.rates.get_wees(0,1.3,1.0,m_tyovoimanulkop)
+            # työvoiman ulkopuolella, naiset
+            w_tyovoimanulkop= 0.0290785
+            uw1,uw2,uw3 = self.rates.get_wees(1,1.2,1.0,w_tyovoimanulkop)
+            
+            # työkyvyttömät, miehet
+            md= 0.009292
+            md1,md2,md3 = self.rates.get_wees(0,1.3,1.0,md)
+            # työkyvyttömät, naiset
+            wd=0.0057823
+            wd1,wd2,wd3 = self.rates.get_wees(1,1.2,1.0,wd)
+            
+            # 13,0,1,10,3,11,12
+            initial_weight[0,:] = [m1*4/5,m1*1/5,0.68*om1,0.32*om1,md1,um1,1-om1-um1-m1-md1]
+            initial_weight[1,:] = [m2*4/5,m2*1/5,0.68*om2,0.32*om2,md2,um2,1-om2-um2-m2-md2]
+            initial_weight[2,:] = [m3*4/5,m3*1/5,0.68*om3,0.32*om3,md3,um3,1-om3-um3-m3-md3]
+            initial_weight[3,:] = [w1*4/5,w1*1/5,0.44*ow1,0.56*ow1,wd1,uw1,1-ow1-uw1-w1-wd1]
+            initial_weight[4,:] = [w2*4/5,w2*1/5,0.44*ow2,0.56*ow2,wd2,uw2,1-ow2-uw2-w2-wd2]
+            initial_weight[5,:] = [w3*4/5,w3*1/5,0.44*ow3,0.56*ow3,wd3,uw3,1-ow3-uw3-w3-wd3]
         else:
             print('Unsupported year',self.year)
             error(999)
@@ -2506,6 +2561,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
                 elif employment_status==3: # tk
                     # do nothing
                     employment_status = 3
+                    ove_paid=0
                     pension = pension * self.palkkakerroin
                     tyoelake = self.elakeindeksi * tyoelake
                     kansanelake = kansanelake * self.kelaindeksi
@@ -2521,6 +2577,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
                     # lykkäys ei vähennä kansaneläkettä
                     tyoelake += (self.scale_pension(pension,age,scale=scale_acc,unemp_after_ra=unemp_after_ra) - pension)
                     pension=0
+                    ove_paid=0
                     employment_status = 2 
                 else:
                     # lykkäyskorotus
@@ -2534,6 +2591,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
                     # lykkäys ei vähennä kansaneläkettä
                     tyoelake += (self.scale_pension(pension,age,scale=scale_acc,unemp_after_ra=unemp_after_ra) - pension)
                     pension=0
+                    ove_paid=0
                     employment_status = 2 
                     
             elif employment_status in {8,9}: # ve, ve+työ, ve+osatyö
@@ -4397,7 +4455,10 @@ class UnemploymentLargeEnv_v7(gym.Env):
         Irtisanottuja työttömiä ei reduktio koske ensimmäisenä vuonna
         '''
         
-        min_reduction=-0.01 # This is used to calibrate the modeled wages to match the observed wages
+        if g < 3:
+            min_reduction=-0.01 # This is used to calibrate the modeled wages to match the observed wages
+        else: # naisilla suurempi
+            min_reduction=-0.05 # This is used to calibrate the modeled wages to match the observed wages
         
         if initial_reduction:
             wage_reduction=max(min_reduction,1.0-(1.0-self.wage_initial_reduction)*(1.0-wage_reduction))
@@ -4439,7 +4500,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
             if self.update_disab_wage_reduction:
                 wage_reduction=max(min_reduction,1.0-(1.0-self.salary_const)*(1.0-wage_reduction))
         elif state in {7}: # kotihoidontuki 
-            wage_reduction=max(min_reduction,1.0-(1.0-self.salary_const)*(1.0-wage_reduction))
+            wage_reduction=max(min_reduction,1.0-(1.0-self.salary_const_khh)*(1.0-wage_reduction))
         elif state in {2}: # ve
             wage_reduction=max(min_reduction,1.0-(1.0-self.salary_const_retirement)*(1.0-wage_reduction))
         elif state in {14}: # sairaspäiväraha
@@ -5096,6 +5157,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
         #
     
         self.salary_const=0.045*self.timestep # 0.0425*self.timestep # 0.038 työttämyydestä palkka alenee tämän verran vuodessa
+        self.salary_const_khh=0.025*self.timestep # 0.0425*self.timestep # 0.038 työttämyydestä palkka alenee tämän verran vuodessa
         self.salary_const_ml=0.0*self.timestep # vanhempainvapaasta palkka alenee tämän verran vuodessa; palkkapenalty on jo mukana keskipalkoissa, joten tässä ei
         self.salary_const_retirement=0.10*self.timestep # vanhuuseläkkeellä muutos nopeampaa
         self.salary_const_svpaiva=np.array([0.30,0.25,0.25,0.30,0.25,0.20])*self.timestep # [0.20,0.16,0.12,0.20,0.15,0.12] pitkällä svpäivärahalla muutos nopeaa fyysisissä töissä
@@ -5116,14 +5178,14 @@ class UnemploymentLargeEnv_v7(gym.Env):
         self.men_mu_scale_kokoaika_after=0.035 # 0.130 # 0.0595 # 0.065 # how much penalty is associated with work increase with age after mu_age
         #self.men_mu_scale_osaaika=0.085 #0.010 # how much penalty is associated with work increase with age after mu_age
         self.men_mu_age = self.min_retirementage - 5.0
-        self.men_kappa_hoitovapaa=0.015 # hyöty henkilölle hoitovapaalla olosta
-        self.men_kappa_under_3y=0.015
+        self.men_kappa_hoitovapaa=0.010 # hyöty henkilölle hoitovapaalla olosta
+        self.men_kappa_under_3y=0.010
         self.men_kappa_ve=0.0
-        self.men_kappa_pinkslip_young=0.30 # p.o. 0.10
+        self.men_kappa_pinkslip_young=0.10
         self.men_kappa_pinkslip_middle=0.10
         self.men_kappa_pinkslip_elderly=0.15
         self.men_kappa_pinkslip_putki=0.20
-        self.men_kappa_param=np.array([-0.395, -0.415, -0.465, -0.570, -0.650, -1.300]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
+        self.men_kappa_param=np.array([-0.395, -0.415, -0.465, -0.555, -0.650, -1.400]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
                                 # delta      0.020   0.090   0.75  0.125  0.300
         self.men_student_kappa_param=np.array([0.05, 0.0, -0.05, -100.0, -100.0, -100.0]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
         
@@ -5131,14 +5193,14 @@ class UnemploymentLargeEnv_v7(gym.Env):
         self.women_mu_scale_kokoaika_after=0.015  #0.150 # 0.0785 #0.085 # how much penalty is associated with work increase with age after mu_age
         #self.women_mu_scale_osaaika=0.105 # 0.020 # how much penalty is associated with work increase with age after mu_age
         self.women_mu_age = self.min_retirementage - 3.0
-        self.women_kappa_hoitovapaa=0.10 # 0.170 # 0.27
+        self.women_kappa_hoitovapaa=0.080 # 0.170 # 0.27
         self.women_kappa_under_3y=0.020
         self.women_kappa_ve=0.0
-        self.women_kappa_pinkslip_young=0.15 # p.o. 0.05
+        self.women_kappa_pinkslip_young=0.05
         self.women_kappa_pinkslip_middle=0.25
         self.women_kappa_pinkslip_elderly=0.10
         self.women_kappa_pinkslip_putki=0.25
-        self.women_kappa_param=np.array([-0.230, -0.250, -0.300, -0.375, -0.475, -1.300]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
+        self.women_kappa_param=np.array([-0.230, -0.250, -0.300, -0.365, -0.475, -1.400]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
                                 # delta      0.005   0.060   0.105   0.115    0.220
         self.women_student_kappa_param=np.array([0.05, 0.0, -0.05, -100.0, -100.0, -100.0]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
 
@@ -6758,7 +6820,7 @@ class UnemploymentLargeEnv_v7(gym.Env):
         '''
         returns the version of life-cycle model's episodestate used
         '''
-        return 7
+        return 8
 
     def get_mortstate(self) -> int:
         return 15
@@ -6788,170 +6850,3 @@ class UnemploymentLargeEnv_v7(gym.Env):
             spouse_pt_action=0
 
         return emp_action,emp_savaction,main_pt_action,spouse_action,spouse_savaction,spouse_pt_action
-
-class QUnemploymentLargeEnv_v7(gym.Env):
-    '''
-    Wrapper that consider actions as a single action
-    '''
-
-    def __init__(self,**kwargs) -> None:
-        super().__init__()
-        self.actualenv=UnemploymentLargeEnv_v7(**kwargs)
-        self.include_savings=False
-        self.n_actions=self.actualenv.n_actions
-        self.n_spouse_actions=self.actualenv.n_spouse_actions
-        self.n_parttime_action=self.actualenv.n_parttime_action
-        n_actions = self.n_actions*self.n_spouse_actions*self.n_parttime_action*self.n_parttime_action
-        self.action_space = spaces.Discrete(n_actions)                    
-        self.observation_space = self.actualenv.observation_space
-        self.states = self.actualenv.states
-
-    def step(self, action: int, dynprog: bool=False, debug: bool=False):
-        '''
-        Open AI interfacen mukainen step-funktio, joka tekee askeleen eteenpäin
-        toiminnon action mukaan 
-
-        Keskeinen funktio simuloinnissa
-        '''
-        act = self.get_Qactions(action)
-        return self.actualenv.step(act, dynprog, debug)
-
-    def get_Qactions(self,action):
-        act = action//(self.n_spouse_actions*self.n_parttime_action*self.actualenv.n_parttime_action)
-        action_left = action - act*self.n_spouse_actions*self.n_parttime_action*self.n_parttime_action
-        emp_action = act
-        act = action_left//(self.n_parttime_action*self.n_parttime_action)
-        action_left -= act*self.n_parttime_action*self.n_parttime_action
-        spouse_action = act
-
-        emp_savaction=0
-        spouse_savaction=0
-        
-        act = action_left//self.n_parttime_action
-        action_left -= act*self.n_parttime_action
-        main_pt_action = act
-        act = action_left
-        spouse_pt_action=act
-
-        return np.array([emp_action,spouse_action,main_pt_action,spouse_pt_action],dtype=int)
-
-    def reset(self,init=None):
-        return self.actualenv.reset(init=init)
-
-    def close(self):
-        self.actualenv.close()
-        
-    def set_state(self,state):
-        self.actualenv.set_state(state)
-        
-    def get_state(self):
-        return self.actualenv.get_state()
-
-    def get_retirementage(self) -> float:
-        return self.actualenv.get_retirementage()
-
-    def get_n_states(self):
-        '''
-        returns number of the employment state & number of actions
-        '''
-        return self.actualenv.get_n_states()
-        
-    def get_lc_version(self) -> int:
-        '''
-        returns the version of life-cycle model's episodestate used
-        '''
-        return self.actualenv.get_lc_version()
-
-    def unempright_left(self,emp: int,tis: float,bu: float,ika: float,tyohistoria: float):
-        return self.actualenv.unempright_left(emp=emp,tis=tis,bu=bu,ika=ika,tyohistoria=tyohistoria)
-
-    def get_mortstate(self) -> int:
-        return self.actualenv.get_mortstate()
-
-    def seed(self, seed: int =None):
-    #    '''
-    #    Open AI interfacen mukainen seed-funktio, joka alustaa satunnaisluvut
-    #    '''
-        return self.actualenv.env_seed(init_seed=seed)
-
-    def env_seed(self, move_seed=None,init_seed=None):
-        return self.actualenv.env_seed(init_seed=seed)
-
-
-# class Q2UnemploymentLargeEnv_v7(gym.Env):
-#     '''
-#     Wrapper that consider actions as a single action
-#     '''
-
-#     def __init__(self,**kwargs) -> None:
-#         super().__init__()
-#         self.actualenv=UnemploymentLargeEnv_v7(**kwargs)
-#         self.include_savings=False
-#         self.n_actions=self.actualenv.n_actions
-#         self.n_spouse_actions=self.actualenv.n_spouse_actions
-#         self.n_parttime_action=self.actualenv.n_parttime_action
-#         n_actions = self.n_actions*self.n_parttime_action
-#         self.action_space = spaces.MultiDiscrete([n_actions,n_actions])                 
-#         self.observation_space = self.actualenv.observation_space
-
-#     def step(self, action: int, dynprog: bool=False, debug: bool=False):
-#         '''
-#         Open AI interfacen mukainen step-funktio, joka tekee askeleen eteenpäin
-#         toiminnon action mukaan 
-
-#         Keskeinen funktio simuloinnissa
-#         '''
-#         act = self.get_Qactions(action)
-#         return self.actualenv.step(act, dynprog, debug)
-
-#     def get_Qactions(self,action):
-#         act1 = action[0]//self.n_parttime_action
-#         action_left1 = action[0] - act1*self.n_parttime_action
-#         emp_action1 = act1
-#         act2 = action[1]//self.n_parttime_action
-#         action_left2 = action[1] - act2*self.n_parttime_action
-#         emp_action2 = act2
-
-#         emp_savaction=0
-#         spouse_savaction=0
-        
-#         return np.array([emp_action1,emp_action2,main_pt_action,spouse_pt_action],dtype=int)
-
-#     def reset(self,init=None):
-#         return self.actualenv.reset(init=init)
-
-#     def close(self):
-#         self.actualenv.close()
-        
-#     def set_state(self,state):
-#         self.actualenv.set_state(state)
-        
-#     def get_state(self):
-#         return self.actualenv.get_state()
-
-#     def get_retirementage(self) -> float:
-#         return self.actualenv.get_retirementage()
-
-#     def get_n_states(self):
-#         '''
-#         returns number of the employment state & number of actions
-#         '''
-#         return self.actualenv.get_n_states()
-        
-#     def get_lc_version(self) -> int:
-#         '''
-#         returns the version of life-cycle model's episodestate used
-#         '''
-#         return self.actualenv.get_lc_version()
-
-#     def get_mortstate(self) -> int:
-#         return self.actualenv.get_mortstate()
-
-#     def seed(self, seed: int =None):
-#     #    '''
-#     #    Open AI interfacen mukainen seed-funktio, joka alustaa satunnaisluvut
-#     #    '''
-#         return self.actualenv.env_seed(init_seed=seed)
-
-#     def env_seed(self, move_seed=None,init_seed=None):
-#         return self.actualenv.env_seed(init_seed=seed)
