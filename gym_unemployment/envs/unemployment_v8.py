@@ -4472,6 +4472,12 @@ class UnemploymentLargeEnv_v8(gym.Env):
         main_moved=False
         spouse_moved=False
 
+        #if True:
+        #    _,_,_,c3,c7,c18 = self.comp_infostats(age)
+        #    if (c18>0 or children_under18>0) and (c3 != children_under3):
+        #        print(f'v1: c3 {children_under3} c7 {children_under7} c18 {children_under18}')
+        #        print(f'v2: c3 {c3} c7 {c7} c18 {c18}')
+
         if self.randomness: # can be disabled for testing purposes
             # kaikki satunnaisuus kerralla
             sattuma = np.random.uniform(size=9)
@@ -4739,6 +4745,9 @@ class UnemploymentLargeEnv_v8(gym.Env):
         else:
             puoliso_next_wage = self.get_spousewage(age,spouse_wage_reduction)
 
+        #self.infostate_print_ages(age)
+        #print(f'1.0: c3 {children_under3} c7 {children_under7} c18 {children_under18}')
+
         self.state = self.states.state_encode(main_empstate,g,spouse_g,main_pension,main_wage,age,time_in_state,
                                 tyoelake_maksussa,pinkslip,toe,toekesto,tyoura,main_next_wage,used_unemp_benefit,
                                 main_wage_reduction,unemp_after_ra,unempwage,unempwage_basis,
@@ -4760,10 +4769,33 @@ class UnemploymentLargeEnv_v8(gym.Env):
                                 main_until_student,spouse_until_student,main_until_outsider,spouse_until_outsider,
                                 prefnoise)
 
+        #self.check_cstate()
+
         if self.plotdebug:
             self.render(done=done,reward=reward,netto=netto,benq=benq,netto_omat=netto_omat,netto_puoliso=netto_puoliso)
 
         return np.array(self.state,dtype=np.float32), reward, done, benq
+
+    def check_cstate(self):
+        state = np.array(self.state,dtype=np.float32)
+        main_empstate,g,spouse_g,main_pension,main_old_paid_wage,age,time_in_state,main_paid_pension,pinkslip,toe,\
+            toekesto,tyoura,used_unemp_benefit,main_wage_reduction,unemp_after_ra,unempwage,\
+            unempwage_basis,prefnoise,children_under3,children_under7,children_under18,\
+            unemp_left,alkanut_ansiosidonnainen,toe58,ove_paid,jasen,\
+            puoliso,spouse_empstate,spouse_old_paid_wage,spouse_pension,spouse_wage_reduction,\
+            puoliso_paid_pension,puoliso_next_wage,puoliso_used_unemp_benefit,\
+            puoliso_unemp_benefit_left,puoliso_unemp_after_ra,puoliso_unempwage,\
+            puoliso_unempwage_basis,puoliso_alkanut_ansiosidonnainen,puoliso_toe58,\
+            puoliso_toe,puoliso_toekesto,puoliso_tyoura,spouse_time_in_state,puoliso_pinkslip,\
+            puoliso_ove_paid,kansanelake,spouse_kansanelake,tyoelake_maksussa,\
+            spouse_tyoelake_maksussa,main_next_wage,\
+            main_paid_wage,spouse_paid_wage,\
+            pt_act,sp_pt_act,main_basis_wage,spouse_basis_wage,\
+            main_life_left,spouse_life_left,main_until_disab,spouse_until_disab,\
+            time_to_marriage,time_to_divorce,until_birth,\
+            main_until_student,spouse_until_student,main_until_outsider,spouse_until_outsider\
+                 = self.states.state_decode(state)
+        print(f'2.0: c3 {children_under3} c7 {children_under7} c18 {children_under18}')
 
     def update_toes(self,t,age,toe,tyoura,toe58,main_empstate,main_paid_wage,main_basis_wage,unempwage_basis,is_spouse,
                     used_unemp_benefit,alkanut_ansiosidonnainen,unempwage_old):
@@ -4774,6 +4806,8 @@ class UnemploymentLargeEnv_v8(gym.Env):
         retired={2,8,9}
         self.update_infostate(t,main_empstate,main_paid_wage,main_basis_wage,unempwage_basis,is_spouse=is_spouse)
         toe,toekesto,unempwage,children_under3,children_under7,children_under18 = self.comp_infostats(age,is_spouse=is_spouse)
+        #if is_spouse:
+        #    self.infostate_print_ages(age)
         if age >= 58 and self.suojasaanto_toe58: # suojasääntö
             unempwage = max(unempwage,unempwage_old)
 
@@ -6184,6 +6218,19 @@ class UnemploymentLargeEnv_v8(gym.Env):
                         children_under3 += 1
 
         return toes,toekesto,wage,children_under3,children_under7,children_under18
+
+    def infostate_print_ages(self,age):
+        toes,toekesto,wage,c3,c7,c18 = self.comp_infostats(age)
+        if self.infostate['children_n']>0:
+            first = True
+            for k in range(self.infostate['children_n']):
+                c_age = age-self.infostate['children_date'][k]
+                if c_age<=20:
+                    if first:
+                        print(f'age {age:.2f} child {k}/{self.infostate["children_n"]}: age {c_age:.2f} c3: {c3} c7: {c7} c18: {c18}')
+                        first = False
+                    else:
+                        print(f'age {age:.2f} child {k}/{self.infostate["children_n"]}: age {c_age:.2f}')
 
     def infostate_comp_5y_ave_wage(self,is_spouse:bool =False,render:bool =False):
         emp_states={1,10}

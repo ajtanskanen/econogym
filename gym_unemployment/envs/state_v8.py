@@ -1,3 +1,14 @@
+"""
+
+    state_v8
+
+
+    Sisäisen tilan hallinta unemployment_v8:lle
+
+    - lapsilukuun liityvät ongelmat korjatut
+
+"""
+
 import math
 import gym
 import numpy as np
@@ -362,7 +373,7 @@ class Statevector_v8():
 
         age=vec[pos+2]*age_scale+age_mid
         time_in_state=vec[pos+3]*10+10
-        pink=int(vec[pos+5]) # irtisanottu vai ei 
+        pink=int(round(vec[pos+5])) # irtisanottu vai ei 
         toe=vec[pos+6]+14/12 # työssäoloehto, kesto
         tyohist=vec[pos+7]*20+10 # työhistoria
         used_unemp_benefit=vec[pos+11]+1 # käytetty työttämyyspäivärahapäivien määrä
@@ -370,14 +381,14 @@ class Statevector_v8():
         unemp_after_ra=vec[pos+13]*2+1
         unemp_left=vec[pos+9]+1
         alkanut_ansiosidonnainen=int(vec[pos+17])
-        children_under3=int(vec[pos+18]*10+5)
-        children_under7=int(vec[pos+19]*10+5)
-        children_under18=int(vec[pos+20]*10+5)
-        toe58=int(vec[pos+21])
-        ove_paid=int(vec[pos+22])
-        kassanjasen=int(vec[pos+24])
+        children_under3=int(round(vec[pos+18]*10+5))
+        children_under7=int(round(vec[pos+19]*10+5))
+        children_under18=int(round(vec[pos+20]*10+5))
+        toe58=int(round(vec[pos+21]))
+        ove_paid=int(round(vec[pos+22]))
+        kassanjasen=int(round(vec[pos+24]))
         toekesto=vec[pos+25]+14/12
-        puoliso=int(vec[pos+26])
+        puoliso=int(round(vec[pos+26]))
         puoliso_old_wage=vec[pos+27]*self.wagescale+self.wagescale
         puoliso_pension=vec[pos+28]*self.pensionscale+self.pensionscale
         puoliso_wage_reduction=vec[pos+29]
@@ -389,13 +400,13 @@ class Statevector_v8():
         puoliso_unempwage=vec[pos+35]*self.wagescale+self.wagescale
         puoliso_unempwage_basis=vec[pos+36]*self.wagescale+self.wagescale
         puoliso_alkanut_ansiosidonnainen=int(vec[pos+37])
-        puoliso_toe58=int(vec[pos+38])
+        puoliso_toe58=int(round(vec[pos+38]))
         puoliso_toe=vec[pos+39]+14/12
         puoliso_toekesto=vec[pos+40]+14/12
         puoliso_tyoura=vec[pos+41]*20+10
         puoliso_time_in_state=vec[pos+42]*10+10
-        puoliso_pinkslip=int(vec[pos+43])
-        puoliso_ove_paid=int(vec[pos+44])
+        puoliso_pinkslip=int(round(vec[pos+43]))
+        puoliso_ove_paid=int(round(vec[pos+44]))
         
         kansanelake=vec[pos+45]*self.pensionscale+self.pensionscale
         puoliso_kansanelake=vec[pos+46]*self.pensionscale+self.pensionscale
@@ -449,7 +460,6 @@ class Statevector_v8():
                main_life_left,spouse_life_left,main_until_disab,spouse_until_disab,\
                time_to_marriage,time_to_divorce,until_birth,\
                main_until_student,spouse_until_student,main_until_outsider,spouse_until_outsider
-                
                               
     def random_init_state(self,minage: float=18,maxage: float=70):
         emp=random.randint(0,15)
@@ -469,9 +479,9 @@ class Statevector_v8():
         unempwage=np.random.uniform(0,80_000)
         unempwage_basis=np.random.uniform(0,80_000)
         prefnoise=np.random.uniform(-1,1)
-        children_under3=np.random.randint(0,10)
-        children_under7=np.random.randint(0,10)
-        children_under18=np.random.randint(0,10)
+        children_under3=np.random.randint(0,15)
+        children_under7=np.random.randint(0,15)
+        children_under18=np.random.randint(0,15)
         unemp_benefit_left=np.random.randint(0,10)
         alkanut_ansiosidonnainen=np.random.randint(0,2)
         toe58=np.random.randint(0,2)
@@ -552,6 +562,7 @@ class Statevector_v8():
         return vec
         
     def unit_test_code_decode(self):
+        print('unit_test_code_decode')
         for k in range(10):
             emp=random.randint(0,15)
             g=np.random.randint(0,3)
@@ -570,9 +581,9 @@ class Statevector_v8():
             unempwage=np.random.uniform(0,80_000)
             unempwage_basis=np.random.uniform(0,80_000)
             prefnoise=np.random.uniform(-1,1)
-            children_under3=np.random.randint(0,10)
-            children_under7=np.random.randint(0,10)
-            children_under18=np.random.randint(0,10)
+            children_under3=np.random.randint(0,15)
+            children_under7=np.random.randint(0,15)
+            children_under18=np.random.randint(0,15)
             unemp_benefit_left=np.random.randint(0,10)
             alkanut_ansiosidonnainen=np.random.randint(0,2)
             toe58=np.random.randint(0,2)
@@ -642,6 +653,9 @@ class Statevector_v8():
                                 time_to_marriage,time_to_divorce,until_birth,
                                 main_until_student,spouse_until_student,main_until_outsider,spouse_until_outsider,
                                 prefnoise)
+
+            # test vectorization
+            vec = np.array(vec,dtype=np.float32)
                                 
             emp2,g2,p2_g,pension2,wage2,age2,time_in_state2,paid_pension2,pink2,toe2,toekesto2,\
                 tyohist2,used_unemp_benefit2,wage_reduction2,unemp_after_ra2,\
@@ -693,6 +707,8 @@ class Statevector_v8():
                                 spouse_until_student,spouse_until_student2,
                                 main_until_outsider,main_until_outsider2,
                                 spouse_until_outsider,spouse_until_outsider2)
+
+        print('Done')
         
     def check_state(self,emp,g,p_g,pension,old_wage,age,time_in_state,paid_pension,pink,
                     toe,tyohist,next_wage,used_unemp_benefit,wage_reduction,
