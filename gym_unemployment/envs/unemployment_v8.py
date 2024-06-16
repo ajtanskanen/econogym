@@ -475,8 +475,8 @@ class UnemploymentLargeEnv_v8(gym.Env):
         self.plottkdebug=False
 
     def set_annual_params(self,year: int) -> None:
-        # arvot tammikuun lukuja inflaation vuosimuutoksessa, https://pxweb2.stat.fi/PxWeb/pxweb/fi/StatFin/StatFin__khi/statfin_khi_pxt_122p.px/table/tableViewLayout1/
-        inflation_raw = np.array([1.0,1.011,1.010,1.009,1.044,1.084,1.014,1.021,1.020,1.020]) # 2018 2019 2020 2021 2022 2023 2024 2025 2026 2027
+        # arvot JOULUKUUN lukuja kuluttajahintaindeksin vuosimuutoksessa, https://pxweb2.stat.fi/PxWeb/pxweb/fi/StatFin/StatFin__khi/statfin_khi_pxt_122p.px/table/tableViewLayout1/
+        inflation_raw = np.array([1.0,1.011399,1.00381,1.020716,1.071655,1.043444,1.014,1.021,1.020,1.020]) # 2018 2019 2020 2021 2022 2023 2024 2025 2026 2027
         self.inflation = np.cumprod(inflation_raw)
         self.inflationfactor = self.inflation[year-2018]
 
@@ -492,8 +492,12 @@ class UnemploymentLargeEnv_v8(gym.Env):
 
         if self.porrasta_toe:
             self.max_toe=35/12
-            self.min_toewage=844*12*self.salaryinflationfactor # vuoden 2019 luku tilanteessa, jossa ei tessiä
-            self.min_halftoewage=422*12*self.salaryinflationfactor # vuoden 2019 luku tilanteessa, jossa ei tessiä
+            if self.year<2024:
+                self.min_toewage=844*12*self.salaryinflationfactor # vuoden 2019 luku tilanteessa, jossa ei tessiä
+                self.min_halftoewage=422*12*self.salaryinflationfactor # vuoden 2019 luku tilanteessa, jossa ei tessiä
+            else:
+                self.min_toewage=930*12*self.salaryinflationfactor # vuoden 2024 luku 
+                self.min_halftoewage=0.5*930*12*self.salaryinflationfactor # vuoden 2024 luku 
         else:
             self.max_toe=28/12
             self.min_toewage=1211*12*self.salaryinflationfactor # vuoden 2019 luku tilanteessa, jossa ei tessiä
@@ -709,8 +713,8 @@ class UnemploymentLargeEnv_v8(gym.Env):
     def comp_time_until_v2(self,age: float,intensity,max_age: float=50,initial: bool=False,min_time: float=0.0) -> float:
 
         '''
-        simuloidaan npv jokaiselle erikseen kauanko elinaikaa min_age:n jälkeen henkilöllä on.
-        hyvin yksinkertainen toteutus. Tulos on vuosina.
+        simuloidaan jokaiselle erikseen kauanko aikaa eventiin on. hyvin yksinkertainen toteutus. Tulos on vuosina.
+        min_age:n jälkeen henkilöllä on.
 
         tässä oletetaan, että eventti voi sattua vain kerran. lasketaan aika siihen.
 
@@ -719,7 +723,7 @@ class UnemploymentLargeEnv_v8(gym.Env):
         '''
         docont = True
         sattuma = random.uniform(0,1)
-        x = age + self.timestep
+        x = age #+ self.timestep
         b = intensity[int(np.floor(x))]
         if sattuma > b:
             while docont and x < max_age:
@@ -760,7 +764,11 @@ class UnemploymentLargeEnv_v8(gym.Env):
         npv <- diskontattu
         npv0 <- ei ole diskontattu
         '''
-        time = self.comp_time_until_v2(age,self.disability_intensity[:,g,state],max_age=self.max_age,initial=False,min_time=0.0)
+        if state != 3:
+            time = self.comp_time_until_v2(age,self.disability_intensity[:,g,state],max_age=self.max_age,initial=False,min_time=0.0)
+        else:
+            time = 100
+
         if self.plotdebug and True:
             print(f'For age {age} group {g} comp_until_disab x: {time}')
 
@@ -4467,16 +4475,10 @@ class UnemploymentLargeEnv_v8(gym.Env):
         #pot_main_wage=main_wage
         #pot_spouse_wage=spouse_wage
 
-        intage=int(np.floor(age))
-        t=int((age-self.min_age)/self.timestep)
+        intage=int(math.floor(age))
+        t=round((age-self.min_age)/self.timestep)
         main_moved=False
         spouse_moved=False
-
-        #if True:
-        #    _,_,_,c3,c7,c18 = self.comp_infostats(age)
-        #    if (c18>0 or children_under18>0) and (c3 != children_under3):
-        #        print(f'v1: c3 {children_under3} c7 {children_under7} c18 {children_under18}')
-        #        print(f'v2: c3 {c3} c7 {c7} c18 {c18}')
 
         if self.randomness: # can be disabled for testing purposes
             # kaikki satunnaisuus kerralla
@@ -4686,7 +4688,7 @@ class UnemploymentLargeEnv_v8(gym.Env):
 
             if main_empstate in {2,3,8,9}: # retired
                 reward_omat,omat_equivalent = self.log_utility(netto_omat,main_empstate,age,g=g,pinkslip=pinkslip,children_under_3y=children_under3)
-                k=int(main_life_left/self.timestep)
+                k=round(main_life_left/self.timestep)
                 reward_omat *= self.npv_gpension[k] # discounting with pension index & gamma
                 npv0 = k
                 npv = self.npv_pension[k]
@@ -4697,7 +4699,7 @@ class UnemploymentLargeEnv_v8(gym.Env):
 
             if spouse_empstate in {2,3,8,9}: # retired
                 reward_puoliso,spouse_equivalent = self.log_utility(netto_puoliso,int(spouse_empstate),age,g=spouse_g,pinkslip=puoliso_pinkslip,children_under_3y=children_under3)
-                k=int(spouse_life_left/self.timestep)
+                k=round(spouse_life_left/self.timestep)
                 reward_puoliso *= self.npv_gpension[k] # discounting with pension index & gamma
                 p_npv0 = k
                 p_npv = self.npv_pension[k]
@@ -4953,13 +4955,13 @@ class UnemploymentLargeEnv_v8(gym.Env):
         #self.men_mu_scale_osaaika=0.085 #0.010 # how much penalty is associated with work increase with age after mu_age
         self.men_mu_age = self.min_retirementage - 5.0
         self.men_kappa_hoitovapaa=0.005 # hyöty henkilölle hoitovapaalla olosta
-        self.men_kappa_under_3y=0.010
+        self.men_kappa_under_3y=0.005
         self.men_kappa_ve=0.0
-        self.men_kappa_pinkslip_young=0.15
-        self.men_kappa_pinkslip_middle=0.10
-        self.men_kappa_pinkslip_elderly=0.15
+        self.men_kappa_pinkslip_young=0.25
+        self.men_kappa_pinkslip_middle=0.15
+        self.men_kappa_pinkslip_elderly=0.10
         self.men_kappa_pinkslip_putki=0.25
-        self.men_kappa_param=np.array([-0.350, -0.370, -0.435, -0.540, -0.675, -1.400]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
+        self.men_kappa_param=np.array([-0.350, -0.370, -0.445, -0.535, -0.690, -1.400]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
                                 # delta      0.020   0.090   0.75  0.125  0.300
         self.men_student_kappa_param=np.array([0.05, 0.0, -0.05, -100.0, -100.0, -100.0]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
 
@@ -4967,14 +4969,14 @@ class UnemploymentLargeEnv_v8(gym.Env):
         self.women_mu_scale_kokoaika_after=0.015  #0.150 # 0.0785 #0.085 # how much penalty is associated with work increase with age after mu_age
         #self.women_mu_scale_osaaika=0.105 # 0.020 # how much penalty is associated with work increase with age after mu_age
         self.women_mu_age = self.min_retirementage - 3.0
-        self.women_kappa_hoitovapaa=0.055 # 0.170 # 0.27
-        self.women_kappa_under_3y=0.015
+        self.women_kappa_hoitovapaa=0.050 # 0.170 # 0.27
+        self.women_kappa_under_3y=0.010
         self.women_kappa_ve=0.0
-        self.women_kappa_pinkslip_young=0.15
-        self.women_kappa_pinkslip_middle=0.30
-        self.women_kappa_pinkslip_elderly=0.15
-        self.women_kappa_pinkslip_putki=0.25
-        self.women_kappa_param=np.array([-0.265, -0.300, -0.335, -0.345, -0.470, -1.400]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
+        self.women_kappa_pinkslip_young=0.10
+        self.women_kappa_pinkslip_middle=0.40
+        self.women_kappa_pinkslip_elderly=0.10
+        self.women_kappa_pinkslip_putki=0.20
+        self.women_kappa_param=np.array([-0.270, -0.310, -0.340, -0.345, -0.490, -1.400]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
                                 # delta      0.005   0.060   0.105   0.115    0.220
         self.women_student_kappa_param=np.array([0.05, 0.0, -0.05, -100.0, -100.0, -100.0]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
 
@@ -4985,7 +4987,7 @@ class UnemploymentLargeEnv_v8(gym.Env):
         return (1-nu)/nu*math.log(1-pt_factor/div)
 
     def map_pt_kappa_v2(self,pt_factor,g):
-        n=int(pt_factor*4.0)-1
+        n=round(pt_factor*4.0)-1
         print(n,pt_factor,'v2')
         if g<3:
             return self.men_kappa_param[n]
@@ -5395,9 +5397,9 @@ class UnemploymentLargeEnv_v8(gym.Env):
 
     def map_age(self,age: float,start_zero: bool=False):
         if start_zero:
-            return int((age)*self.inv_timestep)
+            return round((age)*self.inv_timestep)
         else:
-            return int((age-self.min_age)*self.inv_timestep)
+            return round((age-self.min_age)*self.inv_timestep)
 
 
     ##############
@@ -5482,7 +5484,7 @@ class UnemploymentLargeEnv_v8(gym.Env):
         else:
             gender=0 # random.choices(np.array([0,1],dtype=int),weights=[0.5,0.5])[0]
             g=random.choices(np.array([0,1,2],dtype=int),weights=self.group_weights[0,:])[0]
-            group=int(g+gender*3)
+            group=round(g+gender*3)
 
         employment_state=random.choices(np.array([13,0,1,10,3,11,12],dtype=int),
                 weights = self.initial_weights[group,:])[0]
@@ -5503,15 +5505,15 @@ class UnemploymentLargeEnv_v8(gym.Env):
         if employment_state==0:
             wage_reduction=random.uniform(maxred,0.30)
         elif employment_state==13:
-            wage_reduction=random.uniform(0.05,0.40) # 20-70
+            wage_reduction=random.uniform(0.10,0.40) # 20-70
         elif employment_state==1:
-            wage_reduction=random.uniform(maxred,0.10) # 20-70
+            wage_reduction=random.uniform(maxred,0.15) # 20-70
         elif employment_state in {5,6,7}:
             wage_reduction=random.uniform(maxred,0.30) # 20-70
         elif employment_state==10:
             wage_reduction=random.uniform(maxred,0.15) # 20-70
         elif employment_state==12:
-            wage_reduction=random.uniform(maxred,0.30)
+            wage_reduction=random.uniform(maxred,0.35)
         elif employment_state==11:
             wage_reduction=random.uniform(0.10,0.60) # 15-50
         elif employment_state==3:
@@ -5999,7 +6001,7 @@ class UnemploymentLargeEnv_v8(gym.Env):
         self.infostate[enimaika] = 0
         self.infostate[voc_basiswage] = np.zeros(self.n_time)-1
         sattuma = random.uniform(0,1)
-        t=int((age-self.min_age)/self.timestep)
+        t=round((age-self.min_age)/self.timestep)
 
         if sattuma<self.kassanjasenyys_rate[t]:
             self.set_kassanjasenyys(1) #self.infostate['kassanjasen'] = 1
@@ -6013,7 +6015,7 @@ class UnemploymentLargeEnv_v8(gym.Env):
 
     def infostate_set_enimmaisaika(self,age: float,is_spouse:bool =False):
         states,latest,enimaika,palkka,voc_unempbasis,member,voc_wagebasis = self.infostate_vocabulary(is_spouse=is_spouse)
-        t = int((age-self.min_age)/self.timestep)
+        t = round((age-self.min_age)/self.timestep)
         self.infostate[enimaika] = t
 
     def update_infostate(self,t: int,state: int,paid_wage: float,basiswage: float,unempbasis: float,is_spouse:bool =False):
@@ -6050,7 +6052,7 @@ class UnemploymentLargeEnv_v8(gym.Env):
 
     def comp_toe_wage_nykytila(self,is_spouse:bool =False):
         states,latest,enimaika,palkka,voc_unempbasis,member,voc_wagebasis = self.infostate_vocabulary(is_spouse=is_spouse)
-        lstate=int(self.infostate[states][self.infostate[latest]])
+        lstate=round(self.infostate[states][self.infostate[latest]])
         toes=0
         wage=0
         n_toe=int(np.floor(self.max_toe/self.timestep))
@@ -6122,7 +6124,7 @@ class UnemploymentLargeEnv_v8(gym.Env):
 
     def comp_toe_wage_porrastus(self,is_spouse:bool =False):
         states,latest,enimaika,palkka,voc_unempbasis,member,voc_wagebasis = self.infostate_vocabulary(is_spouse=is_spouse)
-        lstate=int(self.infostate[states][self.infostate[latest]])
+        lstate=round(self.infostate[states][self.infostate[latest]])
         toes=0
         toekesto=0
         wage=0
@@ -6241,7 +6243,7 @@ class UnemploymentLargeEnv_v8(gym.Env):
 
         states,latest,enimaika,voc_wage,voc_unempbasis,member,voc_wagebasis = self.infostate_vocabulary(is_spouse=is_spouse)
 
-        lstate=int(self.infostate[latest])+1
+        lstate=round(self.infostate[latest])+1
         n=int(np.ceil(5/self.timestep))
         wage=0
         truewage=0
@@ -6286,7 +6288,7 @@ class UnemploymentLargeEnv_v8(gym.Env):
 
         states,latest,enimaika,voc_wage,voc_unempbasis,member,voc_wagebasis = self.infostate_vocabulary(is_spouse=is_spouse)
 
-        lstate=int(self.infostate[latest])+1
+        lstate=round(self.infostate[latest])+1
         n=int(np.ceil(1/self.timestep))
         wage=0
         truewage=0
@@ -6360,7 +6362,7 @@ class UnemploymentLargeEnv_v8(gym.Env):
         '''
         states,latest,enimaika,palkka,voc_unempbasis,member,voc_wagebasis = self.infostate_vocabulary(is_spouse=is_spouse)
 
-        t = int((age-self.min_age)/self.timestep)
+        t = round((age-self.min_age)/self.timestep)
         ed_t = self.infostate[enimaika]
         if (t-ed_t)*self.timestep < 1.0: 
             return True
@@ -6381,7 +6383,7 @@ class UnemploymentLargeEnv_v8(gym.Env):
 
         states,latest,enimaika,palkka,voc_unempbasis,member,voc_wagebasis = self.infostate_vocabulary(is_spouse=is_spouse)
 
-        lstate=int(self.infostate[states][self.infostate[latest]])
+        lstate=round(self.infostate[states][self.infostate[latest]])
 
         nt=0
         t2=max(0,self.infostate[enimaika]-1)
@@ -6422,7 +6424,7 @@ class UnemploymentLargeEnv_v8(gym.Env):
 
         states,latest,enimaika,palkka,voc_unempbasis,member,voc_wagebasis = self.infostate_vocabulary(is_spouse=is_spouse)
 
-        lstate=int(self.infostate[states][self.infostate[latest]])
+        lstate=round(self.infostate[states][self.infostate[latest]])
 
         nt=0
         t2=max(0,self.infostate[enimaika]-1)
@@ -6461,7 +6463,7 @@ class UnemploymentLargeEnv_v8(gym.Env):
         unemp_states={0,4}
         family_states={5,6,7,12,14}
         ret_states={2,3,8,9}
-        lstate=int(self.infostate[states][self.infostate[latest]])
+        lstate=round(self.infostate[states][self.infostate[latest]])
 
         if age<self.minage_500 or lstate in ret_states:
             return 0

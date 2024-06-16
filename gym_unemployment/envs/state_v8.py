@@ -373,22 +373,22 @@ class Statevector_v8():
 
         age=vec[pos+2]*age_scale+age_mid
         time_in_state=vec[pos+3]*10+10
-        pink=int(round(vec[pos+5])) # irtisanottu vai ei 
+        pink=round(vec[pos+5]) # irtisanottu vai ei 
         toe=vec[pos+6]+14/12 # työssäoloehto, kesto
         tyohist=vec[pos+7]*20+10 # työhistoria
         used_unemp_benefit=vec[pos+11]+1 # käytetty työttämyyspäivärahapäivien määrä
         wage_reduction=vec[pos+12]
         unemp_after_ra=vec[pos+13]*2+1
         unemp_left=vec[pos+9]+1
-        alkanut_ansiosidonnainen=int(vec[pos+17])
-        children_under3=int(round(vec[pos+18]*10+5))
-        children_under7=int(round(vec[pos+19]*10+5))
-        children_under18=int(round(vec[pos+20]*10+5))
-        toe58=int(round(vec[pos+21]))
-        ove_paid=int(round(vec[pos+22]))
-        kassanjasen=int(round(vec[pos+24]))
+        alkanut_ansiosidonnainen=round(vec[pos+17])
+        children_under3=round(vec[pos+18]*10+5)
+        children_under7=round(vec[pos+19]*10+5)
+        children_under18=round(vec[pos+20]*10+5)
+        toe58=round(vec[pos+21])
+        ove_paid=round(vec[pos+22])
+        kassanjasen=round(vec[pos+24])
         toekesto=vec[pos+25]+14/12
-        puoliso=int(round(vec[pos+26]))
+        puoliso=round(vec[pos+26])
         puoliso_old_wage=vec[pos+27]*self.wagescale+self.wagescale
         puoliso_pension=vec[pos+28]*self.pensionscale+self.pensionscale
         puoliso_wage_reduction=vec[pos+29]
@@ -399,14 +399,14 @@ class Statevector_v8():
         puoliso_unemp_after_ra=2*vec[pos+34]+1
         puoliso_unempwage=vec[pos+35]*self.wagescale+self.wagescale
         puoliso_unempwage_basis=vec[pos+36]*self.wagescale+self.wagescale
-        puoliso_alkanut_ansiosidonnainen=int(vec[pos+37])
-        puoliso_toe58=int(round(vec[pos+38]))
+        puoliso_alkanut_ansiosidonnainen=round(vec[pos+37])
+        puoliso_toe58=round(vec[pos+38])
         puoliso_toe=vec[pos+39]+14/12
         puoliso_toekesto=vec[pos+40]+14/12
         puoliso_tyoura=vec[pos+41]*20+10
         puoliso_time_in_state=vec[pos+42]*10+10
-        puoliso_pinkslip=int(round(vec[pos+43]))
-        puoliso_ove_paid=int(round(vec[pos+44]))
+        puoliso_pinkslip=round(vec[pos+43])
+        puoliso_ove_paid=round(vec[pos+44])
         
         kansanelake=vec[pos+45]*self.pensionscale+self.pensionscale
         puoliso_kansanelake=vec[pos+46]*self.pensionscale+self.pensionscale
@@ -445,7 +445,7 @@ class Statevector_v8():
         #    else:
         #        prefnoise=0
 
-        return int(emp),g,spouse_g,pension,wage,age,time_in_state,paid_pension,pink,toe,toekesto,\
+        return round(emp),g,spouse_g,pension,wage,age,time_in_state,paid_pension,pink,toe,toekesto,\
                tyohist,used_unemp_benefit,wage_reduction,unemp_after_ra,\
                unempwage,unempwage_basis,prefnoise,children_under3,children_under7,children_under18,\
                unemp_left,alkanut_ansiosidonnainen,toe58,ove_paid,kassanjasen,puoliso,puoliso_tila,\
