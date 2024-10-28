@@ -475,12 +475,31 @@ class UnemploymentLargeEnv_v8(gym.Env):
         self.plottkdebug=False
 
     def set_annual_params(self,year: int) -> None:
-        # arvot JOULUKUUN lukuja kuluttajahintaindeksin vuosimuutoksessa, https://pxweb2.stat.fi/PxWeb/pxweb/fi/StatFin/StatFin__khi/statfin_khi_pxt_122p.px/table/tableViewLayout1/
-        inflation_raw = np.array([1.0,1.011399,1.00381,1.020716,1.071655,1.043444,1.014,1.021,1.020,1.020]) # 2018 2019 2020 2021 2022 2023 2024 2025 2026 2027
+        # arvot JOULUKUUN lukuja kuluttajahintaindeksin vuosimuutoksessa, https://stat.fi/tilasto/khi
+        inflation_raw = np.array([1.0, # 2018
+                                  1.011399, # 2019
+                                  1.00381, # 2020
+                                  1.020716, # 2021
+                                  1.071655, # 2022
+                                  1.043444, # 2023
+                                  1.014, # 2024
+                                  1.021, # 2025
+                                  1.020, # 2026
+                                  1.020]) # 2027
         self.inflation = np.cumprod(inflation_raw)
         self.inflationfactor = self.inflation[year-2018]
 
-        salaryinflation_raw=np.array([1.0,1.021243,1.01987,1.021732,1.024266,1.023242,1.03145,1.032,1.032,1.032]) # 2018 2019 2020 2021 2022 2023 2024 2025 2026 2027
+        # arvot ansiotasoindeksi (y+1)Q1 vs yQ1 tasossa
+        salaryinflation_raw=np.array([1.0, # 2018
+                                      1.021243, # 2019
+                                      1.01987, # 2020
+                                      1.021613, # 2021
+                                      1.022646, # 2022
+                                      1.030886, # 2023
+                                      1.03957, # 2024
+                                      1.032, # 2025
+                                      1.032, # 2026
+                                      1.032]) # 2027
         self.salaryinflation=np.cumprod(salaryinflation_raw)
         self.salaryinflationfactor = self.salaryinflation[year-2018]
         if year<2023:
@@ -2612,7 +2631,7 @@ class UnemploymentLargeEnv_v8(gym.Env):
                 if jaljella:
                     employment_status  = 0 # siirto ansiosidonnaiselle
                     #if alkanut_ansiosidonnainen<1:
-                    if irtisanottu>0 or alkanut_ansiosidonnainen>0: # or alkanut_ansiosidonnainen>0: # muuten ei oikeutta ansiopäivärahaan karenssi vuoksi
+                    if irtisanottu>0 or alkanut_ansiosidonnainen>0: # muuten ei oikeutta ansiopäivärahaan karenssi vuoksi
                         used_unemp_benefit += self.timestep
                         karenssia_jaljella=0.0
                     else:
