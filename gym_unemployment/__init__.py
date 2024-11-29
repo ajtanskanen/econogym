@@ -51,6 +51,11 @@ register(
 )
 
 register(
+    id='unemployment-v9',
+    entry_point='gym_unemployment.envs:UnemploymentEnv_v9',
+)
+
+register(
     id='Qunemployment-v7',
     entry_point='gym_unemployment.envs:QUnemploymentLargeEnv_v7',
 )

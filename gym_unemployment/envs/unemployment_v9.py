@@ -1,7 +1,7 @@
 """
 
-    unemployment_v8
-
+    unemployment_v9
+    
 
     Gym module implementing the Finnish social security including earnings-related components,
     e.g., the unemployment benefit
@@ -21,6 +21,7 @@
     v7 adds time until disability, time until marriage/divorce, time until having a child as a state variable
     - this should improve fit
     v8 revised fit
+    v9 alimony and child support to be fixed
 
     fully random events still include:
     - next salary
@@ -30,6 +31,9 @@
     genders are here fixed: main is a man and spouse is a woman (to be improved later)
     - this enables a smaller state space
     - more flexible groups available
+
+    FIXME:
+    - yksinhuoltaja voi olla vain nainen? nyt molemmat eronneet vanhemmat yksinhuoltajia
 
 """
 
@@ -55,7 +59,7 @@ from . state_v8 import Statevector_v8
 #         return 'Unknown state '+key
 
 
-class UnemploymentLargeEnv_v8(gym.Env):
+class UnemploymentEnv_v9(gym.Env):
     """
     Description:
         The Finnish Unemployment Pension Scheme
@@ -1302,7 +1306,7 @@ class UnemploymentLargeEnv_v8(gym.Env):
 
     def comp_benefits(self,wage: float,benefitbasis: float,main_kansanelake: float,tyoelake: float,employment_state: int,pt_state: int,
                     time_in_state: float,children_under3: int,children_under7: int,children_under18: int,ika: float,
-                    puoliso: int,spouse_empstate: int,spouse_pt_state: int,puoliso_palkka: float,spouse_kansanelake: float,puoliso_tyoelake: float,
+                    puoliso: int,spouse_empstate: int,spouse_pt_state: int,spouse_wage: float,spouse_kansanelake: float,puoliso_tyoelake: float,
                     puoliso_benefitbasis: float,spouse_time_in_state: float,
                     used_unemp_benefit: float, puoliso_used_unemp_benefit: float,
                     g: int,p_g: int,
@@ -1324,13 +1328,16 @@ class UnemploymentLargeEnv_v8(gym.Env):
         if puoliso>0 and not (employment_state==15 or spouse_empstate==15): # pariskunta
             p = self.setup_couples(ika,wage,benefitbasis,main_kansanelake,tyoelake,employment_state,pt_state,time_in_state,used_unemp_benefit,
                     children_under3,children_under7,children_under18,irtisanottu,karenssia_jaljella,
-                    puoliso_palkka,puoliso_benefitbasis,spouse_kansanelake,puoliso_tyoelake,spouse_empstate,spouse_pt_state,spouse_time_in_state,puoliso_used_unemp_benefit,
+                    spouse_wage,puoliso_benefitbasis,spouse_kansanelake,puoliso_tyoelake,spouse_empstate,spouse_pt_state,spouse_time_in_state,puoliso_used_unemp_benefit,
                     puoliso_irtisanottu,puoliso_karenssia_jaljella)
 
             netto,benefitq = self.ben.laske_tulot_v3(p,include_takuuelake = self.include_takuuelake,omatalku='',puolisoalku='puoliso_',
                 split_costs=True,set_equal=True,add_kansanelake=False) # kansaneläke already included
             benefitq['netto'] = netto
             netto=netto*12
+
+            #if children_under18>0: # FIXME
+            #    print(f"ika {ika:.2f} c18 {children_under18} q {benefitq['lapsilisa']}")
 
             if self.include_emtr:
                 emtr_tilat=set([0,1,4,5,6,7,8,9,10,11,12,13,14])
@@ -1345,29 +1352,13 @@ class UnemploymentLargeEnv_v8(gym.Env):
 
                     p0 = self.setup_couples(ika,w0,ow0,main_kansanelake,tyoelake,e0,pt_state,0,used_unemp_benefit,
                             children_under3,children_under7,children_under18,irtisanottu,0,
-                            puoliso_palkka,puoliso_benefitbasis,spouse_kansanelake,puoliso_tyoelake,spouse_empstate,spouse_pt_state,spouse_time_in_state,puoliso_used_unemp_benefit,
+                            spouse_wage,puoliso_benefitbasis,spouse_kansanelake,puoliso_tyoelake,spouse_empstate,spouse_pt_state,spouse_time_in_state,puoliso_used_unemp_benefit,
                             puoliso_irtisanottu,0)
                     p1 = self.setup_couples(ika,w1,ow1,main_kansanelake,tyoelake,e1,pt_state,0,used_unemp_benefit,
                             children_under3,children_under7,children_under18,irtisanottu,0,
-                            puoliso_palkka,puoliso_benefitbasis,spouse_kansanelake,puoliso_tyoelake,spouse_empstate,spouse_pt_state,spouse_time_in_state,puoliso_used_unemp_benefit,
+                            spouse_wage,puoliso_benefitbasis,spouse_kansanelake,puoliso_tyoelake,spouse_empstate,spouse_pt_state,spouse_time_in_state,puoliso_used_unemp_benefit,
                             puoliso_irtisanottu,0)
-                    _,_,tvax = self.marg.comp_emtr(p0,p1,w1,dt=1200)#,display=printtaa)
-                    # if tvax<20 and printtaa:
-                    #     print("\n")
-                    #     _,_,tvax,q0,q1 = self.marg.comp_emtr(p0,p1,w1,dt=1200,full=True,display=printtaa)
-                    #     print("employment_state",employment_state,'wage',wage)
-                    #     print('w0',w0,'e0',e0,'ow0',ow0)
-                    #     print('w1',w1,'e1',e1,'ow1',ow1)
-                    #     print('***** q0 q1 vertailu')
-                    #     print('tyotpvraha_netto:',q0['omat_tyotpvraha_netto'],'vs',q1['omat_tyotpvraha_netto'])
-                    #     print('tyotpvraha:',q0['omat_tyotpvraha'],'vs',q1['omat_tyotpvraha'])
-                    #     compare_q_print(q0,q1)
-                    #     print('*****')
-                    #     #print('q0',q0,'q1',q1)
-                    #     print('unempwage_basis',unempwage_basis,'unempwage',unempwage)
-                    #     self.render(render_puoliso=False,render_omat=True)
-                    #     print("\n")
-
+                    _,_,tvax = self.marg.comp_emtr(p0,p1,w1,dt=1200)
                     _,effx,_ = self.marg.comp_emtr(p,p,wage,dt=1200)
                     benefitq['omat_emtr'] = effx
                     benefitq['omat_tva'] = tvax
@@ -1383,13 +1374,9 @@ class UnemploymentLargeEnv_v8(gym.Env):
 
                 if spouse_empstate in emtr_tilat:
                     printtaa=True
-                    #if spouse_empstate==1:
-                    #    printtaa=True
-                    #else:
-                    #    printtaa=False
-                    pe0,pe1,pw0,pw1,pow0,pow1 = self.setup_contrafactual(spouse_empstate,puoliso_palkka,potential_spouse_wage,puoliso_unempwage_basis,kassanjasen,puoliso_unempwage)
+                    pe0,pe1,pw0,pw1,pow0,pow1 = self.setup_contrafactual(spouse_empstate,spouse_wage,potential_spouse_wage,puoliso_unempwage_basis,kassanjasen,puoliso_unempwage)
                     if pw1<1.0 or pw1<pw0+1.0:
-                        print('co puoliso',spouse_empstate,pw0,pw1,ika,puoliso_palkka)
+                        print('co puoliso',spouse_empstate,pw0,pw1,ika,spouse_wage)
                         self.render(render_puoliso=True,render_omat=False)
                     pp0 = self.setup_couples(ika,wage,benefitbasis,main_kansanelake,tyoelake,employment_state,pt_state,time_in_state,used_unemp_benefit,
                             children_under3,children_under7,children_under18,irtisanottu,0,
@@ -1400,22 +1387,7 @@ class UnemploymentLargeEnv_v8(gym.Env):
                             pw1,pow1,spouse_kansanelake,puoliso_tyoelake,pe1,spouse_pt_state,0,puoliso_used_unemp_benefit,
                             puoliso_irtisanottu,0)
                     nettox2,_,tvax2 = self.marg.comp_emtr(pp0,pp1,pw1,dt=1200,alku='puoliso_')
-                    # if tvax2<20 and printtaa:
-                    #     print("\n")
-                    #     nettox2,_,tvax2,q0,q1 = self.marg.comp_emtr(pp0,pp1,pw1,dt=1200,alku='puoliso_',display=printtaa,full=True)
-                    #     print('employment_state',spouse_empstate,'wage',puoliso_palkka)
-                    #     print('w0',pw0,'e0',pe0,'ow0',pow0)
-                    #     print('w1',pw1,'e1',pe1,'ow1',pow1)
-                    #     print('unempwage_basis',puoliso_unempwage_basis,'unempwage',puoliso_unempwage)
-                    #     print('***** q0 q1 vertailu')
-                    #     print('tyotpvraha_netto:',q0['puoliso_tyotpvraha_netto'],'vs',q1['puoliso_tyotpvraha_netto'])
-                    #     print('tyotpvraha:',q0['puoliso_tyotpvraha'],'vs',q1['puoliso_tyotpvraha'])
-                    #     compare_q_print(q0,q1)
-                    #     print('*****')
-                    #     self.render(render_puoliso=True,render_omat=False)
-                    #     print("\n")
-
-                    _,effx2,_ = self.marg.comp_emtr(p,p,puoliso_palkka,dt=1200,alku='puoliso_')
+                    _,effx2,_ = self.marg.comp_emtr(p,p,spouse_wage,dt=1200,alku='puoliso_')
                     if tvax2<1.0:
                         print('puoliso tvax',spouse_empstate,pw0,pw1,tvax2)
                         self.render(render_puoliso=True,render_omat=False)
@@ -1446,7 +1418,7 @@ class UnemploymentLargeEnv_v8(gym.Env):
             netto_omat=benefitq['omat_netto']*12
             netto_puoliso=benefitq['puoliso_netto']*12
         else: # ei pariskunta
-            if employment_state in [5,6,7]:
+            if employment_state in [5,6,7]: # vanhempainvapaalla
                 if spouse_empstate not in [5,6,7] or (spouse_empstate in [5,6,7] and g>p_g):
                     p = self.setup_benefits(wage,benefitbasis,main_kansanelake,tyoelake,employment_state,pt_state,time_in_state,ika,used_unemp_benefit,
                         children_under3,children_under7,children_under18,puoliso=0,
@@ -1456,7 +1428,7 @@ class UnemploymentLargeEnv_v8(gym.Env):
                     c18=children_under18
                     self.setup_children(p,puoliso,employment_state,-1,children_under3,children_under7,children_under18,children_under18)
                     self.setup_asumismenot(employment_state,0,-1,children_under18,p)
-                else:
+                else: # molemmat ei vanhempainvapaalla yhtä aikaa niin että saavat lapsilisät
                     # lapset 0 tässä, yksinkertaistus
                     p = self.setup_benefits(wage,benefitbasis,main_kansanelake,tyoelake,employment_state,pt_state,time_in_state,ika,used_unemp_benefit,
                         0,0,0,puoliso=0,irtisanottu=irtisanottu,karenssia_jaljella=karenssia_jaljella,alku='')
@@ -1465,11 +1437,10 @@ class UnemploymentLargeEnv_v8(gym.Env):
                     c18=0
                     self.setup_children(p,puoliso,employment_state,spouse_empstate,0,0,0,children_under18)
                     self.setup_asumismenot(employment_state,0,-1,0,p)
-            elif (employment_state!=15 and g>p_g) and spouse_empstate not in [5,6,7]:
+            elif employment_state!=15 and (g>p_g or spouse_empstate==15) and spouse_empstate not in [5,6,7]:
                 # lapset itsellä, ei puolisolla. tässä epäsymmetria
                 p = self.setup_benefits(wage,benefitbasis,main_kansanelake,tyoelake,employment_state,pt_state,time_in_state,ika,used_unemp_benefit,
-                    children_under3,children_under7,children_under18,puoliso=0,
-                    irtisanottu=irtisanottu,karenssia_jaljella=karenssia_jaljella,alku='')
+                    children_under3,children_under7,children_under18,puoliso=0,irtisanottu=irtisanottu,karenssia_jaljella=karenssia_jaljella,alku='')
                 c3=children_under3
                 c7=children_under7
                 c18=children_under18
@@ -1489,7 +1460,7 @@ class UnemploymentLargeEnv_v8(gym.Env):
 
             if spouse_empstate in [5,6,7]:
                 if employment_state not in [5,6,7] or (employment_state in [5,6,7] and p_g>g):
-                    p2 = self.setup_benefits(puoliso_palkka,puoliso_benefitbasis,spouse_kansanelake,puoliso_tyoelake,spouse_empstate,spouse_pt_state,spouse_time_in_state,ika,puoliso_used_unemp_benefit,
+                    p2 = self.setup_benefits(spouse_wage,puoliso_benefitbasis,spouse_kansanelake,puoliso_tyoelake,spouse_empstate,spouse_pt_state,spouse_time_in_state,ika,puoliso_used_unemp_benefit,
                               children_under3,children_under7,children_under18,puoliso=0,irtisanottu=puoliso_irtisanottu,
                               karenssia_jaljella=puoliso_karenssia_jaljella,alku='')
                     self.setup_children(p2,puoliso,spouse_empstate,-1,children_under3,children_under7,children_under18,children_under18)
@@ -1498,17 +1469,16 @@ class UnemploymentLargeEnv_v8(gym.Env):
                     pc7=children_under7
                     pc18=children_under18
                 else:
-                    p2 = self.setup_benefits(puoliso_palkka,puoliso_benefitbasis,spouse_kansanelake,puoliso_tyoelake,spouse_empstate,spouse_pt_state,spouse_time_in_state,ika,puoliso_used_unemp_benefit,
-                              0,0,0,puoliso=0,irtisanottu=puoliso_irtisanottu,karenssia_jaljella=puoliso_karenssia_jaljella,
-                              alku='',p2=p)
+                    p2 = self.setup_benefits(spouse_wage,puoliso_benefitbasis,spouse_kansanelake,puoliso_tyoelake,spouse_empstate,spouse_pt_state,spouse_time_in_state,ika,puoliso_used_unemp_benefit,
+                              0,0,0,puoliso=0,irtisanottu=puoliso_irtisanottu,karenssia_jaljella=puoliso_karenssia_jaljella,alku='')
                     self.setup_children(p2,puoliso,spouse_empstate,-1,0,0,0,children_under18)
                     self.setup_asumismenot(spouse_empstate,0,-1,0,p2)
                     pc3=0
                     pc7=0
                     pc18=0
-            elif spouse_empstate!=15 and g<p_g and employment_state not in [5,6,7]:
+            elif spouse_empstate!=15 and (g<p_g or employment_state==15) and employment_state not in [5,6,7]:
                 # lapsilisat maksetaan puolisolle
-                p2 = self.setup_benefits(puoliso_palkka,puoliso_benefitbasis,spouse_kansanelake,puoliso_tyoelake,spouse_empstate,spouse_pt_state,spouse_time_in_state,ika,puoliso_used_unemp_benefit,
+                p2 = self.setup_benefits(spouse_wage,puoliso_benefitbasis,spouse_kansanelake,puoliso_tyoelake,spouse_empstate,spouse_pt_state,spouse_time_in_state,ika,puoliso_used_unemp_benefit,
                           children_under3,children_under7,children_under18,puoliso=0,irtisanottu=puoliso_irtisanottu,
                           karenssia_jaljella=puoliso_karenssia_jaljella,alku='')
                 self.setup_children(p2,puoliso,spouse_empstate,-1,children_under3,children_under7,children_under18,children_under18)
@@ -1517,9 +1487,8 @@ class UnemploymentLargeEnv_v8(gym.Env):
                 pc7=children_under7
                 pc18=children_under18
             else:
-                p2 = self.setup_benefits(puoliso_palkka,puoliso_benefitbasis,spouse_kansanelake,puoliso_tyoelake,spouse_empstate,spouse_pt_state,spouse_time_in_state,ika,puoliso_used_unemp_benefit,
-                          0,0,0,puoliso=0,irtisanottu=puoliso_irtisanottu,karenssia_jaljella=puoliso_karenssia_jaljella,
-                          alku='') #,p2=p) # onko p2=p oikein??
+                p2 = self.setup_benefits(spouse_wage,puoliso_benefitbasis,spouse_kansanelake,puoliso_tyoelake,spouse_empstate,spouse_pt_state,spouse_time_in_state,ika,puoliso_used_unemp_benefit,
+                          0,0,0,puoliso=0,irtisanottu=puoliso_irtisanottu,karenssia_jaljella=puoliso_karenssia_jaljella,alku='') 
                 self.setup_children(p2,puoliso,spouse_empstate,-1,0,0,0,children_under18)
                 self.setup_asumismenot(spouse_empstate,0,-1,0,p2)
                 pc3=0
@@ -1529,14 +1498,13 @@ class UnemploymentLargeEnv_v8(gym.Env):
             netto2,benefitq2 = self.ben.laske_tulot_v3(p2,include_takuuelake = self.include_takuuelake,omat='puoliso_',puoliso='omat_',omatalku='',puolisoalku='puoliso_',split_costs=True,add_kansanelake=False,set_equal=False) # switch order
             netto = netto1+netto2
 
+            #if c18>0 or pc18>0: # FIXME
+            #    print(f'ika {ika:.2f} c18 {c18} pc18',pc18,'q1',benefitq1['lapsilisa'],'q2',benefitq2['lapsilisa'])
+
             if self.include_emtr:
                 emtr_tilat=set([0,1,4,5,6,7,10,11,13,14])
                 if employment_state in emtr_tilat:
                     printtaa=True
-                    #if employment_state==0:
-                    #    printtaa=False
-                    #else:
-                    #    printtaa=False
                     e0,e1,w0,w1,ow0,ow1 = self.setup_contrafactual(employment_state,wage,potential_wage,unempwage_basis,kassanjasen,unempwage)
 
                     p0 = self.setup_benefits(w0,ow0,main_kansanelake,tyoelake,e0,pt_state,0,ika,used_unemp_benefit,
@@ -1554,24 +1522,6 @@ class UnemploymentLargeEnv_v8(gym.Env):
 
                     nettox,_,tvax = self.marg.comp_emtr(p0,p1,w1,dt=1200)#,display=printtaa)
                     _,effx,_ = self.marg.comp_emtr(p,p,wage,dt=1200)
-                    # if tvax<1.0:
-                    #     print('omat tvax',employment_state,w0,w1,tvax)
-                    #     self.render()
-                    # if tvax<20 and printtaa:
-                    #     print("\n")
-                    #     _,_,tvax,q0,q1 = self.marg.comp_emtr(p0,p1,w1,dt=1200,full=True,display=printtaa)
-                    #     print('employment_state',employment_state,'wage',wage)
-                    #     print('w0',w0,'e0',e0,'ow0',ow0)
-                    #     print('w1',w1,'e1',e1,'ow1',ow1)
-                    #     print('unempwage_basis',unempwage_basis,'unempwage',unempwage)
-                    #     print('***** q0 q1 vertailu')
-                    #     print('tyotpvraha_netto:',q0['omat_tyotpvraha_netto'],'vs',q1['omat_tyotpvraha_netto'])
-                    #     print('tyotpvraha:',q0['omat_tyotpvraha'],'vs',q1['omat_tyotpvraha'])
-                    #     compare_q_print(q0,q1)
-                    #     print('*****')
-                    #     self.render(render_puoliso=False,render_omat=True)
-                    #     print("\n")
-
                     benefitq1['omat_emtr'] = effx
                     benefitq1['omat_tva'] = tvax
                 else:
@@ -1579,7 +1529,7 @@ class UnemploymentLargeEnv_v8(gym.Env):
                     benefitq1['omat_tva'] = np.nan
 
                 if spouse_empstate in emtr_tilat:
-                    pe0,pe1,pw0,pw1,pow0,pow1 = self.setup_contrafactual(spouse_empstate,puoliso_palkka,potential_spouse_wage,puoliso_unempwage_basis,kassanjasen,puoliso_unempwage)
+                    pe0,pe1,pw0,pw1,pow0,pow1 = self.setup_contrafactual(spouse_empstate,spouse_wage,potential_spouse_wage,puoliso_unempwage_basis,kassanjasen,puoliso_unempwage)
                     pp0 = self.setup_benefits(pw0,pow0,spouse_kansanelake,puoliso_tyoelake,pe0,spouse_pt_state,0,ika,puoliso_used_unemp_benefit,
                               pc3,pc7,pc18,puoliso=0,irtisanottu=puoliso_irtisanottu,karenssia_jaljella=0,alku='')
                     self.setup_children(pp0,0,pe0,spouse_empstate,pc3,pc7,pc18,pc18)
@@ -1594,22 +1544,7 @@ class UnemploymentLargeEnv_v8(gym.Env):
                     self.setup_asumismenot(pe1,0,spouse_empstate,pc18,pp1)
 
                     nettox2,_,tvax2 = self.marg.comp_emtr(pp0,pp1,pw1,dt=1200,alku='')
-                    _,effx2,_ = self.marg.comp_emtr(p2,p2,puoliso_palkka,dt=1200,alku='')
-                    # if tvax2<1.0:
-                    #     print('puoliso tvax',spouse_empstate,pw0,pw1,tvax2)
-                    #     self.render()
-                    # if tvax2<20 and printtaa:
-                    #     nettox2,_,tvax2,q0,q1 = self.marg.comp_emtr(pp0,pp1,pw1,dt=1200,alku='puoliso_',full=True,display=printtaa)
-                    #     print('employment_state',spouse_empstate,'wage',puoliso_palkka)
-                    #     print('w0',w0,'e0',e0,'ow0',ow0)
-                    #     print('w1',w1,'e1',e1,'ow1',ow1)
-                    #     print('unempwage_basis',puoliso_unempwage_basis,'unempwage',puoliso_unempwage)
-                    #     print('***** q0 q1 vertailu')
-                    #     print('tyotpvraha_netto:',q0['puoliso_tyotpvraha_netto'],'vs',q1['puoliso_tyotpvraha_netto'])
-                    #     print('tyotpvraha:',q0['puoliso_tyotpvraha'],'vs',q1['puoliso_tyotpvraha'])
-                    #     compare_q_print(q0,q1)
-                    #     print('*****')
-                    #     print("\n")
+                    _,effx2,_ = self.marg.comp_emtr(p2,p2,spouse_wage,dt=1200,alku='')
 
                     benefitq2['puoliso_emtr'] = effx2
                     benefitq2['puoliso_tva'] = tvax2
@@ -1628,7 +1563,7 @@ class UnemploymentLargeEnv_v8(gym.Env):
             if netto1<1 and debug:
                 print(f'netto<1, omat tila {employment_state}',wage,benefitbasis,main_kansanelake,tyoelake,time_in_state,ika,children_under3,children_under7,children_under18)
             if netto2<1 and puoliso>0 and debug:
-                print(f'netto<1, spouse {spouse_empstate}',puoliso_palkka,puoliso_benefitbasis,spouse_kansanelake,puoliso_tyoelake,spouse_time_in_state,ika)
+                print(f'netto<1, spouse {spouse_empstate}',spouse_wage,puoliso_benefitbasis,spouse_kansanelake,puoliso_tyoelake,spouse_time_in_state,ika)
 
             if (benefitq1['omat_netto']<1e-6 or benefitq2['puoliso_netto']<1e-6) and debug:
                 print(f'omat netto {employment_state}: ',benefitq1['omat_netto'])
