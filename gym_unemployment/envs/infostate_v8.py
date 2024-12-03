@@ -9,7 +9,7 @@ from . rates import Rates
 import random
 
 class Infostate_v8(gym.Env):
-    def __init__(self,lapsia: int=0,lasten_iat=np.zeros(15),lapsia_paivakodissa: int=0,age: int=18,spouse:bool =False): -> None:
+    def __init__(self,lapsia: int=0,lasten_iat=np.zeros(15),lapsia_paivakodissa: int=0,age: int=18,spouse:bool =False) -> None:
         '''
         Alustaa infostate-dictorionaryn
         Siihen talletetaan tieto aiemmista tiloista, joiden avulla lasketaan statistiikkoja

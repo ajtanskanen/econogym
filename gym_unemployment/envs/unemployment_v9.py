@@ -6565,7 +6565,7 @@ class UnemploymentEnv_v9(gym.Env):
         '''
         returns the version of life-cycle model's episodestate used
         '''
-        return 8
+        return 9
 
     def get_mortstate(self) -> int:
         return 15
