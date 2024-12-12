@@ -5177,6 +5177,8 @@ class UnemploymentEnv_v9(gym.Env):
                         self.ben = fin_benefits.BasicIncomeBenefits
                     elif value=='BenefitsYleistuki':
                         self.ben = fin_benefits.BenefitsYleistuki
+                        self.suojasaanto_toe58 = False
+                        self.ansiopvraha_toe = 1.0
                     else:
                         print('ERROR: unknown ben')
             if key=='step':
