@@ -5175,7 +5175,7 @@ class UnemploymentEnv_v9(gym.Env):
                         self.custom_ben=fin_benefits.Benefits
                     elif value=='basicIncomeBenefits':
                         self.custom_ben = fin_benefits.BasicIncomeBenefits
-                    elif value=='BenefitsYleistuki':
+                    elif value=='benefitsYleistuki':
                         self.custom_ben = fin_benefits.BenefitsYleistuki
                         self.suojasaanto_toe58 = False
                         self.ansiopvraha_toe = 1.0
