@@ -4827,7 +4827,7 @@ class UnemploymentEnv_v9(gym.Env):
             benq[alku+'alv'] *= p1
             benq[alku+'valtionvero'] *= p1
             benq[alku+'kunnallisvero'] *= p1
-            benq[alku+'asumistuki'] *= p1
+            benq[alku+'asumistuki'] *= p1   # eläkeläisen asumistuki puuttuu??
             benq[alku+'tyotvakmaksu'] *= p1 # tätä ei oikeastaan tarvita, mutta ei haittaa
             benq[alku+'sairausvakuutusmaksu'] *= p1 # sairaanhoitomaksu maksetaan myös eläketulosta
             benq[alku+'elake_maksussa'] *= p1
@@ -5163,15 +5163,17 @@ class UnemploymentEnv_v9(gym.Env):
             if key=='ben':
                 if value is not None:
                     if value=='benefitsHO':
-                        self.custom_ben=fin_benefits.BenefitsHO
+                        self.custom_ben = fin_benefits.BenefitsHO
                         self.suojasaanto_toe58 = False
                         self.ansiopvraha_toe = 1.0
                     elif value=='benefits':
                         self.custom_ben=fin_benefits.Benefits
                     elif value=='basicIncomeBenefits':
-                        self.ben = fin_benefits.BasicIncomeBenefits
-                    elif value=='BenefitsYleistuki':
-                        self.ben = fin_benefits.BenefitsYleistuki
+                        self.custom_ben = fin_benefits.BasicIncomeBenefits
+                    elif value=='benefitsYleistuki':
+                        self.custom_ben = fin_benefits.BenefitsYleistuki
+                        self.suojasaanto_toe58 = False
+                        self.ansiopvraha_toe = 1.0
                     else:
                         print('ERROR: unknown ben')
             if key=='step':
