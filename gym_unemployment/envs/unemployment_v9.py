@@ -266,10 +266,6 @@ class UnemploymentEnv_v9(gym.Env):
         self.viewer = None
         self.state = None
 
-        # arvot tammikuun lukuja inflaation vuosimuutoksessa, https://pxweb2.stat.fi/PxWeb/pxweb/fi/StatFin/StatFin__khi/statfin_khi_pxt_122p.px/table/tableViewLayout1/
-        #inflation_raw=np.array([1.0,1.011,1.010,1.009,1.044,1.01,1.01]) # 2018 2019 2020 2021 2022 2023 2024
-        #self.inflation=np.cumprod(inflation_raw)
-
         self.steps_beyond_done = None
 
         # normitetaan työttämyysjaksot askelvälin monikerroiksi
@@ -1800,28 +1796,28 @@ class UnemploymentEnv_v9(gym.Env):
             initial_weight[3,:] = [w1*4/5,w1*1/5,0.44*ow1,0.56*ow1,wd1,uw1,1-ow1-uw1-w1-wd1]
             initial_weight[4,:] = [w2*4/5,w2*1/5,0.44*ow2,0.56*ow2,wd2,uw2,1-ow2-uw2-w2-wd2]
             initial_weight[5,:] = [w3*4/5,w3*1/5,0.44*ow3,0.56*ow3,wd3,uw3,1-ow3-uw3-w3-wd3]
-        elif self.year==2023: # PÄIVITÄ
+        elif self.year==2023: # 31.1.2025
             # tilat [13,0,1,10,3,11,12] siis [tmtuki,ansiosidonnainen,kokoaikatyö,osaaikatyö,työvoimanulkopuolella,opiskelija]
             # lasketaan painotetut kertoimet eri tulotasoille
             # työttömät miehet, osuus väestästä
-            m_tyoton=0.018869
+            m_tyoton=0.03070
             m1,m2,m3 = self.rates.get_wees(0,1.27,1.0,m_tyoton)
             # työttömät naiset, osuus väestästä
             w_tyoton=0.0160433
             w1,w2,w3 = self.rates.get_wees(1,1.2,1.0,w_tyoton)
 
             # työlliset, miehet
-            om= 0.28022   # miehet töissä
+            om= 0.26026   # miehet töissä
             om1,om2,om3 = self.rates.get_wees(0,1.25,1.0,om)
             # työlliset, naiset
-            ow=0.3858752
+            ow=0.364
             ow1,ow2,ow3 = self.rates.get_wees(1,1.2,1.0,ow)
 
             # työvoiman ulkopuolella, miehet
-            m_tyovoimanulkop=0.034
+            m_tyovoimanulkop=0.038
             um1,um2,um3 = self.rates.get_wees(0,1.3,1.0,m_tyovoimanulkop)
             # työvoiman ulkopuolella, naiset
-            w_tyovoimanulkop= 0.0290785
+            w_tyovoimanulkop= 0.0285
             uw1,uw2,uw3 = self.rates.get_wees(1,1.2,1.0,w_tyovoimanulkop)
 
             # työkyvyttömät, miehet
@@ -1843,24 +1839,24 @@ class UnemploymentEnv_v9(gym.Env):
             # lasketaan painotetut kertoimet eri tulotasoille
             # työttömät miehet, osuus väestästä
             # työttömät miehet, osuus väestästä
-            m_tyoton=0.018869
+            m_tyoton=0.03070
             m1,m2,m3 = self.rates.get_wees(0,1.27,1.0,m_tyoton)
             # työttömät naiset, osuus väestästä
-            w_tyoton=0.0160433
+            w_tyoton=0.0194
             w1,w2,w3 = self.rates.get_wees(1,1.2,1.0,w_tyoton)
 
             # työlliset, miehet
-            om= 0.28022   # miehet töissä
+            om= 0.26026   # miehet töissä
             om1,om2,om3 = self.rates.get_wees(0,1.25,1.0,om)
             # työlliset, naiset
-            ow=0.3858752
+            ow=0.364
             ow1,ow2,ow3 = self.rates.get_wees(1,1.2,1.0,ow)
 
             # työvoiman ulkopuolella, miehet
-            m_tyovoimanulkop=0.034
+            m_tyovoimanulkop=0.038
             um1,um2,um3 = self.rates.get_wees(0,1.3,1.0,m_tyovoimanulkop)
             # työvoiman ulkopuolella, naiset
-            w_tyovoimanulkop= 0.0290785
+            w_tyovoimanulkop= 0.0285
             uw1,uw2,uw3 = self.rates.get_wees(1,1.2,1.0,w_tyovoimanulkop)
 
             # työkyvyttömät, miehet
@@ -1881,24 +1877,24 @@ class UnemploymentEnv_v9(gym.Env):
             # tilat [13,0,1,10,3,11,12] siis [tmtuki,ansiosidonnainen,kokoaikatyö,osaaikatyö,työvoimanulkopuolella,opiskelija]
             # lasketaan painotetut kertoimet eri tulotasoille
             # työttömät miehet, osuus väestästä
-            m_tyoton=0.018869
+            m_tyoton=0.03070
             m1,m2,m3 = self.rates.get_wees(0,1.27,1.0,m_tyoton)
             # työttömät naiset, osuus väestästä
-            w_tyoton=0.0160433
+            w_tyoton=0.0194
             w1,w2,w3 = self.rates.get_wees(1,1.2,1.0,w_tyoton)
 
             # työlliset, miehet
-            om= 0.28022   # miehet töissä
+            om= 0.26026   # miehet töissä
             om1,om2,om3 = self.rates.get_wees(0,1.25,1.0,om)
             # työlliset, naiset
-            ow=0.3858752
+            ow=0.364
             ow1,ow2,ow3 = self.rates.get_wees(1,1.2,1.0,ow)
 
             # työvoiman ulkopuolella, miehet
-            m_tyovoimanulkop=0.034
+            m_tyovoimanulkop=0.038
             um1,um2,um3 = self.rates.get_wees(0,1.3,1.0,m_tyovoimanulkop)
             # työvoiman ulkopuolella, naiset
-            w_tyovoimanulkop= 0.0290785
+            w_tyovoimanulkop= 0.0285
             uw1,uw2,uw3 = self.rates.get_wees(1,1.2,1.0,w_tyovoimanulkop)
 
             # työkyvyttömät, miehet
