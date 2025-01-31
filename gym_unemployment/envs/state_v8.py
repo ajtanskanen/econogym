@@ -275,7 +275,7 @@ class Statevector_v8():
         d[states5+42]='puoliso_time_in_state'
         d[states5+43]='puoliso_pinkslip'
         d[states5+44]='puoliso_ove_paid'
-        d[states5+45]='kansanelake'
+        d[states5+45]='puoliso_kansanelake'
         d[states5+46]='puoliso_kansanelake'
         d[states5+47]='main_paid_wage'
         d[states5+48]='spouse_paid_wage'

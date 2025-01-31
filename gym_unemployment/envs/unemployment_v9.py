@@ -944,13 +944,15 @@ class UnemploymentEnv_v9(gym.Env):
                 p['lapsia_paivahoidossa'] = 0
                 p['lapsia_kotihoidontuella'] = children_under7
 
-            if employment_state==10 or spouse_empstate==10:
+            if employment_state==10:
                 p['osaaikainen_paivahoito'] = 1
             else:
                 p['osaaikainen_paivahoito'] = 0
 
             if children_under18>0:
                 p['saa_elatustukea'] = 1 # vain yksinhuoltaja
+            else:
+                p['saa_elatustukea'] = 0
 
     def initial_benefits_p(self):
         p={}
@@ -1420,39 +1422,34 @@ class UnemploymentEnv_v9(gym.Env):
         else: # ei pariskunta
             if employment_state in [5,6,7]: # vanhempainvapaalla
                 if spouse_empstate not in [5,6,7] or (spouse_empstate in [5,6,7] and g>p_g):
-                    p = self.setup_benefits(wage,benefitbasis,main_kansanelake,tyoelake,employment_state,pt_state,time_in_state,ika,used_unemp_benefit,
-                        children_under3,children_under7,children_under18,puoliso=0,
-                        irtisanottu=irtisanottu,karenssia_jaljella=karenssia_jaljella,alku='')
                     c3=children_under3
                     c7=children_under7
                     c18=children_under18
-                    self.setup_children(p,puoliso,employment_state,-1,children_under3,children_under7,children_under18,children_under18)
+                    p = self.setup_benefits(wage,benefitbasis,main_kansanelake,tyoelake,employment_state,pt_state,time_in_state,ika,used_unemp_benefit,
+                        c3,c7,c18,puoliso=0,irtisanottu=irtisanottu,karenssia_jaljella=karenssia_jaljella,alku='')
+                    self.setup_children(p,puoliso,employment_state,-1,c3,c7,c18,children_under18)
                     self.setup_asumismenot(employment_state,0,-1,children_under18,p)
                 else: # molemmat ei vanhempainvapaalla yhtä aikaa niin että saavat lapsilisät
                     # lapset 0 tässä, yksinkertaistus
                     p = self.setup_benefits(wage,benefitbasis,main_kansanelake,tyoelake,employment_state,pt_state,time_in_state,ika,used_unemp_benefit,
                         0,0,0,puoliso=0,irtisanottu=irtisanottu,karenssia_jaljella=karenssia_jaljella,alku='')
-                    c3=0
-                    c7=0
-                    c18=0
-                    self.setup_children(p,puoliso,employment_state,spouse_empstate,0,0,0,children_under18)
+                    c3,c7,c18=0,0,0
+                    self.setup_children(p,puoliso,employment_state,spouse_empstate,c3,c7,c18,children_under18)
                     self.setup_asumismenot(employment_state,0,-1,0,p)
             elif employment_state!=15 and (g>p_g or spouse_empstate==15) and spouse_empstate not in [5,6,7]:
                 # lapset itsellä, ei puolisolla. tässä epäsymmetria
-                p = self.setup_benefits(wage,benefitbasis,main_kansanelake,tyoelake,employment_state,pt_state,time_in_state,ika,used_unemp_benefit,
-                    children_under3,children_under7,children_under18,puoliso=0,irtisanottu=irtisanottu,karenssia_jaljella=karenssia_jaljella,alku='')
                 c3=children_under3
                 c7=children_under7
                 c18=children_under18
+                p = self.setup_benefits(wage,benefitbasis,main_kansanelake,tyoelake,employment_state,pt_state,time_in_state,ika,used_unemp_benefit,
+                    c3,c7,c18,puoliso=0,irtisanottu=irtisanottu,karenssia_jaljella=karenssia_jaljella,alku='')
                 self.setup_children(p,puoliso,employment_state,-1,children_under3,children_under7,children_under18,children_under18)
                 self.setup_asumismenot(employment_state,0,-1,children_under18,p)
             else:
                 # lapset 0 tässä, yksinkertaistus
                 p = self.setup_benefits(wage,benefitbasis,main_kansanelake,tyoelake,employment_state,pt_state,time_in_state,ika,used_unemp_benefit,
                     0,0,0,puoliso=0,irtisanottu=irtisanottu,karenssia_jaljella=karenssia_jaljella,alku='')
-                c3=0
-                c7=0
-                c18=0
+                c3,c7,c18=0,0,0
                 self.setup_children(p,puoliso,employment_state,spouse_empstate,0,0,0,children_under18)
                 self.setup_asumismenot(employment_state,0,-1,0,p)
 
@@ -1460,29 +1457,29 @@ class UnemploymentEnv_v9(gym.Env):
 
             if spouse_empstate in [5,6,7]:
                 if employment_state not in [5,6,7] or (employment_state in [5,6,7] and p_g>g):
-                    p2 = self.setup_benefits(spouse_wage,puoliso_benefitbasis,spouse_kansanelake,puoliso_tyoelake,spouse_empstate,spouse_pt_state,spouse_time_in_state,ika,puoliso_used_unemp_benefit,
-                              children_under3,children_under7,children_under18,puoliso=0,irtisanottu=puoliso_irtisanottu,
-                              karenssia_jaljella=puoliso_karenssia_jaljella,alku='')
-                    self.setup_children(p2,puoliso,spouse_empstate,-1,children_under3,children_under7,children_under18,children_under18)
-                    self.setup_asumismenot(spouse_empstate,0,-1,children_under18,p2)
                     pc3=children_under3
                     pc7=children_under7
                     pc18=children_under18
+                    p2 = self.setup_benefits(spouse_wage,puoliso_benefitbasis,spouse_kansanelake,puoliso_tyoelake,spouse_empstate,spouse_pt_state,spouse_time_in_state,ika,puoliso_used_unemp_benefit,
+                              children_under3,children_under7,children_under18,puoliso=0,irtisanottu=puoliso_irtisanottu,
+                              karenssia_jaljella=puoliso_karenssia_jaljella,alku='')
+                    self.setup_children(p2,puoliso,spouse_empstate,-1,pc3,pc7,pc18,pc18)
+                    self.setup_asumismenot(spouse_empstate,0,-1,pc18,p2)
                 else:
                     p2 = self.setup_benefits(spouse_wage,puoliso_benefitbasis,spouse_kansanelake,puoliso_tyoelake,spouse_empstate,spouse_pt_state,spouse_time_in_state,ika,puoliso_used_unemp_benefit,
                               0,0,0,puoliso=0,irtisanottu=puoliso_irtisanottu,karenssia_jaljella=puoliso_karenssia_jaljella,alku='')
                     self.setup_children(p2,puoliso,spouse_empstate,-1,0,0,0,children_under18)
                     self.setup_asumismenot(spouse_empstate,0,-1,0,p2)
-                    pc3=0
-                    pc7=0
-                    pc18=0
+                    pc3,pc7,pc18 = 0,0,0
             elif spouse_empstate!=15 and (g<p_g or employment_state==15) and employment_state not in [5,6,7]:
                 # lapsilisat maksetaan puolisolle
+                pc3=children_under3
+                pc7=children_under7
+                pc18=children_under18
                 p2 = self.setup_benefits(spouse_wage,puoliso_benefitbasis,spouse_kansanelake,puoliso_tyoelake,spouse_empstate,spouse_pt_state,spouse_time_in_state,ika,puoliso_used_unemp_benefit,
-                          children_under3,children_under7,children_under18,puoliso=0,irtisanottu=puoliso_irtisanottu,
-                          karenssia_jaljella=puoliso_karenssia_jaljella,alku='')
-                self.setup_children(p2,puoliso,spouse_empstate,-1,children_under3,children_under7,children_under18,children_under18)
-                self.setup_asumismenot(spouse_empstate,0,-1,children_under18,p2)
+                          pc3,pc7,pc18,puoliso=0,irtisanottu=puoliso_irtisanottu,karenssia_jaljella=puoliso_karenssia_jaljella,alku='')
+                self.setup_children(p2,puoliso,spouse_empstate,-1,pc3,pc7,pc18,pc18)
+                self.setup_asumismenot(spouse_empstate,0,-1,pc18,p2)
                 pc3=children_under3
                 pc7=children_under7
                 pc18=children_under18
@@ -1491,9 +1488,7 @@ class UnemploymentEnv_v9(gym.Env):
                           0,0,0,puoliso=0,irtisanottu=puoliso_irtisanottu,karenssia_jaljella=puoliso_karenssia_jaljella,alku='') 
                 self.setup_children(p2,puoliso,spouse_empstate,-1,0,0,0,children_under18)
                 self.setup_asumismenot(spouse_empstate,0,-1,0,p2)
-                pc3=0
-                pc7=0
-                pc18=0
+                pc3,pc7,pc18 = 0,0,0
 
             netto2,benefitq2 = self.ben.laske_tulot_v3(p2,include_takuuelake = self.include_takuuelake,omat='puoliso_',puoliso='omat_',omatalku='',puolisoalku='puoliso_',split_costs=True,add_kansanelake=False,set_equal=False) # switch order
             netto = netto1+netto2
