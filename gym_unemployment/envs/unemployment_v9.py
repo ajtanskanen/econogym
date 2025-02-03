@@ -606,13 +606,14 @@ class UnemploymentEnv_v9(gym.Env):
         #    kassanjasenyys_rate=kassanjasenyys_rate,include_halftoe = self.include_halftoe,min_toewage = self.min_toewage)
 
         #self.palkat_ika_miehet,self.palkat_ika_naiset,self.g_r = self.rates.setup_salaries_v4(self.min_retirementage)
-        self.palkat_ika_miehet,self.palkat_ika_naiset,self.g_r = self.rates.setup_salaries_v4(self.min_retirementage)
-        self.wages_spouse=Wages_v1(year = self.year,silent = self.silent,max_age = self.max_age,
+        self.wages_spouse = Wages_v1(year = self.year,silent = self.silent,max_age = self.max_age,
             n_groups = self.n_groups,timestep = self.timestep,inv_timestep = self.inv_timestep,
             min_retirementage = self.min_retirementage,min_salary = self.min_salary, weights = self.group_weights)
-        self.wages_main=Wages_v1(year = self.year,silent = self.silent,max_age = self.max_age,
+        self.wages_main = Wages_v1(year = self.year,silent = self.silent,max_age = self.max_age,
             n_groups = self.n_groups,timestep = self.timestep,inv_timestep = self.inv_timestep,
             min_retirementage = self.min_retirementage,min_salary = self.min_salary, weights = self.group_weights)
+
+        #self.palkat_ika_miehet,self.palkat_ika_naiset,_,_ = self.wages_main.get_salaries()
 
         self.get_wage = self.wages_main.get_wage
         self.get_spousewage = self.wages_spouse.get_wage
