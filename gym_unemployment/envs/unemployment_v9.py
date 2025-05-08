@@ -477,30 +477,34 @@ class UnemploymentEnv_v9(gym.Env):
     def set_annual_params(self,year: int) -> None:
         # arvot MAALISKUUN lukuja kuluttajahintaindeksin vuosimuutoksessa, https://stat.fi/tilasto/khi
         # nämä matchataan ansiotasoindeksin muutokseen
-        inflation_raw = np.array([1.0, # 2018
-                                  1.011206, # 1.011399, # 2019
-                                  1.006027, # 1.00381, # 2020
-                                  1.013334622, # 1.020716, # 2021
-                                  1.057976542, # 1.071655, # 2022
-                                  1.079315007, # 1.043444, # 2023
-                                  1.021795407, # 1.014, # 2024
-                                  1.005312194, # 1.006896, # 2025
-                                  1.020, # 2026
-                                  1.020]) # 2027
+        #inflation_raw = np.array([1.0, # 2018
+        #                          1.010248, # 1.011206, # 1.011399, # 2019
+        #                          1.002917, # 1.006027, # 1.00381, # 2020
+        #                          1.021936, # 1.013334622, # 1.020716, # 2021
+        #                          1.071092, # 1.057976542, # 1.071655, # 2022
+        #                          1.062916, # 1.079315007, # 1.043444, # 2023
+        #                          1.015725, # 1.021795407, # 1.014, # 2024
+        #                          1.005592, # 1.005312194, # 1.006896, # 2025
+        #                          1.015, # 2026
+        #                          1.020]) # 2027
+
+        inflation_raw = self.rates.get_inflation()
         self.inflation = np.cumprod(inflation_raw)
         self.inflationfactor = self.inflation[year-2018]
 
         # arvot ansiotasoindeksi (y+1)Q1 vs yQ1 tasossa
-        salaryinflation_raw=np.array([1.0, # 2018
-                                      1.021243, # 2019
-                                      1.01987, # 2020
-                                      1.021613, # 2021
-                                      1.022646, # 2022
-                                      1.030886, # 2023
-                                      1.039005, # 2024
-                                      1.032, # 2025
-                                      1.032, # 2026
-                                      1.032]) # 2027
+        #salaryinflation_raw=np.array([1.0, # 2018
+        #                              1.021210603, # 1.021243, # 2019
+        #                              1.019460017, # 1.01987, # 2020
+        #                              1.024215574, # 1.021613, # 2021
+        #                              1.024079442, # 1.022646, # 2022
+        #                              1.042374951, # 1.030886, # 2023
+        #                              1.030721699, # 1.039005, # 2024
+        #                              1.032, # 2025
+        #                              1.038, # 2026
+        #                              1.030]) # 2027
+
+        salaryinflation_raw = self.rates.get_wageinflation()
         self.salaryinflation=np.cumprod(salaryinflation_raw)
         self.salaryinflationfactor = self.salaryinflation[year-2018]
         if year<2023:
@@ -592,12 +596,13 @@ class UnemploymentEnv_v9(gym.Env):
 
     def set_year(self,year: int) -> None:
         self.year=year
+        self.rates=Rates(year = self.year,silent = self.silent,max_age = self.max_age,max_retage=self.max_retirementage,
+            n_groups = self.n_groups,timestep = self.timestep,inv_timestep = self.inv_timestep,n_empl = self.n_empl)
+
         self.set_annual_params(year)
         self.set_retirementage(year)
         self.ben.set_year(year)
         self.marg=fin_benefits.Marginals(self.ben,year = self.year)
-        self.rates=Rates(year = self.year,silent = self.silent,max_age = self.max_age,max_retage=self.max_retirementage,
-            n_groups = self.n_groups,timestep = self.timestep,inv_timestep = self.inv_timestep,n_empl = self.n_empl)
 
         self.group_weights = self.rates.get_group_weights()
         #print('self.group_weights',self.group_weights)
@@ -1876,6 +1881,44 @@ class UnemploymentEnv_v9(gym.Env):
             initial_weight[4,:] = [w2*4/5,w2*1/5,0.44*ow2,0.56*ow2,wd2,uw2,1-ow2-uw2-w2-wd2]
             initial_weight[5,:] = [w3*4/5,w3*1/5,0.44*ow3,0.56*ow3,wd3,uw3,1-ow3-uw3-w3-wd3]
         elif self.year==2025: # PÄIVITÄ
+            # tilat [13,0,1,10,3,11,12] siis [tmtuki,ansiosidonnainen,kokoaikatyö,osaaikatyö,työvoimanulkopuolella,opiskelija]
+            # lasketaan painotetut kertoimet eri tulotasoille
+            # työttömät miehet, osuus väestästä
+            m_tyoton=0.03070
+            m1,m2,m3 = self.rates.get_wees(0,1.27,1.0,m_tyoton)
+            # työttömät naiset, osuus väestästä
+            w_tyoton=0.0194
+            w1,w2,w3 = self.rates.get_wees(1,1.2,1.0,w_tyoton)
+
+            # työlliset, miehet
+            om= 0.26026   # miehet töissä
+            om1,om2,om3 = self.rates.get_wees(0,1.25,1.0,om)
+            # työlliset, naiset
+            ow=0.364
+            ow1,ow2,ow3 = self.rates.get_wees(1,1.2,1.0,ow)
+
+            # työvoiman ulkopuolella, miehet
+            m_tyovoimanulkop=0.038
+            um1,um2,um3 = self.rates.get_wees(0,1.3,1.0,m_tyovoimanulkop)
+            # työvoiman ulkopuolella, naiset
+            w_tyovoimanulkop= 0.0285
+            uw1,uw2,uw3 = self.rates.get_wees(1,1.2,1.0,w_tyovoimanulkop)
+
+            # työkyvyttömät, miehet
+            md= 0.009292
+            md1,md2,md3 = self.rates.get_wees(0,1.3,1.0,md)
+            # työkyvyttömät, naiset
+            wd=0.0057823
+            wd1,wd2,wd3 = self.rates.get_wees(1,1.2,1.0,wd)
+
+            # 13,0,1,10,3,11,12
+            initial_weight[0,:] = [m1*4/5,m1*1/5,0.68*om1,0.32*om1,md1,um1,1-om1-um1-m1-md1]
+            initial_weight[1,:] = [m2*4/5,m2*1/5,0.68*om2,0.32*om2,md2,um2,1-om2-um2-m2-md2]
+            initial_weight[2,:] = [m3*4/5,m3*1/5,0.68*om3,0.32*om3,md3,um3,1-om3-um3-m3-md3]
+            initial_weight[3,:] = [w1*4/5,w1*1/5,0.44*ow1,0.56*ow1,wd1,uw1,1-ow1-uw1-w1-wd1]
+            initial_weight[4,:] = [w2*4/5,w2*1/5,0.44*ow2,0.56*ow2,wd2,uw2,1-ow2-uw2-w2-wd2]
+            initial_weight[5,:] = [w3*4/5,w3*1/5,0.44*ow3,0.56*ow3,wd3,uw3,1-ow3-uw3-w3-wd3]
+        elif self.year==2026: # PÄIVITÄ
             # tilat [13,0,1,10,3,11,12] siis [tmtuki,ansiosidonnainen,kokoaikatyö,osaaikatyö,työvoimanulkopuolella,opiskelija]
             # lasketaan painotetut kertoimet eri tulotasoille
             # työttömät miehet, osuus väestästä
@@ -5162,6 +5205,10 @@ class UnemploymentEnv_v9(gym.Env):
                 if value is not None:
                     if value=='benefitsHO':
                         self.custom_ben = fin_benefits.BenefitsHO
+                        self.suojasaanto_toe58 = False
+                        self.ansiopvraha_toe = 1.0
+                    elif value=='BenefitsPuoliväliriihi2025':
+                        self.custom_ben = fin_benefits.BenefitsPuoliväliriihi2025
                         self.suojasaanto_toe58 = False
                         self.ansiopvraha_toe = 1.0
                     elif value=='benefits':
