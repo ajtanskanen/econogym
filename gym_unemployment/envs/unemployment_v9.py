@@ -675,7 +675,7 @@ class UnemploymentEnv_v9(gym.Env):
         self.disability_intensity,self.svpaivaraha_disabilityrate,self.svpaivaraha_short3m = self.rates.get_eff_disab_rate_v8()
         #self.pinkslip_intensity = self.rates.get_pinkslip_rate()*self.timestep
         self.pinkslip_intensity = self.rates.get_pinkslip_rate_v8()*self.timestep
-        self.birth_intensity = self.rates.get_birth_rate_v8(symmetric=False)
+        self.birth_intensity = self.rates.get_birth_rate_v9(symmetric=False)
         self.mort_intensity = self.rates.get_mort_rate_v8(self.year) #get_mort_rate()
         self.student_inrate,self.student_outrate = self.rates.get_student_rate_v8() # myös armeijassa olevat tässä
         self.outsider_inrate,self.outsider_outrate = self.rates.get_outsider_rate_v8(self.max_retirementage)
