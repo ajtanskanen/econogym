@@ -21,7 +21,10 @@
     v7 adds time until disability, time until marriage/divorce, time until having a child as a state variable
     - this should improve fit
     v8 revised fit
-    v9 alimony and child support to be fixed
+    v9 
+    - alimony slightly improved
+    - child support fixed
+    - refitted reemp probs + career impact
 
     fully random events still include:
     - next salary
@@ -33,7 +36,7 @@
     - more flexible groups available
 
     FIXME:
-    - yksinhuoltaja voi olla vain nainen? nyt molemmat eronneet vanhemmat yksinhuoltajia
+    - lapsia syntyy samallalailla kaikille, pitäisi painottaa jo lapsia saaneita perheitä?
 
 """
 
@@ -625,7 +628,7 @@ class UnemploymentEnv_v9(gym.Env):
         self.get_spousewage = self.wages_spouse.get_wage
 
         # reemployment probability
-        prob_ft_3m,prob_pt_3m,prob_3m_oa,parttime_fullemp_prob_3m,fulltime_pt_prob_3m = self.rates.get_reemp_prob_v8()
+        prob_ft_3m,prob_pt_3m,prob_3m_oa,parttime_fullemp_prob_3m,fulltime_pt_prob_3m = self.rates.get_reemp_prob_v9()
         #prob_1y=1-(1-prob_ft_3m)**(1./0.25)
         self.unemp_reemp_ft_prob=prob_ft_3m #1-(1-prob_1y)**self.timestep # kolmessa kuukaudessa
         self.student_reemp_ft_prob=prob_ft_3m
@@ -672,44 +675,18 @@ class UnemploymentEnv_v9(gym.Env):
         else:
             print('unknown year',self.year)
 
-        self.disability_intensity,self.svpaivaraha_disabilityrate,self.svpaivaraha_short3m = self.rates.get_eff_disab_rate_v8()
+        self.disability_intensity,self.svpaivaraha_disabilityrate,self.svpaivaraha_short3m = self.rates.get_eff_disab_rate_v9()
         #self.pinkslip_intensity = self.rates.get_pinkslip_rate()*self.timestep
         self.pinkslip_intensity = self.rates.get_pinkslip_rate_v8()*self.timestep
         self.birth_intensity = self.rates.get_birth_rate_v9(symmetric=False)
         self.mort_intensity = self.rates.get_mort_rate_v8(self.year) #get_mort_rate()
-        self.student_inrate,self.student_outrate = self.rates.get_student_rate_v8() # myös armeijassa olevat tässä
-        self.outsider_inrate,self.outsider_outrate = self.rates.get_outsider_rate_v8(self.max_retirementage)
+        self.student_inrate,self.student_outrate = self.rates.get_student_rate_v9() # myös armeijassa olevat tässä
+        self.outsider_inrate,self.outsider_outrate = self.rates.get_outsider_rate_v9(self.max_retirementage)
         self.divorce_rate = self.rates.get_divorce_rate()
         self.marriage_rate, self.marriage_matrix = self.rates.get_marriage_rate()
 
         self.npv_pension,self.npv_gpension = self.comp_npv()
-        self.initial_weights = self.get_initial_weights()
-
-    def comp_npv_v5(self):
-        '''
-        lasketaan montako timestep:iä (diskontattuna) max_age:n jälkeen henkilä on vanhuuseläkkeellä
-        hyvin yksinkertainen toteutus. Tulos on odotettu lukumäärä timestep:jä
-
-        npv <- diskontattu
-        npv0 <- ei ole diskontattu
-        '''
-        npv0=np.zeros(self.n_groups)
-        npv_pension=np.zeros(self.n_groups)
-
-        for g in range(self.n_groups):
-            cpsum0=1.0
-            cpsum_gpension=1.0
-            for x in np.arange(100,self.max_age,-self.timestep):
-                m=self.mort_intensity[int(np.floor(x)),g]
-                cpsum0=m*1+(1-m)*(1+cpsum0) # no discount
-                cpsum_gpension=m*1+(1-m)*(1+cpsum_gpension*self.gamma*self.elakeindeksi)  # gamma + pension indexing discount
-            npv0[g]=cpsum0
-            npv_gpension[g]=cpsum_gpension
-
-        if self.plotdebug:
-            print('npv:',npv)
-
-        return npv0,npv_gpension
+        self.initial_weights = self.rates.get_initial_weights_v9()
 
     def comp_npv(self):
         '''
@@ -1598,374 +1575,6 @@ class UnemploymentEnv_v9(gym.Env):
             random.seed(init_seed)
             print('init_seed',init_seed)
 
-    def get_initial_weights(self):
-        '''
-        Alkuarvot tilalle 18-vuotiaana
-        '''
-
-        initial_weight=np.zeros((6,7))
-        if self.year==2018:
-            # tilat [13,0,1,10,3,11,12] siis [tmtuki,ansiosidonnainen,kokoaikatyö,osaaikatyö,työvoimanulkopuolella,opiskelija]
-            # lasketaan painotetut kertoimet eri tulotasoille
-
-            # työttömät miehet, osuus väestästä
-            m_tyoton=0.019
-            m1,m2,m3 = self.rates.get_wees(0,1.27,1.0,m_tyoton)
-            # työttömät naiset, osuus väestästä
-            w_tyoton=0.01609
-            w1,w2,w3 = self.rates.get_wees(1,1.2,1.0,w_tyoton)
-
-            # työlliset, miehet
-            om=0.2565  # miehet töissä + opiskelija
-            om1,om2,om3 = self.rates.get_wees(0,1.25,1.0,om)
-            # työlliset, naiset
-            ow=0.3443
-            ow1,ow2,ow3 = self.rates.get_wees(1,1.2,1.0,ow)
-
-            # työvoiman ulkopuolella, miehet
-            m_tyovoimanulkop=0.029
-            um1,um2,um3 = self.rates.get_wees(0,1.3,1.0,m_tyovoimanulkop)
-            # työvoiman ulkopuolella, naiset
-            w_tyovoimanulkop=0.025
-            uw1,uw2,uw3 = self.rates.get_wees(1,1.2,1.0,w_tyovoimanulkop)
-
-            # työkyvyttömät, miehet
-            md=0.008
-            md1,md2,md3 = self.rates.get_wees(0,1.3,1.0,md)
-            # työkyvyttömät, naiset
-            wd=0.00730
-            wd1,wd2,wd3 = self.rates.get_wees(1,1.2,1.0,wd)
-
-            # opiskelijat+työlliset+muut työvoiman ulkop+työttömät, miehet
-            ym=0.686+om+m_tyovoimanulkop+m_tyoton # miehet töissä + opiskelija
-            # opiskelijat+työlliset+muut työvoiman ulkop+työttömät, naiset
-            yw=0.6076+ow+w_tyovoimanulkop+w_tyoton
-
-            # 13,0,1,10,3,11,12
-            initial_weight[0,:] = [m1*4/5,m1*1/5,0.68*om1,0.32*om1,md1,um1,1-om1-um1-m1-md1]
-            initial_weight[1,:] = [m2*4/5,m2*1/5,0.68*om2,0.32*om2,md2,um2,1-om2-um2-m2-md2]
-            initial_weight[2,:] = [m3*4/5,m3*1/5,0.68*om3,0.32*om3,md3,um3,1-om3-um3-m3-md3]
-            initial_weight[3,:] = [w1*4/5,w1*1/5,0.44*ow1,0.56*ow1,wd1,uw1,1-ow1-uw1-w1-wd1]
-            initial_weight[4,:] = [w2*4/5,w2*1/5,0.44*ow2,0.56*ow2,wd2,uw2,1-ow2-uw2-w2-wd2]
-            initial_weight[5,:] = [w3*4/5,w3*1/5,0.44*ow3,0.56*ow3,wd3,uw3,1-ow3-uw3-w3-wd3]
-        elif self.year==2019: #
-            # tilat [13,0,1,10,3,11,12] siis [tmtuki,ansiosidonnainen,kokoaikatyö,osaaikatyö,työvoimanulkopuolella,opiskelija]
-            # lasketaan painotetut kertoimet eri tulotasoille
-            # työttömät miehet, osuus väestästä
-            m_tyoton=0.02133
-            m1,m2,m3 = self.rates.get_wees(0,1.27,1.0,m_tyoton)
-            # työttömät naiset, osuus väestästä
-            w_tyoton=0.0165347
-            w1,w2,w3 = self.rates.get_wees(1,1.2,1.0,w_tyoton)
-
-            # työlliset, miehet
-            om=0.2606  # miehet töissä + opiskelija
-            om1,om2,om3 = self.rates.get_wees(0,1.25,1.0,om)
-            # työlliset, naiset
-            ow=0.3633
-            ow1,ow2,ow3 = self.rates.get_wees(1,1.2,1.0,ow)
-
-            # työvoiman ulkopuolella, miehet
-            m_tyovoimanulkop=0.0301
-            um1,um2,um3 = self.rates.get_wees(0,1.3,1.0,m_tyovoimanulkop)
-
-            # työvoiman ulkopuolella, naiset
-            w_tyovoimanulkop=0.02661
-            uw1,uw2,uw3 = self.rates.get_wees(1,1.2,1.0,w_tyovoimanulkop)
-
-            # työkyvyttömät, miehet
-            md=0.01031
-            md1,md2,md3 = self.rates.get_wees(0,1.3,1.0,md)
-            # työkyvyttömät, naiset
-            wd=0.007156
-            wd1,wd2,wd3 = self.rates.get_wees(1,1.2,1.0,wd)
-
-            # 13,0,1,10,3,11,12
-            initial_weight[0,:] = [m1*4/5,m1*1/5,0.68*om1,0.32*om1,md1,um1,1-om1-um1-m1-md1]
-            initial_weight[1,:] = [m2*4/5,m2*1/5,0.68*om2,0.32*om2,md2,um2,1-om2-um2-m2-md2]
-            initial_weight[2,:] = [m3*4/5,m3*1/5,0.68*om3,0.32*om3,md3,um3,1-om3-um3-m3-md3]
-            initial_weight[3,:] = [w1*4/5,w1*1/5,0.44*ow1,0.56*ow1,wd1,uw1,1-ow1-uw1-w1-wd1]
-            initial_weight[4,:] = [w2*4/5,w2*1/5,0.44*ow2,0.56*ow2,wd2,uw2,1-ow2-uw2-w2-wd2]
-            initial_weight[5,:] = [w3*4/5,w3*1/5,0.44*ow3,0.56*ow3,wd3,uw3,1-ow3-uw3-w3-wd3]
-        elif self.year==2020: #
-            # tilat [13,0,1,10,3,11,12] siis [tmtuki,ansiosidonnainen,kokoaikatyö,osaaikatyö,työvoimanulkopuolella,opiskelija]
-            # lasketaan painotetut kertoimet eri tulotasoille
-            # työttömät miehet, osuus väestästä
-            m_tyoton=0.02399
-            m1,m2,m3 = self.rates.get_wees(0,1.27,1.0,m_tyoton)
-            # työttömät naiset, osuus väestästä
-            w_tyoton=0.02051
-            w1,w2,w3 = self.rates.get_wees(1,1.2,1.0,w_tyoton)
-
-            # työlliset, miehet
-            om=0.2053
-            om1,om2,om3 = self.rates.get_wees(0,1.25,1.0,om)
-            # työlliset, naiset
-            ow=0.2732
-            ow1,ow2,ow3 = self.rates.get_wees(1,1.2,1.0,ow)
-
-            # työvoiman ulkopuolella, miehet
-            m_tyovoimanulkop=0.03278
-            um1,um2,um3 = self.rates.get_wees(0,1.3,1.0,m_tyovoimanulkop)
-            # työvoiman ulkopuolella, naiset
-            w_tyovoimanulkop=0.02433
-            uw1,uw2,uw3 = self.rates.get_wees(1,1.2,1.0,w_tyovoimanulkop)
-
-            # työkyvyttömät, miehet
-            md=0.00982
-            md1,md2,md3 = self.rates.get_wees(0,1.3,1.0,md)
-            # työkyvyttömät, naiset
-            wd=0.00685
-            wd1,wd2,wd3 = self.rates.get_wees(1,1.2,1.0,wd)
-
-            # 13,0,1,10,3,11,12
-            initial_weight[0,:] = [m1*4/5,m1*1/5,0.68*om1,0.32*om1,md1,um1,1-om1-um1-m1-md1]
-            initial_weight[1,:] = [m2*4/5,m2*1/5,0.68*om2,0.32*om2,md2,um2,1-om2-um2-m2-md2]
-            initial_weight[2,:] = [m3*4/5,m3*1/5,0.68*om3,0.32*om3,md3,um3,1-om3-um3-m3-md3]
-            initial_weight[3,:] = [w1*4/5,w1*1/5,0.44*ow1,0.56*ow1,wd1,uw1,1-ow1-uw1-w1-wd1]
-            initial_weight[4,:] = [w2*4/5,w2*1/5,0.44*ow2,0.56*ow2,wd2,uw2,1-ow2-uw2-w2-wd2]
-            initial_weight[5,:] = [w3*4/5,w3*1/5,0.44*ow3,0.56*ow3,wd3,uw3,1-ow3-uw3-w3-wd3]
-        elif self.year==2021:
-            # tilat [13,0,1,10,3,11,12] siis [tmtuki,ansiosidonnainen,kokoaikatyö,osaaikatyö,työvoimanulkopuolella,opiskelija]
-            # lasketaan painotetut kertoimet eri tulotasoille
-            # työttömät miehet, osuus väestästä
-            # työttömät miehet, osuus väestästä
-            m_tyoton=0.018869
-            m1,m2,m3 = self.rates.get_wees(0,1.27,1.0,m_tyoton)
-            # työttömät naiset, osuus väestästä
-            w_tyoton=0.0160433
-            w1,w2,w3 = self.rates.get_wees(1,1.2,1.0,w_tyoton)
-
-            # työlliset, miehet
-            om= 0.28022   # miehet töissä
-            om1,om2,om3 = self.rates.get_wees(0,1.25,1.0,om)
-            # työlliset, naiset
-            ow=0.3858752
-            ow1,ow2,ow3 = self.rates.get_wees(1,1.2,1.0,ow)
-
-            # työvoiman ulkopuolella, miehet
-            m_tyovoimanulkop=0.034
-            um1,um2,um3 = self.rates.get_wees(0,1.3,1.0,m_tyovoimanulkop)
-            # työvoiman ulkopuolella, naiset
-            w_tyovoimanulkop= 0.0290785
-            uw1,uw2,uw3 = self.rates.get_wees(1,1.2,1.0,w_tyovoimanulkop)
-
-            # työkyvyttömät, miehet
-            md = 0.0057823
-            md1,md2,md3 = self.rates.get_wees(0,1.3,1.0,md)
-            # työkyvyttömät, naiset
-            wd = 0.009292
-            wd1,wd2,wd3 = self.rates.get_wees(1,1.2,1.0,wd)
-
-            # 13,0,1,10,3,11,12
-            initial_weight[0,:] = [m1*4/5,m1*1/5,0.68*om1,0.32*om1,md1,um1,1-om1-um1-m1-md1]
-            initial_weight[1,:] = [m2*4/5,m2*1/5,0.68*om2,0.32*om2,md2,um2,1-om2-um2-m2-md2]
-            initial_weight[2,:] = [m3*4/5,m3*1/5,0.68*om3,0.32*om3,md3,um3,1-om3-um3-m3-md3]
-            initial_weight[3,:] = [w1*4/5,w1*1/5,0.44*ow1,0.56*ow1,wd1,uw1,1-ow1-uw1-w1-wd1]
-            initial_weight[4,:] = [w2*4/5,w2*1/5,0.44*ow2,0.56*ow2,wd2,uw2,1-ow2-uw2-w2-wd2]
-            initial_weight[5,:] = [w3*4/5,w3*1/5,0.44*ow3,0.56*ow3,wd3,uw3,1-ow3-uw3-w3-wd3]
-        elif self.year==2022:
-            # tilat [13,0,1,10,3,11,12] siis [tmtuki,ansiosidonnainen,kokoaikatyö,osaaikatyö,työvoimanulkopuolella,opiskelija]
-            # lasketaan painotetut kertoimet eri tulotasoille
-
-            # työttömät miehet, osuus väestästä
-            m_tyoton = 0.018869
-            m1,m2,m3 = self.rates.get_wees(0,1.27,1.0,m_tyoton)
-            # työttömät naiset, osuus väestästä
-            w_tyoton = 0.0160433
-            w1,w2,w3 = self.rates.get_wees(1,1.2,1.0,w_tyoton)
-
-            # työlliset, miehet
-            om = 0.28022   # miehet töissä
-            om1,om2,om3 = self.rates.get_wees(0,1.25,1.0,om)
-            # työlliset, naiset
-            ow = 0.3858752
-            ow1,ow2,ow3 = self.rates.get_wees(1,1.2,1.0,ow)
-
-            # työvoiman ulkopuolella, miehet
-            m_tyovoimanulkop = 0.0344
-            um1,um2,um3 = self.rates.get_wees(0,1.3,1.0,m_tyovoimanulkop)
-            # työvoiman ulkopuolella, naiset
-            w_tyovoimanulkop = 0.0290785
-            uw1,uw2,uw3 = self.rates.get_wees(1,1.2,1.0,w_tyovoimanulkop)
-
-            # työkyvyttömät, miehet
-            md = 0.009292
-            md1,md2,md3 = self.rates.get_wees(0,1.3,1.0,md)
-            # työkyvyttömät, naiset
-            wd = 0.0057823
-            wd1,wd2,wd3 = self.rates.get_wees(1,1.2,1.0,wd)
-
-            # 13,0,1,10,3,11,12
-            initial_weight[0,:] = [m1*4/5,m1*1/5,0.68*om1,0.32*om1,md1,um1,1-om1-um1-m1-md1]
-            initial_weight[1,:] = [m2*4/5,m2*1/5,0.68*om2,0.32*om2,md2,um2,1-om2-um2-m2-md2]
-            initial_weight[2,:] = [m3*4/5,m3*1/5,0.68*om3,0.32*om3,md3,um3,1-om3-um3-m3-md3]
-            initial_weight[3,:] = [w1*4/5,w1*1/5,0.44*ow1,0.56*ow1,wd1,uw1,1-ow1-uw1-w1-wd1]
-            initial_weight[4,:] = [w2*4/5,w2*1/5,0.44*ow2,0.56*ow2,wd2,uw2,1-ow2-uw2-w2-wd2]
-            initial_weight[5,:] = [w3*4/5,w3*1/5,0.44*ow3,0.56*ow3,wd3,uw3,1-ow3-uw3-w3-wd3]
-        elif self.year==2023: # 31.1.2025
-            # tilat [13,0,1,10,3,11,12] siis [tmtuki,ansiosidonnainen,kokoaikatyö,osaaikatyö,työvoimanulkopuolella,opiskelija]
-            # lasketaan painotetut kertoimet eri tulotasoille
-            # työttömät miehet, osuus väestästä
-            m_tyoton=0.03070
-            m1,m2,m3 = self.rates.get_wees(0,1.27,1.0,m_tyoton)
-            # työttömät naiset, osuus väestästä
-            w_tyoton=0.0160433
-            w1,w2,w3 = self.rates.get_wees(1,1.2,1.0,w_tyoton)
-
-            # työlliset, miehet
-            om= 0.26026   # miehet töissä
-            om1,om2,om3 = self.rates.get_wees(0,1.25,1.0,om)
-            # työlliset, naiset
-            ow=0.364
-            ow1,ow2,ow3 = self.rates.get_wees(1,1.2,1.0,ow)
-
-            # työvoiman ulkopuolella, miehet
-            m_tyovoimanulkop=0.038
-            um1,um2,um3 = self.rates.get_wees(0,1.3,1.0,m_tyovoimanulkop)
-            # työvoiman ulkopuolella, naiset
-            w_tyovoimanulkop= 0.0285
-            uw1,uw2,uw3 = self.rates.get_wees(1,1.2,1.0,w_tyovoimanulkop)
-
-            # työkyvyttömät, miehet
-            md= 0.009292
-            md1,md2,md3 = self.rates.get_wees(0,1.3,1.0,md)
-            # työkyvyttömät, naiset
-            wd=0.0057823
-            wd1,wd2,wd3 = self.rates.get_wees(1,1.2,1.0,wd)
-
-            # 13,0,1,10,3,11,12
-            initial_weight[0,:] = [m1*4/5,m1*1/5,0.68*om1,0.32*om1,md1,um1,1-om1-um1-m1-md1]
-            initial_weight[1,:] = [m2*4/5,m2*1/5,0.68*om2,0.32*om2,md2,um2,1-om2-um2-m2-md2]
-            initial_weight[2,:] = [m3*4/5,m3*1/5,0.68*om3,0.32*om3,md3,um3,1-om3-um3-m3-md3]
-            initial_weight[3,:] = [w1*4/5,w1*1/5,0.44*ow1,0.56*ow1,wd1,uw1,1-ow1-uw1-w1-wd1]
-            initial_weight[4,:] = [w2*4/5,w2*1/5,0.44*ow2,0.56*ow2,wd2,uw2,1-ow2-uw2-w2-wd2]
-            initial_weight[5,:] = [w3*4/5,w3*1/5,0.44*ow3,0.56*ow3,wd3,uw3,1-ow3-uw3-w3-wd3]
-        elif self.year==2024: # PÄIVITÄ
-            # tilat [13,0,1,10,3,11,12] siis [tmtuki,ansiosidonnainen,kokoaikatyö,osaaikatyö,työvoimanulkopuolella,opiskelija]
-            # lasketaan painotetut kertoimet eri tulotasoille
-            # työttömät miehet, osuus väestästä
-            # työttömät miehet, osuus väestästä
-            m_tyoton=0.03070
-            m1,m2,m3 = self.rates.get_wees(0,1.27,1.0,m_tyoton)
-            # työttömät naiset, osuus väestästä
-            w_tyoton=0.0194
-            w1,w2,w3 = self.rates.get_wees(1,1.2,1.0,w_tyoton)
-
-            # työlliset, miehet
-            om= 0.26026   # miehet töissä
-            om1,om2,om3 = self.rates.get_wees(0,1.25,1.0,om)
-            # työlliset, naiset
-            ow=0.364
-            ow1,ow2,ow3 = self.rates.get_wees(1,1.2,1.0,ow)
-
-            # työvoiman ulkopuolella, miehet
-            m_tyovoimanulkop=0.038
-            um1,um2,um3 = self.rates.get_wees(0,1.3,1.0,m_tyovoimanulkop)
-            # työvoiman ulkopuolella, naiset
-            w_tyovoimanulkop= 0.0285
-            uw1,uw2,uw3 = self.rates.get_wees(1,1.2,1.0,w_tyovoimanulkop)
-
-            # työkyvyttömät, miehet
-            md= 0.009292
-            md1,md2,md3 = self.rates.get_wees(0,1.3,1.0,md)
-            # työkyvyttömät, naiset
-            wd=0.0057823
-            wd1,wd2,wd3 = self.rates.get_wees(1,1.2,1.0,wd)
-
-            # 13,0,1,10,3,11,12
-            initial_weight[0,:] = [m1*4/5,m1*1/5,0.68*om1,0.32*om1,md1,um1,1-om1-um1-m1-md1]
-            initial_weight[1,:] = [m2*4/5,m2*1/5,0.68*om2,0.32*om2,md2,um2,1-om2-um2-m2-md2]
-            initial_weight[2,:] = [m3*4/5,m3*1/5,0.68*om3,0.32*om3,md3,um3,1-om3-um3-m3-md3]
-            initial_weight[3,:] = [w1*4/5,w1*1/5,0.44*ow1,0.56*ow1,wd1,uw1,1-ow1-uw1-w1-wd1]
-            initial_weight[4,:] = [w2*4/5,w2*1/5,0.44*ow2,0.56*ow2,wd2,uw2,1-ow2-uw2-w2-wd2]
-            initial_weight[5,:] = [w3*4/5,w3*1/5,0.44*ow3,0.56*ow3,wd3,uw3,1-ow3-uw3-w3-wd3]
-        elif self.year==2025: # PÄIVITÄ
-            # tilat [13,0,1,10,3,11,12] siis [tmtuki,ansiosidonnainen,kokoaikatyö,osaaikatyö,työvoimanulkopuolella,opiskelija]
-            # lasketaan painotetut kertoimet eri tulotasoille
-            # työttömät miehet, osuus väestästä
-            m_tyoton=0.03070
-            m1,m2,m3 = self.rates.get_wees(0,1.27,1.0,m_tyoton)
-            # työttömät naiset, osuus väestästä
-            w_tyoton=0.0194
-            w1,w2,w3 = self.rates.get_wees(1,1.2,1.0,w_tyoton)
-
-            # työlliset, miehet
-            om= 0.26026   # miehet töissä
-            om1,om2,om3 = self.rates.get_wees(0,1.25,1.0,om)
-            # työlliset, naiset
-            ow=0.364
-            ow1,ow2,ow3 = self.rates.get_wees(1,1.2,1.0,ow)
-
-            # työvoiman ulkopuolella, miehet
-            m_tyovoimanulkop=0.038
-            um1,um2,um3 = self.rates.get_wees(0,1.3,1.0,m_tyovoimanulkop)
-            # työvoiman ulkopuolella, naiset
-            w_tyovoimanulkop= 0.0285
-            uw1,uw2,uw3 = self.rates.get_wees(1,1.2,1.0,w_tyovoimanulkop)
-
-            # työkyvyttömät, miehet
-            md= 0.009292
-            md1,md2,md3 = self.rates.get_wees(0,1.3,1.0,md)
-            # työkyvyttömät, naiset
-            wd=0.0057823
-            wd1,wd2,wd3 = self.rates.get_wees(1,1.2,1.0,wd)
-
-            # 13,0,1,10,3,11,12
-            initial_weight[0,:] = [m1*4/5,m1*1/5,0.68*om1,0.32*om1,md1,um1,1-om1-um1-m1-md1]
-            initial_weight[1,:] = [m2*4/5,m2*1/5,0.68*om2,0.32*om2,md2,um2,1-om2-um2-m2-md2]
-            initial_weight[2,:] = [m3*4/5,m3*1/5,0.68*om3,0.32*om3,md3,um3,1-om3-um3-m3-md3]
-            initial_weight[3,:] = [w1*4/5,w1*1/5,0.44*ow1,0.56*ow1,wd1,uw1,1-ow1-uw1-w1-wd1]
-            initial_weight[4,:] = [w2*4/5,w2*1/5,0.44*ow2,0.56*ow2,wd2,uw2,1-ow2-uw2-w2-wd2]
-            initial_weight[5,:] = [w3*4/5,w3*1/5,0.44*ow3,0.56*ow3,wd3,uw3,1-ow3-uw3-w3-wd3]
-        elif self.year==2026: # PÄIVITÄ
-            # tilat [13,0,1,10,3,11,12] siis [tmtuki,ansiosidonnainen,kokoaikatyö,osaaikatyö,työvoimanulkopuolella,opiskelija]
-            # lasketaan painotetut kertoimet eri tulotasoille
-            # työttömät miehet, osuus väestästä
-            m_tyoton=0.03070
-            m1,m2,m3 = self.rates.get_wees(0,1.27,1.0,m_tyoton)
-            # työttömät naiset, osuus väestästä
-            w_tyoton=0.0194
-            w1,w2,w3 = self.rates.get_wees(1,1.2,1.0,w_tyoton)
-
-            # työlliset, miehet
-            om= 0.26026   # miehet töissä
-            om1,om2,om3 = self.rates.get_wees(0,1.25,1.0,om)
-            # työlliset, naiset
-            ow=0.364
-            ow1,ow2,ow3 = self.rates.get_wees(1,1.2,1.0,ow)
-
-            # työvoiman ulkopuolella, miehet
-            m_tyovoimanulkop=0.038
-            um1,um2,um3 = self.rates.get_wees(0,1.3,1.0,m_tyovoimanulkop)
-            # työvoiman ulkopuolella, naiset
-            w_tyovoimanulkop= 0.0285
-            uw1,uw2,uw3 = self.rates.get_wees(1,1.2,1.0,w_tyovoimanulkop)
-
-            # työkyvyttömät, miehet
-            md= 0.009292
-            md1,md2,md3 = self.rates.get_wees(0,1.3,1.0,md)
-            # työkyvyttömät, naiset
-            wd=0.0057823
-            wd1,wd2,wd3 = self.rates.get_wees(1,1.2,1.0,wd)
-
-            # 13,0,1,10,3,11,12
-            initial_weight[0,:] = [m1*4/5,m1*1/5,0.68*om1,0.32*om1,md1,um1,1-om1-um1-m1-md1]
-            initial_weight[1,:] = [m2*4/5,m2*1/5,0.68*om2,0.32*om2,md2,um2,1-om2-um2-m2-md2]
-            initial_weight[2,:] = [m3*4/5,m3*1/5,0.68*om3,0.32*om3,md3,um3,1-om3-um3-m3-md3]
-            initial_weight[3,:] = [w1*4/5,w1*1/5,0.44*ow1,0.56*ow1,wd1,uw1,1-ow1-uw1-w1-wd1]
-            initial_weight[4,:] = [w2*4/5,w2*1/5,0.44*ow2,0.56*ow2,wd2,uw2,1-ow2-uw2-w2-wd2]
-            initial_weight[5,:] = [w3*4/5,w3*1/5,0.44*ow3,0.56*ow3,wd3,uw3,1-ow3-uw3-w3-wd3]
-        else:
-            print('Unsupported year',self.year)
-            error(999)
-
-        for k in range(6):
-            scale=np.sum(initial_weight[k,:])
-            initial_weight[k,:] /= scale
-
-        return initial_weight
-
     def scale_pension(self,pension: float,age: float,scale: bool = True,unemp_after_ra: float = 0,elinaikakerroin: bool = True):
         '''
         Elinaikakertoimen ja lykkäyskorotuksen huomiointi
@@ -2660,7 +2269,7 @@ class UnemploymentEnv_v9(gym.Env):
         '''
         employment_status = 11 # switch
         time_in_state = self.timestep
-        pinkslip,paid_wage,basis_wage,karenssia_jaljella = 1,0,0,0
+        pinkslip,paid_wage,basis_wage,karenssia_jaljella = 1,0,0,0  # ei karenssia jos siirtyy työttömäksi
         until_outsider = self.comp_time_to_outsider(employment_status,age,g)
 
         if not moved:
@@ -2680,10 +2289,10 @@ class UnemploymentEnv_v9(gym.Env):
         pension = self.pension_accrual(age,paid_wage,pension,state=5)
         tyoelake = tyoelake*self.elakeindeksi
         time_in_state = self.timestep
-        pinkslip=1
+        pinkslip=1 # ei karenssia jos siirty työttömäksi
         until_disab = 1.0 # self.comp_until_disab(g,age,state=employment_status)
 
-        return employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage,until_disab,life_left
+        return employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage,until_disab,life_left,pinkslip
 
     def move_to_disab(self,pension: float,old_paid_wage: float,age: float,unemp_after_ra: float,kansanelake: float,tyoelake: float,ove_paid: int,has_spouse: int,children_under18: int,is_spouse: bool,life_left: float):
         '''
@@ -2748,9 +2357,10 @@ class UnemploymentEnv_v9(gym.Env):
         until_student=100.0
         until_outsider=100.0
         life_left = life_left # should be self.comp_life_left(group,age,3) but group is not known
+        pinkslip = 0
 
         # tässä pitäisi päivittää myös elinaika
-        return employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage,until_disab,life_left #,until_student,until_outsider
+        return employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage,until_disab,life_left,pinkslip #,until_student,until_outsider
 
     def comp_familypension(self,puoliso: float,emp_state: int,spouse_empstate: int,tyoelake: float,pension: float,age: float,
                             puoliso_tyoelake: float,spouse_pension: float,children_under18: int,has_spouse: bool,is_spouse: bool):
@@ -2818,7 +2428,7 @@ class UnemploymentEnv_v9(gym.Env):
         employment_status = 7 # kotihoidontuelle
         pension = self.pension_accrual(age,old_wage,pension,state=7)
         tyoelake=tyoelake*self.elakeindeksi
-        pinkslip = 0
+        pinkslip = 0 # karenssi jos siirtyy työttömäksi
         paid_wage=0
         basis_wage=0
 
@@ -2839,7 +2449,7 @@ class UnemploymentEnv_v9(gym.Env):
         pension = self.pension_accrual(age,paid_wage,pension,state=6)
         tyoelake = tyoelake*self.elakeindeksi
         time_in_state += self.timestep
-        pinkslip = 0
+        pinkslip = 0 # karenssi jos siirtyy työttömäksi
         paid_wage=0
 
         return employment_status,pension,tyoelake,paid_wage,time_in_state,pinkslip,basis_wage
@@ -2855,9 +2465,47 @@ class UnemploymentEnv_v9(gym.Env):
         pension = self.pension_accrual(age,paid_wage,pension,state=5)
         tyoelake = tyoelake*self.elakeindeksi
         time_in_state += self.timestep
-        pinkslip = 0
+        pinkslip = 0 # karenssi jos siirtyy työttömäksi
 
         return employment_status,pension,tyoelake,paid_wage,time_in_state,pinkslip,basis_wage
+
+    def under_unemp_ft_reemp_rate(self,intage: int,g: int,career: float,s: float):
+        vrt = self.unemp_reemp_ft_prob[intage,g]
+        if intage<50:
+            if career>2.0:
+                vrt += 0.05            
+            elif career>15.0:
+                vrt += 0.10
+        else:
+            if career>15.0:
+                vrt += 0.05
+
+        if s<vrt:
+            return True
+        else:
+            return False
+
+    def under_unemp_pt_reemp_rate(self,intage: int,g: int,career: float,s: float):
+        vrt = self.unemp_reemp_pt_prob[intage,g]
+        if intage<25:
+            if career>1.0:
+                vrt += 0.05            
+            elif career>5.0:
+                vrt += 0.15
+        elif intage<55:
+            if career>2.0:
+                vrt += 0.05            
+            elif career>15.0:
+                vrt += 0.10
+        else:
+            if career>15.0:
+                vrt += 0.05
+
+        if s<vrt:
+            return True
+        else:
+            return False
+
 
     def stay_unemployed(self,raw_wage: float,paid_wage: float,pt_action: int,employment_status: int,
                         kansanelake: float,tyoelake: float,pension: float,time_in_state: float,toe: float,toekesto: float,
@@ -2872,15 +2520,16 @@ class UnemploymentEnv_v9(gym.Env):
         karenssia_jaljella=0
 
         # if the aim is to be employed, there is a definite age-dependent probability that a person is reemployed
-        if (action == 1) and self.unemp_limit_reemp:
-            if sattuma[7]>self.unemp_reemp_ft_prob[intage,g] and self.randomness:
-                if sattuma[7]<self.unemp_reemp_pt_prob[intage,g]:
-                    action = 3
-                else:
+        if  self.unemp_limit_reemp and self.randomness:
+            if (action == 1):
+                if not self.under_unemp_ft_reemp_rate(intage,g,tyoura,sattuma[7]): #sattuma[7]>self.unemp_reemp_ft_prob[intage,g]:
+                    if self.under_unemp_pt_reemp_rate(intage,g,tyoura,sattuma[7]): #sattuma[7]<self.unemp_reemp_pt_prob[intage,g]:
+                        action = 3
+                    else:
+                        action = 0
+            elif (action == 3 or (action==2 and age < self.min_retirementage) or action == 4):
+                if not self.under_unemp_pt_reemp_rate(intage,g,tyoura,sattuma[7]): #sattuma[7]>self.unemp_reemp_pt_prob[intage,g]:
                     action = 0
-        elif (action == 3 or (action==2 and children_under3<1 and age < self.min_retirementage) or action == 4) and self.unemp_limit_reemp:
-            if sattuma[7]>self.unemp_reemp_pt_prob[intage,g] and self.randomness:
-                action = 0
 
         if age >= self.max_unemploymentbenefitage:
             # karttuma vanhan palkan mukaan myös tässä
@@ -2942,9 +2591,8 @@ class UnemploymentEnv_v9(gym.Env):
                 employment_status,pension,tyoelake,paid_wage,time_in_state,tyoura,pinkslip,basis_wage=\
                     self.move_to_parttime(raw_wage,pt_action,pension,tyoelake,age,tyoura,time_in_state)
         elif action == 11: # tk
-            employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage,until_disab,life_left=\
+            employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage,until_disab,life_left,pinkslip=\
                 self.move_to_disab(pension,old_paid_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse,life_left)
-            pinkslip = 0
         else:
             print('error 17')
 
@@ -2965,15 +2613,16 @@ class UnemploymentEnv_v9(gym.Env):
         time_in_state += self.timestep
         karenssia_jaljella=0
 
-        if (action == 1) and self.unemp_limit_reemp:
-            if sattuma[7]>self.unemp_reemp_ft_prob[intage,g] and self.randomness:
-                if sattuma[7]<self.unemp_reemp_pt_prob[intage,g]:
-                    action = 3
-                else:
+        if  self.unemp_limit_reemp and self.randomness:
+            if (action == 1):
+                if not self.under_unemp_ft_reemp_rate(intage,g,tyoura,sattuma[7]): #sattuma[7]>self.unemp_reemp_ft_prob[intage,g]:
+                    if self.under_unemp_pt_reemp_rate(intage,g,tyoura,sattuma[7]): #sattuma[7]<self.unemp_reemp_pt_prob[intage,g]:
+                        action = 3
+                    else:
+                        action = 0
+            elif (action == 3 or (action==2 and age < self.min_retirementage) or action == 4):
+                if not self.under_unemp_pt_reemp_rate(intage,g,tyoura,sattuma[7]): #sattuma[7]>self.unemp_reemp_pt_prob[intage,g]:
                     action = 0
-        elif (action == 3 or (action==2 and children_under3<1 and age < self.min_retirementage) or action == 4) and self.unemp_limit_reemp:
-            if sattuma[7]>self.unemp_reemp_pt_prob[intage,g] and self.randomness:
-                action = 0
 
         if age >= self.max_unemploymentbenefitage:
             employment_status,kansanelake,tyoelake,pension,paid_wage,time_in_state,ove_paid,basis_wage,until_student,until_outsider=\
@@ -3025,7 +2674,7 @@ class UnemploymentEnv_v9(gym.Env):
                 employment_status,pension,tyoelake,paid_wage,time_in_state,tyoura,pinkslip,basis_wage=\
                     self.move_to_parttime(raw_wage,pt_action,pension,tyoelake,age,tyoura,time_in_state)
         elif action == 11: # tk
-            employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage,until_disab,life_left=\
+            employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage,until_disab,life_left,pinkslip=\
                 self.move_to_disab(pension,old_paid_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse,life_left)
         else:
             print('error 17')
@@ -3047,16 +2696,29 @@ class UnemploymentEnv_v9(gym.Env):
         time_in_state += self.timestep
         karenssia_jaljella=0
 
-        if action>0:
-            if (action == 1) and self.unemp_limit_reemp:
-                if sattuma[7]>self.unemp_reemp_ft_prob[intage,g] and self.randomness:
-                    if sattuma[7]>self.unemp_reemp_pt_prob[intage,g] and self.randomness:
+
+        if self.unemp_limit_reemp and self.randomness:
+            if (action == 1):
+                if not self.under_unemp_ft_reemp_rate(intage,g,tyoura,sattuma[7]): #sattuma[7]>self.unemp_reemp_ft_prob[intage,g]:
+                    if self.under_unemp_pt_reemp_rate(intage,g,tyoura,sattuma[7]): #sattuma[7]<self.unemp_reemp_pt_prob[intage,g]:
                         action = 3
                     else:
                         action = 0
-            elif (action == 3 or (action==2 and age < self.min_retirementage) or action == 4) and self.unemp_limit_reemp:
-                if sattuma[7]>self.unemp_reemp_pt_prob[intage,g] and self.randomness:
+            elif (action == 3 or (action==2 and age < self.min_retirementage) or action == 4):
+                if not self.under_unemp_pt_reemp_rate(intage,g,tyoura,sattuma[7]): #sattuma[7]>self.unemp_reemp_pt_prob[intage,g]:
                     action = 0
+
+
+        #if action>0:
+        #    if (action == 1) and self.unemp_limit_reemp:
+        #        if sattuma[7]>self.unemp_reemp_ft_prob[intage,g] and self.randomness:
+        ##            if sattuma[7]>self.unemp_reemp_pt_prob[intage,g] and self.randomness:
+        #                action = 3
+        ##            else:
+        #                action = 0
+        #    elif (action == 3 or (action==2 and age < self.min_retirementage) or action == 4) and self.unemp_limit_reemp:
+        #        if sattuma[7]>self.unemp_reemp_pt_prob[intage,g] and self.randomness:
+        #            action = 0
 
         if age >= self.max_unemploymentbenefitage:
             employment_status,kansanelake,tyoelake,pension,paid_wage,time_in_state,ove_paid,basis_wage,until_student,until_outsider=\
@@ -3102,9 +2764,6 @@ class UnemploymentEnv_v9(gym.Env):
                 used_unemp_benefit += self.timestep
                 if age >= self.min_retirementage:
                     unemp_after_ra += self.timestep
-
-                #employment_status,pension,tyoelake,paid_wage,time_in_state,tyoura,pinkslip,basis_wage=\
-                #    self.move_to_parttime(wage,pt_action,pension,tyoelake,age,time_in_state,tyoura,pinkslip)
         elif action == 4: # osatyö 50% + ve
             if age >= self.min_retirementage: # ve
                 employment_status,kansanelake,tyoelake,pension,paid_wage,time_in_state,ove_paid,basis_wage=\
@@ -3115,7 +2774,7 @@ class UnemploymentEnv_v9(gym.Env):
                 employment_status,pension,tyoelake,paid_wage,time_in_state,tyoura,pinkslip,basis_wage=\
                     self.move_to_parttime(raw_wage,pt_action,pension,tyoelake,age,tyoura,time_in_state)
         elif action == 11: # tk
-            employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage,until_disab,life_left=\
+            employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage,until_disab,life_left,pinkslip=\
                 self.move_to_disab(pension,old_paid_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse,life_left)
         else:
             print('error 1: ',action)
@@ -3194,14 +2853,8 @@ class UnemploymentEnv_v9(gym.Env):
                 tyoelake=tyoelake*self.elakeindeksi
                 tyoura += self.timestep
                 pension = self.pension_accrual(age,paid_wage,pension,state=1)
-
-                #employment_status,pension,tyoelake,paid_wage,time_in_state,tyoura,pinkslip,basis_wage=\
-                #    self.move_to_parttime(raw_wage,pt_action,pension,tyoelake,age,tyoura,unemp_after_ra,has_spouse=has_spouse,is_spouse=is_spouse)
-#            else:
-#                employment_status,pension,tyoelake,paid_wage,time_in_state,tyoura,pinkslip,basis_wage=\
-#                    self.move_to_parttime(raw_wage,pt_action,pension,tyoelake,age,tyoura,unemp_after_ra,has_spouse=has_spouse,is_spouse=is_spouse)
         elif action == 11: # tk
-            employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage,until_disab,life_left=\
+            employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage,until_disab,life_left,pinkslip=\
                 self.move_to_disab(pension,old_paid_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse,life_left)
         else:
             print('error 12')
@@ -3266,13 +2919,13 @@ class UnemploymentEnv_v9(gym.Env):
         #if age >= self.min_retirementage: # ve
         time_in_state += self.timestep
 
-        if action>0:
-            if (action in set([1,2])) and self.unemp_limit_reemp:
-                if sattuma[7]>self.unemp_reemp_pt_prob[intage,g] and self.randomness:
+        if self.randomness and self.unemp_limit_reemp:
+            if (action in set([1,2])):
+                if not self.under_unemp_pt_reemp_rate(intage,g,tyoura,sattuma[7]): #sattuma[7]>self.unemp_reemp_pt_prob[intage,g] and self.randomness:
                     action = 0
-            elif (action in set([3,4])) and self.unemp_limit_reemp:
-                if sattuma[7]>self.unemp_reemp_ft_prob[intage,g] and self.randomness:
-                    if sattuma[7]<self.unemp_reemp_pt_prob[intage,g]:
+            elif (action in set([3,4])):
+                if not self.under_unemp_ft_reemp_rate(intage,g,tyoura,sattuma[7]): #sattuma[7]>self.unemp_reemp_ft_prob[intage,g] and self.randomness:
+                    if self.under_unemp_pt_reemp_rate(intage,g,tyoura,sattuma[7]): #sattuma[7]<self.unemp_reemp_pt_prob[intage,g]:
                         action = 1
                     else:
                         action = 0
@@ -3362,7 +3015,7 @@ class UnemploymentEnv_v9(gym.Env):
             if action == 0:
                 employment_status,kansanelake,tyoelake,pension,paid_wage,time_in_state,\
                     used_unemp_benefit,pinkslip,unemp_after_ra,unempwage_basis,alkanut_ansiosidonnainen,\
-                    karenssia_jaljella,ove_paid,basis_wage=\
+                    karenssia_jaljella,ove_paid,basis_wage =\
                     self.move_to_unemp(pension,old_paid_wage,age,kansanelake,tyoelake,toe,toekesto,pinkslip,tyoura,
                         used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,alkanut_ansiosidonnainen,toe58,ove_paid,has_spouse,is_spouse)
             elif action == 1: #
@@ -3374,8 +3027,9 @@ class UnemploymentEnv_v9(gym.Env):
                 employment_status,pension,tyoelake,paid_wage,time_in_state,tyoura,pinkslip,basis_wage=\
                     self.move_to_parttime(raw_wage,pt_action,pension,tyoelake,age,tyoura,time_in_state)
             elif action == 11: # tk
-                employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage,until_disab,life_left=\
+                employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage,until_disab,life_left,pinkslip=\
                     self.move_to_disab(pension,old_paid_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse,life_left)
+                pinkslip=0
             else:
                 print('Error 21')
         else:
@@ -3422,7 +3076,7 @@ class UnemploymentEnv_v9(gym.Env):
                 employment_status,pension,tyoelake,paid_wage,time_in_state,tyoura,pinkslip,basis_wage=\
                     self.move_to_parttime(raw_wage,pt_action,pension,tyoelake,age,tyoura,0)
             elif action == 11: # tk
-                employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage,until_disab,life_left=\
+                employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage,until_disab,life_left,pinkslip=\
                     self.move_to_disab(pension,old_paid_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse,life_left)
             else:
                 print('Error 23')
@@ -3493,7 +3147,7 @@ class UnemploymentEnv_v9(gym.Env):
             employment_status,pension,tyoelake,paid_wage,time_in_state,tyoura,pinkslip,basis_wage=\
                 self.move_to_parttime(raw_wage,pt_action,pension,tyoelake,age,tyoura,time_in_state)
         elif action == 11: # tk
-            employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage,until_disab,life_left=\
+            employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage,until_disab,life_left,pinkslip=\
                 self.move_to_disab(pension,old_paid_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse,life_left)
         else:
             print('Error 25')
@@ -3563,7 +3217,7 @@ class UnemploymentEnv_v9(gym.Env):
                     employment_status,pension,tyoelake,paid_wage,time_in_state,tyoura,pinkslip,basis_wage=\
                         self.move_to_parttime(raw_wage,pt_action,pension,tyoelake,age,tyoura,time_in_state)
                 elif action == 11: # tk
-                    employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage,until_disab,life_left=\
+                    employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage,until_disab,life_left,pinkslip=\
                         self.move_to_disab(pension,old_paid_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse,life_left)
                 else:
                     print('error 29: ',action)
@@ -3756,7 +3410,7 @@ class UnemploymentEnv_v9(gym.Env):
                 #employment_status,pension,tyoelake,paid_wage,time_in_state,tyoura,pinkslip,basis_wage=\
                 #    self.move_to_work(wage,pt_action,pension,tyoelake,age,0,tyoura,pinkslip)
         elif action == 11: # tk
-            employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage,until_disab,life_left=\
+            employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage,until_disab,life_left,pinkslip=\
                 self.move_to_disab(pension,old_paid_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse,life_left)
         else:
             print('error 12')
@@ -3822,13 +3476,11 @@ class UnemploymentEnv_v9(gym.Env):
                     self.move_to_unemp(pension,old_paid_wage,age,kansanelake,tyoelake,toe,toekesto,pinkslip,tyoura,
                         used_unemp_benefit,unemp_after_ra,unempwage,unempwage_basis,alkanut_ansiosidonnainen,toe58,ove_paid,has_spouse,is_spouse)
             elif action in (4,5): #
-                pinkslip=1  # ei karenssia
                 employment_status,pension,tyoelake,paid_wage,time_in_state,tyoura,pinkslip,basis_wage=\
                     self.move_to_parttime(raw_wage,pt_action,pension,tyoelake,age,tyoura,time_in_state)
             elif action == 11: # tk
-                employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage,until_disab,life_left=\
+                employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage,until_disab,life_left,pinkslip=\
                     self.move_to_disab(pension,old_paid_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse,life_left)
-                pinkslip = 0
             else:
                 print('error 19: ',action)
 
@@ -3857,9 +3509,8 @@ class UnemploymentEnv_v9(gym.Env):
            exit=False
 
         if age >= self.max_svbenefitage and age >= self.min_retirementage:
-                employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage,until_disab,life_left=\
+                employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage,until_disab,life_left,pinkslip=\
                     self.move_to_disab_state(pension,old_paid_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse,life_left)
-                pinkslip = 0
         elif time_in_state<1.0 and not exit:
             if age >= self.max_svbenefitage and action==1:
                 employment_status,kansanelake,tyoelake,pension,paid_wage,time_in_state,ove_paid,basis_wage,until_student,until_outsider=\
@@ -3877,9 +3528,8 @@ class UnemploymentEnv_v9(gym.Env):
                 pension = self.pension_accrual(age,old_paid_wage,pension,state=14)
         else:
             if (not exit and sattuma[5]<self.svpaivaraha_disabilityrate[intage,g]) or action == 11:
-                employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage,until_disab,life_left=\
+                employment_status,pension,kansanelake,tyoelake,paid_wage,time_in_state,ove_paid,basis_wage,until_disab,life_left,pinkslip=\
                     self.move_to_disab_state(pension,old_paid_wage,age,unemp_after_ra,kansanelake,tyoelake,ove_paid,has_spouse,children_under18,is_spouse,life_left)
-                pinkslip = 0
             else:
                 until_outsider = self.comp_time_to_outsider(0,age,g) # state 0 is not 11
                 until_student = self.comp_time_to_study(0,age,g)
@@ -4940,10 +4590,10 @@ class UnemploymentEnv_v9(gym.Env):
 
         self.max_mu_age = self.min_retirementage+15.0 #
 
-        self.men_mu_scale_kokoaika_before=0.075 # 0.130 # 0.0595 # 0.065 # how much penalty is associated with work increase with age after mu_age
-        self.men_mu_scale_kokoaika_after=0.035 # 0.130 # 0.0595 # 0.065 # how much penalty is associated with work increase with age after mu_age
+        self.men_mu_scale_kokoaika_before=0.075 # 0.075 # 0.130 # 0.0595 # 0.065 # how much penalty is associated with work increase with age after mu_age
+        self.men_mu_scale_kokoaika_after=0.025 # 0.035 # 0.130 # 0.0595 # 0.065 # how much penalty is associated with work increase with age after mu_age
         #self.men_mu_scale_osaaika=0.085 #0.010 # how much penalty is associated with work increase with age after mu_age
-        self.men_mu_age = self.min_retirementage - 5.0
+        self.men_mu_age = self.min_retirementage - 4.0 # - 5.0
         self.men_kappa_hoitovapaa=0.005 # hyöty henkilölle hoitovapaalla olosta
         self.men_kappa_under_3y=0.005
         self.men_kappa_ve=0.0
@@ -4951,11 +4601,12 @@ class UnemploymentEnv_v9(gym.Env):
         self.men_kappa_pinkslip_middle=0.15
         self.men_kappa_pinkslip_elderly=0.10
         self.men_kappa_pinkslip_putki=0.25
-        self.men_kappa_param=np.array([-0.350, -0.370, -0.445, -0.535, -0.690, -1.400]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
-                                # delta      0.020   0.090   0.75  0.125  0.300
+        self.men_kappa_param= np.array([-0.360, -0.390, -0.450, -0.550, -0.705, -1.400]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
+                            # np.array([-0.350, -0.385, -0.435, -0.535, -0.690, -1.200]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
+                            # delta      0.020   0.090   0.75  0.125  0.300
         self.men_student_kappa_param=np.array([0.05, 0.0, -0.05, -100.0, -100.0, -100.0]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
 
-        self.women_mu_scale_kokoaika_before=0.065  #0.150 # 0.0785 #0.085 # how much penalty is associated with work increase with age after mu_age
+        self.women_mu_scale_kokoaika_before=0.065 # 0.065  #0.150 # 0.0785 #0.085 # how much penalty is associated with work increase with age after mu_age
         self.women_mu_scale_kokoaika_after=0.015  #0.150 # 0.0785 #0.085 # how much penalty is associated with work increase with age after mu_age
         #self.women_mu_scale_osaaika=0.105 # 0.020 # how much penalty is associated with work increase with age after mu_age
         self.women_mu_age = self.min_retirementage - 3.0
@@ -4966,7 +4617,8 @@ class UnemploymentEnv_v9(gym.Env):
         self.women_kappa_pinkslip_middle=0.40
         self.women_kappa_pinkslip_elderly=0.10
         self.women_kappa_pinkslip_putki=0.20
-        self.women_kappa_param=np.array([-0.270, -0.310, -0.340, -0.345, -0.490, -1.400]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
+        self.women_kappa_param = np.array([-0.270, -0.320, -0.345, -0.365, -0.490, -1.400]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
+                                # np.array([-0.270, -0.320, -0.345, -0.350, -0.480, -1.400]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
                                 # delta      0.005   0.060   0.105   0.115    0.220
         self.women_student_kappa_param=np.array([0.05, 0.0, -0.05, -100.0, -100.0, -100.0]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
 
