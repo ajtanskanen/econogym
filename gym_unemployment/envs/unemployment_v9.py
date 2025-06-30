@@ -2473,12 +2473,15 @@ class UnemploymentEnv_v9(gym.Env):
         vrt = self.unemp_reemp_ft_prob[intage,g]
         if intage<50:
             if career>2.0:
-                vrt += 0.05            
+                vrt += 0.04            
             elif career>15.0:
-                vrt += 0.10
+                vrt += 0.08
+        elif intage<60:
+            if career>10.0:
+                vrt += 0.04
         else:
-            if career>15.0:
-                vrt += 0.05
+            if career>20.0:
+                vrt += 0.02
 
         if s<vrt:
             return True
@@ -2491,14 +2494,17 @@ class UnemploymentEnv_v9(gym.Env):
             if career>1.0:
                 vrt += 0.05            
             elif career>5.0:
-                vrt += 0.15
+                vrt += 0.10
         elif intage<55:
             if career>2.0:
                 vrt += 0.05            
             elif career>15.0:
                 vrt += 0.10
+        elif intage<65:
+            if career>10.0:
+                vrt += 0.05
         else:
-            if career>15.0:
+            if career>20.0:
                 vrt += 0.05
 
         if s<vrt:
@@ -4593,7 +4599,7 @@ class UnemploymentEnv_v9(gym.Env):
         self.men_mu_scale_kokoaika_before=0.075 # 0.075 # 0.130 # 0.0595 # 0.065 # how much penalty is associated with work increase with age after mu_age
         self.men_mu_scale_kokoaika_after=0.025 # 0.035 # 0.130 # 0.0595 # 0.065 # how much penalty is associated with work increase with age after mu_age
         #self.men_mu_scale_osaaika=0.085 #0.010 # how much penalty is associated with work increase with age after mu_age
-        self.men_mu_age = self.min_retirementage - 4.0 # - 5.0
+        self.men_mu_age = self.min_retirementage - 6.0 # - 5.0
         self.men_kappa_hoitovapaa=0.005 # hyöty henkilölle hoitovapaalla olosta
         self.men_kappa_under_3y=0.005
         self.men_kappa_ve=0.0
@@ -4609,7 +4615,7 @@ class UnemploymentEnv_v9(gym.Env):
         self.women_mu_scale_kokoaika_before=0.065 # 0.065  #0.150 # 0.0785 #0.085 # how much penalty is associated with work increase with age after mu_age
         self.women_mu_scale_kokoaika_after=0.015  #0.150 # 0.0785 #0.085 # how much penalty is associated with work increase with age after mu_age
         #self.women_mu_scale_osaaika=0.105 # 0.020 # how much penalty is associated with work increase with age after mu_age
-        self.women_mu_age = self.min_retirementage - 3.0
+        self.women_mu_age = self.min_retirementage - 4.0 # - 3.0
         self.women_kappa_hoitovapaa=0.050 # 0.170 # 0.27
         self.women_kappa_under_3y=0.010
         self.women_kappa_ve=0.0
@@ -5158,12 +5164,15 @@ class UnemploymentEnv_v9(gym.Env):
             wage_reduction=random.uniform(maxred,0.15) # 20-70
         elif employment_state in {5,6,7}:
             wage_reduction=random.uniform(maxred,0.30) # 20-70
+            pink=1
         elif employment_state==10:
             wage_reduction=random.uniform(maxred,0.15) # 20-70
         elif employment_state==12:
             wage_reduction=random.uniform(maxred,0.35)
+            pink=1
         elif employment_state==11:
             wage_reduction=random.uniform(0.10,0.60) # 15-50
+            pink=1
         elif employment_state==3:
             wage_reduction=0.60
             pension=0
