@@ -98,21 +98,21 @@ class UnemploymentEnv_v9(gym.Env):
     Employment states:
         Type: Int
         Num     State
-        0   Earnings-related Unemployed
-        1   Employed
-        2   Retired
-        3   Disabled
-        4   Extended earnings-related unemployment
-        5   Mother's leave
-        6   Father's leave
-        7   Support for taking care of children at home
-        8   Retired working part-time
-        9   Retired worling full-time
-        10  Part-time work
-        11  Outside of work-force
-        12  Student or in the army
-        13  Earnings-unrelated Unemployment (työmarkkinatuki)
-        14  Sickness benefit
+        0   Earnings-related Unemployed * 
+        1   Full time work * 
+        2   Retired * 
+        3   Disabled * 
+        4   Extended earnings-related unemployment * 
+        5   Mother's leave *
+        6   Father's leave *
+        7   Support for taking care of children at home *
+        8   Retired working part-time * 
+        9   Retired working full-time * 
+        10  Part-time work * 
+        11  Outside of work-force *
+        12  Student or in the army *
+        13  Earnings-unrelated Unemployment (työmarkkinatuki) * 
+        14  Sickness benefit *
         15  Dead
 
     Actions:
@@ -219,7 +219,6 @@ class UnemploymentEnv_v9(gym.Env):
                 print('Mortality included, not stopped')
 
         self.n_empl=16 # state of employment, 0,1,2,3,4
-        self.n_empl = self.n_empl
 
         self.set_year(self.year)
 

@@ -23,7 +23,6 @@ class Statevector_v8():
                 min_retirementage: float,min_ove_age: float,get_paid_wage: float,timestep: float):
         self.n_empl=n_empl
         self.n_groups=n_groups # 3 per gender (6 in total)
-        self.n_empl=n_empl
         self.n_parttime_action=n_parttime_action
         self.include_mort=include_mort
         self.setup_state_encoding()
@@ -344,10 +343,10 @@ class Statevector_v8():
         pos+=self.n_groups
 
         puoliso_tila=self.get_onehot(vec,pos,self.n_empl,'s_emp')
-        pos+=self.n_empl+2
+        pos+=self.n_empl+2 # +2 because of indicators
                 
         pt_act=self.get_onehot(vec,pos,self.n_parttime_action,'pt1')
-        pos+=self.n_parttime_action+2
+        pos+=self.n_parttime_action+2 # +2 because of indicators
 
         sp_pt_act=self.get_onehot(vec,pos,self.n_parttime_action,'pt2')
         pos+=self.n_parttime_action
@@ -388,7 +387,7 @@ class Statevector_v8():
         ove_paid=round(vec[pos+22])
         kassanjasen=round(vec[pos+24])
         toekesto=vec[pos+25]+14/12
-        puoliso=round(vec[pos+26])
+        puoliso=round(vec[pos+26]) # 30
         puoliso_old_wage=vec[pos+27]*self.wagescale+self.wagescale
         puoliso_pension=vec[pos+28]*self.pensionscale+self.pensionscale
         puoliso_wage_reduction=vec[pos+29]
@@ -398,7 +397,7 @@ class Statevector_v8():
         puoliso_unemp_benefit_left=vec[pos+33]+1
         puoliso_unemp_after_ra=2*vec[pos+34]+1
         puoliso_unempwage=vec[pos+35]*self.wagescale+self.wagescale
-        puoliso_unempwage_basis=vec[pos+36]*self.wagescale+self.wagescale
+        puoliso_unempwage_basis=vec[pos+36]*self.wagescale+self.wagescale # 40
         puoliso_alkanut_ansiosidonnainen=round(vec[pos+37])
         puoliso_toe58=round(vec[pos+38])
         puoliso_toe=vec[pos+39]+14/12
@@ -409,7 +408,7 @@ class Statevector_v8():
         puoliso_ove_paid=round(vec[pos+44])
         
         kansanelake=vec[pos+45]*self.pensionscale+self.pensionscale
-        puoliso_kansanelake=vec[pos+46]*self.pensionscale+self.pensionscale
+        puoliso_kansanelake=vec[pos+46]*self.pensionscale+self.pensionscale # 50
         paid_pension=tyoelake_maksussa+kansanelake
         puoliso_paid_pension=puoliso_tyoelake_maksussa+puoliso_kansanelake
 
@@ -422,7 +421,7 @@ class Statevector_v8():
         main_life_left=vec[pos+51]*age_maxdur+age_maxdur
         spouse_life_left=vec[pos+52]*age_maxdur+age_maxdur
         main_until_disab=vec[pos+53]*age_maxdur+age_maxdur
-        spouse_until_disab=vec[pos+54]*age_maxdur+age_maxdur
+        spouse_until_disab=vec[pos+54]*age_maxdur+age_maxdur # 60
 
         time_to_marriage=vec[pos+55]*age_maxdur+age_maxdur
         time_to_divorce=vec[pos+56]*age_maxdur+age_maxdur
@@ -430,7 +429,7 @@ class Statevector_v8():
         main_until_student=vec[pos+58]*age_maxdur+age_maxdur
         spouse_until_student=vec[pos+59]*age_maxdur+age_maxdur
         main_until_outsider=vec[pos+60]*age_maxdur+age_maxdur
-        spouse_until_outsider=vec[pos+61]*age_maxdur+age_maxdur
+        spouse_until_outsider=vec[pos+61]*age_maxdur+age_maxdur # 67
 
         if self.include_preferencenoise:
             prefnoise=vec[pos+62]
@@ -445,21 +444,15 @@ class Statevector_v8():
         #    else:
         #        prefnoise=0
 
-        return round(emp),g,spouse_g,pension,wage,age,time_in_state,paid_pension,pink,toe,toekesto,\
-               tyohist,used_unemp_benefit,wage_reduction,unemp_after_ra,\
-               unempwage,unempwage_basis,prefnoise,children_under3,children_under7,children_under18,\
-               unemp_left,alkanut_ansiosidonnainen,toe58,ove_paid,kassanjasen,puoliso,puoliso_tila,\
-               puoliso_old_wage,puoliso_pension,puoliso_wage_reduction,puoliso_paid_pension,puoliso_next_wage,\
-               puoliso_used_unemp_benefit,puoliso_unemp_benefit_left,\
-               puoliso_unemp_after_ra,puoliso_unempwage,puoliso_unempwage_basis,\
-               puoliso_alkanut_ansiosidonnainen,puoliso_toe58,\
-               puoliso_toe,puoliso_toekesto,puoliso_tyoura,puoliso_time_in_state,puoliso_pinkslip,puoliso_ove_paid,\
-               kansanelake,puoliso_kansanelake,tyoelake_maksussa,puoliso_tyoelake_maksussa,next_wage,\
-               main_paid_wage,spouse_paid_wage,pt_act,sp_pt_act,\
-               main_basis_wage,spouse_basis_wage,\
-               main_life_left,spouse_life_left,main_until_disab,spouse_until_disab,\
-               time_to_marriage,time_to_divorce,until_birth,\
-               main_until_student,spouse_until_student,main_until_outsider,spouse_until_outsider
+        # here are 68 variables including pref_noise that is not used => 67 state variables
+
+        return round(emp),g,spouse_g,pension,wage,age,time_in_state,paid_pension,pink,toe,\
+                toekesto,tyohist,used_unemp_benefit,wage_reduction,unemp_after_ra,unempwage,unempwage_basis,prefnoise,children_under3,children_under7,\
+                children_under18,unemp_left,alkanut_ansiosidonnainen,toe58,ove_paid,kassanjasen,puoliso,puoliso_tila,puoliso_old_wage,puoliso_pension,\
+                puoliso_wage_reduction,puoliso_paid_pension,puoliso_next_wage,puoliso_used_unemp_benefit,puoliso_unemp_benefit_left,puoliso_unemp_after_ra,puoliso_unempwage,puoliso_unempwage_basis,puoliso_alkanut_ansiosidonnainen,puoliso_toe58,\
+                puoliso_toe,puoliso_toekesto,puoliso_tyoura,puoliso_time_in_state,puoliso_pinkslip,puoliso_ove_paid,kansanelake,puoliso_kansanelake,tyoelake_maksussa,puoliso_tyoelake_maksussa,\
+                next_wage,main_paid_wage,spouse_paid_wage,pt_act,sp_pt_act,main_basis_wage,spouse_basis_wage,main_life_left,spouse_life_left,main_until_disab,\
+                spouse_until_disab,time_to_marriage,time_to_divorce,until_birth,main_until_student,spouse_until_student,main_until_outsider,spouse_until_outsider
                               
     def random_init_state(self,minage: float=18,maxage: float=70):
         emp=random.randint(0,15)
