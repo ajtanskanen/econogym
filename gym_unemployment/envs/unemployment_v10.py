@@ -561,42 +561,52 @@ class UnemploymentEnv_v10(gym.Env):
             self.min_retirementage_putki=62.0
             self.min_retirementage=63.5
             self.max_retirementage=68
+            self.min_ove_age=61
         elif year==2019:
             self.min_retirementage_putki=62.0
             self.min_retirementage=63.75
             self.max_retirementage=68
+            self.min_ove_age=61
         elif year==2020:
             self.min_retirementage_putki=64.0
             self.min_retirementage=64.0
             self.max_retirementage=69
+            self.min_ove_age=61
         elif year==2021:
             self.min_retirementage_putki=64.0
             self.min_retirementage=64.25
             self.max_retirementage=69
+            self.min_ove_age=61
         elif year==2022:
             self.min_retirementage_putki=64.0
             self.min_retirementage=64.5
             self.max_retirementage=69
+            self.min_ove_age=61
         elif year==2023:
             self.min_retirementage_putki=64.0
             self.min_retirementage=64.75
             self.max_retirementage=69
+            self.min_ove_age=61
         elif year==2024:
             self.min_retirementage_putki=65.0
             self.min_retirementage=65
             self.max_retirementage=70
+            self.min_ove_age=61
         elif year==2025:
             self.min_retirementage_putki=65.0
             self.min_retirementage=65
             self.max_retirementage=70
+            self.min_ove_age=61
         elif year==2026:
             self.min_retirementage_putki=65.0
             self.min_retirementage=65
             self.max_retirementage=70
+            self.min_ove_age=61
         elif year==2027:
             self.min_retirementage_putki=65.0
             self.min_retirementage=65
             self.max_retirementage=70
+            self.min_ove_age=61
         else:
             error('retirement_age')
 
@@ -605,6 +615,10 @@ class UnemploymentEnv_v10(gym.Env):
             self.min_retirementage_putki = 70
             self.min_retirementage = 70
             self.max_retirementage = 71
+            self.max_svbenefitage = self.min_retirementage
+            self.max_unemploymentbenefitage = self.min_retirementage
+            self.min_tyottputki_ika = 68
+            self.min_ove_age = 65
 
 
     def set_year(self,year: int) -> None:
@@ -696,7 +710,7 @@ class UnemploymentEnv_v10(gym.Env):
         self.birth_intensity = self.rates.get_birth_rate_v10(symmetric=False)
         self.mort_intensity = self.rates.get_mort_rate_v10(self.year) #get_mort_rate()
         self.student_inrate,self.student_outrate = self.rates.get_student_rate_v10() # myös armeijassa olevat tässä
-        self.outsider_inrate,self.outsider_outrate = self.rates.get_outsider_rate_v10(self.max_retirementage)
+        self.outsider_inrate,self.outsider_outrate = self.rates.get_outsider_rate_v10(self.max_retirementage,R70=self.retage70)
         self.divorce_rate = self.rates.get_divorce_rate()
         self.marriage_rate, self.marriage_matrix = self.rates.get_marriage_rate()
 
@@ -2016,6 +2030,7 @@ class UnemploymentEnv_v10(gym.Env):
             ove_paid=0
             until_student,until_outsider=100,100
         else: # työvoiman ulkopuolella
+            print('move_to_retirement: retired before retirement age!!!! age',age,'employment_status',employment_status)
             paid_wage=0
             ove_paid=0
             time_in_state = 0
@@ -2023,7 +2038,6 @@ class UnemploymentEnv_v10(gym.Env):
             wage = 0
             time_in_state += self.timestep
             until_student,until_outsider=100,100
-            print('retired before retirement age!!!!')
 
         #if kansanelake>10_000:
         #    print('kansanelake',kansanelake,age,tyoelake*self.elinaikakerroin/12,1-has_spouse)
@@ -4940,7 +4954,6 @@ class UnemploymentEnv_v10(gym.Env):
             elif key=='retage70':
                 if value is not None:
                     self.retage70 = value
-                    print('retage70!!!!',value)
             elif key=='mortplot':
                 if value is not None:
                     self.mortplot=value
