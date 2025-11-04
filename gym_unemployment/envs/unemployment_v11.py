@@ -1,6 +1,6 @@
 """
 
-    unemployment_v10
+    unemployment_v11
     
 
     Gym module implementing the Finnish social security including earnings-related components,
@@ -26,8 +26,9 @@
     - child support fixed
     - refitted reemp probs + career impact
     v10
-    - refitting reemp probs ?
     - enables estimation of retirement age changes
+    v11
+    - refitting reemp probs ?
 
     fully random events still include:
     - next salary
@@ -54,7 +55,7 @@ from . rates import Rates
 from scipy.interpolate import interp1d
 from . util import compare_q_print,crosscheck_print,test_var
 from . wages_v1 import Wages_v1
-from . state_v10 import Statevector_v10
+from . state_v11 import Statevector_v11
 #from . infostate_v5 import Infostate
 
 # class StayDict(dict):
@@ -65,7 +66,7 @@ from . state_v10 import Statevector_v10
 #         return 'Unknown state '+key
 
 
-class UnemploymentEnv_v10(gym.Env):
+class UnemploymentEnv_v11(gym.Env):
     """
     Description:
         The Finnish Unemployment Pension Scheme
@@ -256,7 +257,7 @@ class UnemploymentEnv_v10(gym.Env):
                 self.parttime_actions = self.setup_parttime_actions(debug=True)
 
         #self.setup_state_encoding()
-        self.states=Statevector_v10(self.n_empl,self.n_groups_encoding,self.n_parttime_action,self.include_mort,self.min_age,self.max_age,self.include_preferencenoise,self.min_retirementage,self.min_ove_age,self.get_paid_wage,self.timestep)
+        self.states=Statevector_v11(self.n_empl,self.n_groups_encoding,self.n_parttime_action,self.include_mort,self.min_age,self.max_age,self.include_preferencenoise,self.min_retirementage,self.min_ove_age,self.get_paid_wage,self.timestep)
         self.low,self.high = self.states.set_state_limits()
 
         #self.action_space = spaces.MultiDiscrete([self.n_actions,self.n_spouse_actions])
@@ -652,7 +653,7 @@ class UnemploymentEnv_v10(gym.Env):
         self.get_spousewage = self.wages_spouse.get_wage
 
         # reemployment probability
-        prob_ft_3m,prob_pt_3m,prob_3m_oa,parttime_fullemp_prob_3m,fulltime_pt_prob_3m = self.rates.get_reemp_prob_v10()
+        prob_ft_3m,prob_pt_3m,prob_3m_oa,parttime_fullemp_prob_3m,fulltime_pt_prob_3m = self.rates.get_reemp_prob_v11()
         #prob_1y=1-(1-prob_ft_3m)**(1./0.25)
         self.unemp_reemp_ft_prob=prob_ft_3m #1-(1-prob_1y)**self.timestep # kolmessa kuukaudessa
         self.student_reemp_ft_prob=prob_ft_3m
@@ -702,17 +703,17 @@ class UnemploymentEnv_v10(gym.Env):
         if self.retage70:
             self.elinaikakerroin = self.laske_elinaikakerroin70()*self.elinaikakerroin
 
-        self.disability_intensity,self.svpaivaraha_disabilityrate,self.svpaivaraha_short3m = self.rates.get_eff_disab_rate_v10()
-        self.pinkslip_intensity = self.rates.get_pinkslip_rate_v10()*self.timestep
-        self.birth_intensity = self.rates.get_birth_rate_v10(symmetric=False)
-        self.mort_intensity = self.rates.get_mort_rate_v10(self.year) #get_mort_rate()
-        self.student_inrate,self.student_outrate = self.rates.get_student_rate_v10() # myös armeijassa olevat tässä
-        self.outsider_inrate,self.outsider_outrate = self.rates.get_outsider_rate_v10(self.max_retirementage,R70=self.retage70)
+        self.disability_intensity,self.svpaivaraha_disabilityrate,self.svpaivaraha_short3m = self.rates.get_eff_disab_rate_v11()
+        self.pinkslip_intensity = self.rates.get_pinkslip_rate_v11()*self.timestep
+        self.birth_intensity = self.rates.get_birth_rate_v11(symmetric=False)
+        self.mort_intensity = self.rates.get_mort_rate_v11(self.year) #get_mort_rate()
+        self.student_inrate,self.student_outrate = self.rates.get_student_rate_v11() # myös armeijassa olevat tässä
+        self.outsider_inrate,self.outsider_outrate = self.rates.get_outsider_rate_v11(self.max_retirementage,R70=self.retage70)
         self.divorce_rate = self.rates.get_divorce_rate()
         self.marriage_rate, self.marriage_matrix = self.rates.get_marriage_rate()
 
         self.npv_pension,self.npv_gpension = self.comp_npv()
-        self.initial_weights = self.rates.get_initial_weights_v10()
+        self.initial_weights = self.rates.get_initial_weights_v11()
 
     def comp_npv(self):
         '''
@@ -6366,7 +6367,7 @@ class UnemploymentEnv_v10(gym.Env):
         '''
         returns the version of life-cycle model's episodestate used
         '''
-        return 10
+        return 11
 
     def get_lc_twoperson(self) -> bool:
         '''

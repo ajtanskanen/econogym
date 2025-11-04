@@ -223,7 +223,7 @@ class Wages_v1():
             
     def get_potential_wage(self,age: float):
         '''
-        palkka age-ikäiselle ILMAN time_in_state-vähennystä työllistymispalkkaan, step-kohtaisesti, ei vuosikohtaisesti
+        palkka age-ikäiselle ILMAN palkan vähennystä työllistymispalkkaan, step-kohtaisesti, ei vuosikohtaisesti
         '''
         intage=self.map_age(age)
         if age<self.max_age and age>=self.min_age-1:

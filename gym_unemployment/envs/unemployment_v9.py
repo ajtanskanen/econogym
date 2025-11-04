@@ -6269,6 +6269,12 @@ class UnemploymentEnv_v9(gym.Env):
         '''
         return 9
 
+    def get_lc_twoperson(self) -> bool:
+        '''
+        tells whether state space represent one or two persons
+        '''
+        return True
+
     def get_mortstate(self) -> int:
         return 15
 
