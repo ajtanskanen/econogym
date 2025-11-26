@@ -485,34 +485,9 @@ class UnemploymentEnv_v11(gym.Env):
         self.plottkdebug=False
 
     def set_annual_params(self,year: int) -> None:
-        # arvot MAALISKUUN lukuja kuluttajahintaindeksin vuosimuutoksessa, https://stat.fi/tilasto/khi
-        # nämä matchataan ansiotasoindeksin muutokseen
-        #inflation_raw = np.array([1.0, # 2018
-        #                          1.010248, # 1.011206, # 1.011399, # 2019
-        #                          1.002917, # 1.006027, # 1.00381, # 2020
-        #                          1.021936, # 1.013334622, # 1.020716, # 2021
-        #                          1.071092, # 1.057976542, # 1.071655, # 2022
-        #                          1.062916, # 1.079315007, # 1.043444, # 2023
-        #                          1.015725, # 1.021795407, # 1.014, # 2024
-        #                          1.005592, # 1.005312194, # 1.006896, # 2025
-        #                          1.015, # 2026
-        #                          1.020]) # 2027
-
         inflation_raw = self.rates.get_inflation()
         self.inflation = np.cumprod(inflation_raw)
         self.inflationfactor = self.inflation[year-2018]
-
-        # arvot ansiotasoindeksi (y+1)Q1 vs yQ1 tasossa
-        #salaryinflation_raw=np.array([1.0, # 2018
-        #                              1.021210603, # 1.021243, # 2019
-        #                              1.019460017, # 1.01987, # 2020
-        #                              1.024215574, # 1.021613, # 2021
-        #                              1.024079442, # 1.022646, # 2022
-        #                              1.042374951, # 1.030886, # 2023
-        #                              1.030721699, # 1.039005, # 2024
-        #                              1.032, # 2025
-        #                              1.038, # 2026
-        #                              1.030]) # 2027
 
         salaryinflation_raw = self.rates.get_wageinflation()
         self.salaryinflation=np.cumprod(salaryinflation_raw)
