@@ -407,6 +407,7 @@ class UnemploymentEnv_v11(gym.Env):
         self.minage_500=58 # minimi-ikä 500 päivälle
         self.min_salary=1100*12 # 1000 # julkaistujen laskelmien jälkeen
         self.retage70 = False # nostetaanko eläkeikä nopeasti 70:een
+        self.eak70 = True # korjataanko eak kun ve muuttuu
 
         self.update_disab_wage_reduction=False # True # päivitä wage reduction, vaikka henkilö on työkyvyttömyyseläkkeellä
 
@@ -627,7 +628,11 @@ class UnemploymentEnv_v11(gym.Env):
         self.get_spousewage = self.wages_spouse.get_wage
 
         # reemployment probability
-        prob_ft_3m,prob_pt_3m,prob_3m_oa,parttime_fullemp_prob_3m,fulltime_pt_prob_3m = self.rates.get_reemp_prob_v11()
+        if True:
+            prob_ft_3m,prob_pt_3m,prob_3m_oa,parttime_fullemp_prob_3m,fulltime_pt_prob_3m = self.rates.get_reemp_prob_v11a()
+        else:
+            prob_ft_3m,prob_pt_3m,prob_3m_oa,parttime_fullemp_prob_3m,fulltime_pt_prob_3m = self.rates.get_reemp_prob_v11b()
+
         self.unemp_reemp_ft_prob=prob_ft_3m #1-(1-prob_1y)**self.timestep # kolmessa kuukaudessa
         self.student_reemp_ft_prob=prob_ft_3m
         self.student_reemp_ft_prob[:30,:]=self.student_reemp_ft_prob[:30,:]
@@ -637,7 +642,7 @@ class UnemploymentEnv_v11(gym.Env):
 
         # moving from parttime work to fulltime work
         self.parttime_fullemp_prob=parttime_fullemp_prob_3m #1-(1-prob_1y)**self.timestep # kolmessa kuukaudessa
-        self.fulltime_pt_prob=fulltime_pt_prob_3m #1-(1-prob_1y)**self.timestep # kolmessa kuukaudessa
+        self.fulltime_pt_prob=fulltime_pt_prob_3m #1-(1-prob_1y)**self.timestep # kolmessa kuukaudessa, onnistuu aina koodissa
 
         if self.year>=2025:
             self.ansiopvraha_toe = 1.0
@@ -667,7 +672,7 @@ class UnemploymentEnv_v11(gym.Env):
         else:
             print('unknown year',self.year)
 
-        if self.retage70:
+        if self.retage70 and self.eak70:
             self.elinaikakerroin = self.laske_elinaikakerroin70()*self.elinaikakerroin
 
         self.disability_intensity,self.svpaivaraha_disabilityrate,self.svpaivaraha_short3m = self.rates.get_eff_disab_rate_v11()
@@ -1051,8 +1056,9 @@ class UnemploymentEnv_v11(gym.Env):
                 p[alku+'tyottomyyden_kesto'] = 12*21.5*(used_unemp_benefit-self.timestep)
 
                 if irtisanottu<1 and karenssia_jaljella>0:
-                    p[alku+'saa_ansiopaivarahaa'] = 0
-                    p[alku+'tyoton'] = 0
+                    #p[alku+'saa_ansiopaivarahaa'] = 0
+                    p[alku+'omavastuukerroin'] = max(0,1.0 - karenssia_jaljella/self.timestep)
+                    #p[alku+'tyoton'] = 0
 
                 p[alku+'tyoelake'] = tyoelake/12 # ove
                 p[alku+'osittainenvanhuuselake'] = tyoelake/12 # ove
@@ -2272,7 +2278,7 @@ class UnemploymentEnv_v11(gym.Env):
                         used_unemp_benefit += self.timestep
                         karenssia_jaljella=0.0
                     else:
-                        karenssia_jaljella=0.25 # 90 pv
+                        karenssia_jaljella=0.25 / 3 # 90 pv # ei enää näin kovia anneta
                     alkanut_ansiosidonnainen = 1
                 else:
                     if self.include_putki and age >= self.min_tyottputki_ika and tyoura >= self.tyohistoria_tyottputki:
@@ -2292,13 +2298,13 @@ class UnemploymentEnv_v11(gym.Env):
                 if irtisanottu: # muuten ei oikeutta tm-tukeen karenssin vuoksi
                     karenssia_jaljella=0.0
                 else:
-                    karenssia_jaljella=0.25 # 90 pv
+                    karenssia_jaljella=0.25 / 3 # 90 pv -> 30 pv
 
             #time_in_state=0
             paid_wage=0
 
             if karenssia_jaljella>0:
-                pension=pension*self.palkkakerroin
+                pension = pension*self.palkkakerroin
             else:
                 if tyoelake>0: # ove maksussa, ei karttumaa
                     pension = self.pension_accrual(age,unempwage_basis,pension,state=employment_status,ove_paid=1)
@@ -3363,9 +3369,9 @@ class UnemploymentEnv_v11(gym.Env):
             action=4 # ve:lle
             pinkslip=1
 
-        if (action in {1,2}) and self.unemp_limit_reemp:
-            if sattuma[7]>self.fulltime_pt_prob and self.randomness:
-                action = 0
+        #if (action in {1,2}) and self.unemp_limit_reemp:
+        #    if sattuma[7]>self.fulltime_pt_prob and self.randomness:
+        #        action = 0
 
         #if age >= self.max_retirementage:
         #    employment_status,kansanelake,tyoelake,pension,paid_wage,time_in_state,ove_paid,basis_wage,until_student,until_outsider=\
@@ -4953,6 +4959,9 @@ class UnemploymentEnv_v11(gym.Env):
             elif key=='retage70':
                 if value is not None:
                     self.retage70 = value
+            elif key=='eak70':
+                if value is not None:
+                    self.eak70 = value
             elif key=='mortplot':
                 if value is not None:
                     self.mortplot=value
@@ -5363,7 +5372,7 @@ class UnemploymentEnv_v11(gym.Env):
             sattuma = random.uniform(0,1)
             t=round((age-self.min_age)/self.timestep)
 
-            toissa = self.initial_weights[group,2]+self.initial_weights[group,3]
+            toissa = self.initial_weights[group,2]+self.initial_weights[group,3] # kokoaika + osa-aika
             osuus = self.kassanjasenyys_rate[t]
             if employment_state in set([1,10]):
                 if osuus > toissa:

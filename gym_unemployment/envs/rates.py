@@ -3976,12 +3976,12 @@ class Rates():
     
     def get_pinkslip_rate_v11(self):
         pinkslip_intensity=np.zeros((6,100))
-        pinkslip_intensity[0,:]=0.090 # todennäköisyys tulla irtisanotuksi vuodessa, miehet
-        pinkslip_intensity[1,:]=0.040 # todennäköisyys tulla irtisanotuksi vuodessa, miehet
-        pinkslip_intensity[2,:]=self.get_w(0,pinkslip_intensity[0,:],pinkslip_intensity[1,:],intensity=0.05) # kokonaisintensiteetti 0,05
-        pinkslip_intensity[3,:]=0.070 # todennäköisyys tulla irtisanotuksi vuodessa, naiset
-        pinkslip_intensity[4,:]=0.035 # todennäköisyys tulla irtisanotuksi vuodessa, naiset
-        pinkslip_intensity[5,:]=self.get_w(1,pinkslip_intensity[3,:],pinkslip_intensity[4,:],intensity=0.04) # kokonaisintensiteetti 0,04
+        pinkslip_intensity[0,:]=0.080 # todennäköisyys tulla irtisanotuksi vuodessa, miehet
+        pinkslip_intensity[1,:]=0.030 # todennäköisyys tulla irtisanotuksi vuodessa, miehet
+        pinkslip_intensity[2,:]=0.010 # self.get_w(0,pinkslip_intensity[0,:],pinkslip_intensity[1,:],intensity=0.04) # kokonaisintensiteetti 0,04
+        pinkslip_intensity[3,:]=0.080 # todennäköisyys tulla irtisanotuksi vuodessa, naiset
+        pinkslip_intensity[4,:]=0.030 # todennäköisyys tulla irtisanotuksi vuodessa, naiset
+        pinkslip_intensity[5,:]=0.010 #self.get_w(1,pinkslip_intensity[3,:],pinkslip_intensity[4,:],intensity=0.04) # kokonaisintensiteetti 0,04
 
         return pinkslip_intensity    
     
@@ -4903,50 +4903,58 @@ class Rates():
         
         return reemp_ft,reemp_pt,prob_3m_oa,parttime_fullemp_prob,fulltime_pt_prob_3m  
 
-    def get_reemp_prob_v11(self):
+    def get_reemp_prob_v11a(self):
         '''
         reemployment probability in 3 months
         simplified from v10
         '''
         # reemployment to fulltime work
         reemp_ft=np.zeros((100,6))
-        reemp_ft[0:25,0:3]=0.15 # miehet
-        reemp_ft[25:30,0:3]=0.20
-        reemp_ft[30:50,0:3]=0.25
-        reemp_ft[50:55,0:3]=0.25
-        reemp_ft[55:60,0:3]=0.20
-        reemp_ft[60:65,0:3]=0.20
-        reemp_ft[65:70,0:3]=0.15
+        reemp_ft[0:25,0:3]=0.18 # miehet
+        reemp_ft[25:30,0:3]=0.18
+        reemp_ft[30:50,0:3]=0.23
+        reemp_ft[50:55,0:3]=0.21
+        reemp_ft[55:60,0:3]=0.18
+        reemp_ft[60:65,0:3]=0.16
+        reemp_ft[65:70,0:3]=0.13
         reemp_ft[70:100,0:3]=0.025
 
-        reemp_ft[0:25,3:6]=0.15 # naiset
-        reemp_ft[25:30,3:6]=0.20
-        reemp_ft[30:50,3:6]=0.25
-        reemp_ft[50:55,3:6]=0.25
-        reemp_ft[55:60,3:6]=0.20
-        reemp_ft[60:65,3:6]=0.20
-        reemp_ft[65:70,3:6]=0.15
+        reemp_ft[0:25,3:6]=0.17 # naiset
+        reemp_ft[25:30,3:6]=0.17
+        reemp_ft[30:50,3:6]=0.23
+        reemp_ft[50:55,3:6]=0.22
+        reemp_ft[55:60,3:6]=0.19
+        reemp_ft[60:65,3:6]=0.16
+        reemp_ft[65:70,3:6]=0.13
         reemp_ft[70:100,3:6]=0.025
         
         # reemployment to parttime work
         reemp_pt=np.zeros((100,6))
-        reemp_pt[0:25,0:3]=0.75 # miehet
-        reemp_pt[25:30,0:3]=0.70
-        reemp_pt[30:50,0:3]=0.65
+        reemp_pt[0:25,0:3]=0.80 # miehet
+        reemp_pt[25:30,0:3]=0.80
+        reemp_pt[30:50,0:3]=0.60
         reemp_pt[50:55,0:3]=0.45
-        reemp_pt[55:60,0:3]=0.35
-        reemp_pt[60:65,0:3]=0.30
-        reemp_pt[65:70,0:3]=0.30
+        reemp_pt[55:60,0:3]=0.33
+        reemp_pt[60:65,0:3]=0.27
+        reemp_pt[65:70,0:3]=0.25
         reemp_pt[70:100,0:3]=0.05
 
         reemp_pt[0:25,3:6]=0.80 # naiset
-        reemp_pt[25:30,3:6]=0.75
-        reemp_pt[30:50,3:6]=0.65
-        reemp_pt[50:55,3:6]=0.45
-        reemp_pt[55:60,3:6]=0.35
-        reemp_pt[60:65,3:6]=0.30
-        reemp_pt[65:70,3:6]=0.30
+        reemp_pt[25:30,3:6]=0.80
+        reemp_pt[30:50,3:6]=0.60
+        reemp_pt[50:55,3:6]=0.50
+        reemp_pt[55:60,3:6]=0.36
+        reemp_pt[60:65,3:6]=0.28
+        reemp_pt[65:70,3:6]=0.25
         reemp_pt[70:100,3:6]=0.05
+
+        scale_men = 0.85
+        scale_women = 0.8
+
+        reemp_ft[0:100,0:3] *= scale_men
+        reemp_ft[0:100,3:6] *= scale_women
+        reemp_pt[0:100,0:3] *= scale_men
+        reemp_pt[0:100,3:6] *= scale_women    
 
         if False:
             for g in range(6):
@@ -4963,7 +4971,148 @@ class Rates():
         prob_3m_oa=0.2       
         fulltime_pt_prob_3m=0.8
         
-        return reemp_ft,reemp_pt,prob_3m_oa,parttime_fullemp_prob,fulltime_pt_prob_3m                 
+        return reemp_ft,reemp_pt,prob_3m_oa,parttime_fullemp_prob,fulltime_pt_prob_3m  
+
+    def get_reemp_prob_v11b(self):
+        '''
+        reemployment probability in 3 months
+        '''
+        # reemployment to fulltime work
+        reemp_ft=np.zeros((100,6))
+        reemp_ft[0:25,0]=0.18 # miehet, suorittavia töitä löytyy hyvin nuorena, vanhempana huonommin
+        reemp_ft[25:30,0]=0.19
+        reemp_ft[30:50,0]=0.22
+        reemp_ft[50:55,0]=0.16
+        reemp_ft[55:60,0]=0.15
+        reemp_ft[60:65,0]=0.10
+        reemp_ft[65:70,0]=0.10
+        reemp_ft[70:100,0]=0.05
+
+        reemp_ft[0:25,1]=0.16 # miehet
+        reemp_ft[25:30,1]=0.18
+        reemp_ft[30:50,1]=0.23
+        reemp_ft[50:55,1]=0.20
+        reemp_ft[55:60,1]=0.17
+        reemp_ft[60:65,1]=0.15
+        reemp_ft[65:70,1]=0.15
+        reemp_ft[70:100,1]=0.05
+
+        reemp_ft[0:25,2]=0.18 # miehet
+        reemp_ft[25:30,2]=0.22
+        reemp_ft[30:50,2]=0.28
+        reemp_ft[50:55,2]=0.25
+        reemp_ft[55:60,2]=0.25
+        reemp_ft[60:65,2]=0.20
+        reemp_ft[65:70,2]=0.20
+        reemp_ft[70:100,2]=0.05
+
+        reemp_ft[0:25,3]=0.13 # naiset, suorittavia töitä löytyy hyvin nuorena, vanhempana huonommin
+        reemp_ft[25:30,3]=0.15
+        reemp_ft[30:50,3]=0.23
+        reemp_ft[50:55,3]=0.22
+        reemp_ft[55:60,3]=0.17
+        reemp_ft[60:65,3]=0.15
+        reemp_ft[65:70,3]=0.10
+        reemp_ft[70:100,3]=0.025
+
+        reemp_ft[0:25,4]=0.16 # naiset
+        reemp_ft[25:30,4]=0.15
+        reemp_ft[30:50,4]=0.25
+        reemp_ft[50:55,4]=0.20
+        reemp_ft[55:60,4]=0.20
+        reemp_ft[60:65,4]=0.15
+        reemp_ft[65:70,4]=0.15
+        reemp_ft[70:100,4]=0.025
+
+        reemp_ft[0:25,5]=0.18 # naiset
+        reemp_ft[25:30,5]=0.20
+        reemp_ft[30:50,5]=0.28
+        reemp_ft[50:55,5]=0.25
+        reemp_ft[55:60,5]=0.20
+        reemp_ft[60:65,5]=0.20
+        reemp_ft[65:70,5]=0.20
+        reemp_ft[70:100,5]=0.025
+
+        # reemployment to parttime work
+        reemp_pt=np.zeros((100,6))
+        reemp_pt[0:25,0]=0.70 # miehet
+        reemp_pt[25:30,0]=0.65
+        reemp_pt[30:50,0]=0.60
+        reemp_pt[50:55,0]=0.40
+        reemp_pt[55:60,0]=0.35
+        reemp_pt[60:65,0]=0.30
+        reemp_pt[65:70,0]=0.20
+        reemp_pt[70:100,0]=0.05
+
+        reemp_pt[0:25,1]=0.70 # miehet
+        reemp_pt[25:30,1]=0.65
+        reemp_pt[30:50,1]=0.60
+        reemp_pt[50:55,1]=0.45
+        reemp_pt[55:60,1]=0.37
+        reemp_pt[60:65,1]=0.35
+        reemp_pt[65:70,1]=0.25
+        reemp_pt[70:100,1]=0.10
+
+        reemp_pt[0:25,2]=0.70 # miehet
+        reemp_pt[25:30,2]=0.70
+        reemp_pt[30:50,2]=0.65
+        reemp_pt[50:55,2]=0.50
+        reemp_pt[55:60,2]=0.40
+        reemp_pt[60:65,2]=0.35
+        reemp_pt[65:70,2]=0.25
+        reemp_pt[70:100,2]=0.10
+
+        reemp_pt[0:25,3]=0.65 # naiset
+        reemp_pt[25:30,3]=0.60
+        reemp_pt[30:50,3]=0.55
+        reemp_pt[50:55,3]=0.50
+        reemp_pt[55:60,3]=0.43
+        reemp_pt[60:65,3]=0.30
+        reemp_pt[65:70,3]=0.20
+        reemp_pt[70:100,3]=0.10
+
+        reemp_pt[0:25,4]=0.70 # naiset
+        reemp_pt[25:30,4]=0.65
+        reemp_pt[30:50,4]=0.60
+        reemp_pt[50:55,4]=0.55
+        reemp_pt[55:60,4]=0.45
+        reemp_pt[60:65,4]=0.35
+        reemp_pt[65:70,4]=0.25
+        reemp_pt[70:100,4]=0.10
+
+        reemp_pt[0:25,5]=0.70 # naiset
+        reemp_pt[25:30,5]=0.70
+        reemp_pt[30:50,5]=0.65
+        reemp_pt[50:55,5]=0.60
+        reemp_pt[55:60,5]=0.50
+        reemp_pt[60:65,5]=0.35
+        reemp_pt[65:70,5]=0.25
+        reemp_pt[70:100,5]=0.10
+
+        scale_men = 0.7
+        scale_women = 0.6
+
+        reemp_ft[0:100,0:3] *= scale_men
+        reemp_ft[0:100,3:6] *= scale_women
+        reemp_pt[0:100,0:3] *= scale_men
+        reemp_pt[0:100,3:6] *= scale_women    
+
+        if False:
+            for g in range(6):
+                print(f'-------------')
+                print(f'pt to ft rate ratio {g} 18-29',reemp_pt[18:30,g]/reemp_ft[18:30,g])
+                print(f'pt to ft rate ratio {g} 30-39',reemp_pt[30:40,g]/reemp_ft[30:40,g])
+                print(f'pt to ft rate ratio {g} 40-49',reemp_pt[40:50,g]/reemp_ft[40:50,g])
+                print(f'pt to ft rate ratio {g} 50-59',reemp_pt[50:60,g]/reemp_ft[50:60,g])
+                print(f'pt to ft rate ratio {g} 60-69',reemp_pt[60:70,g]/reemp_ft[60:70,g])
+
+        # keep the ratio of probabilities
+        parttime_fullemp_prob=np.minimum(1.0,reemp_ft/reemp_pt)
+
+        prob_3m_oa=0.2       
+        fulltime_pt_prob_3m=0.8
+        
+        return reemp_ft,reemp_pt,prob_3m_oa,parttime_fullemp_prob,fulltime_pt_prob_3m                     
         
     def get_tyelpremium(self):
         tyel_kokomaksu=np.zeros((2100,5))
