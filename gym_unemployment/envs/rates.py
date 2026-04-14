@@ -3190,7 +3190,7 @@ class Rates():
             naiset_in=np.array([0.00216592,0.00255245,0.00269872,0.00181878,0.00112329,0.00053563,0.0002641,0.0002641,0.00027577,0.00053816,0.00048061,0.00055177,0.00063692,0.00042259,0.0002641,0.0002641,0.00048368,0.00081195,0.00114768,0.00085107,0.00057927,0.00127887,0.00058422,0.00056993,0.00074703,0.00124015,0.0012635,0.0008181,0.00204415,0.00218892,0.00303589,0.00250847,0.00352562,0.00268981,0.00383085,0.00401219,0.00548823,0.00527688,0.00734349,0.00871437,0.01470171,0.02129086,0.03064403,0.03646917,0.04340787,0.05216821,0.06275019,0.07515382,0.08937908,0.10542598,0.12329453,0.14298471,0.16449654])
             miehet_in=np.array([0.00167853,0.00244638,0.00255928,0.00103917,0.00094072,0.00045763,0.0012542,0.00067111,0.0003663,0.00040644,0.0004436,0.00072119,0.00056847,0.00026672,0.0002573,0.0002573,0.0002573,0.00069164,0.00065853,0.00120795,0.00089986,0.00095519,0.00109044,0.00081072,0.00045402,0.00134067,0.00138472,0.00198947,0.00059171,0.00195475,0.00297514,0.00330054,0.00345263,0.00375931,0.0045167,0.00591826,0.00710603,0.00805252,0.00942472,0.01044811,0.01902299,0.02652137,0.03662257,0.04342204,0.05166552,0.059909,0.06825591,0.07660282,0.08494973,0.09329664,0.10164354,0.10999045,0.11833736])
         else:
-            print("Error: Unknown year in ['tk in']")   
+            print("Error: Unknown year in ['tk in']")
             
         # puolet sv:llä olevisa vain 3 kk, puolet yhden vuoden, skaalataan alkavuus
         
@@ -4943,81 +4943,7 @@ class Rates():
         
         return reemp_ft,reemp_pt,prob_3m_oa,parttime_fullemp_prob,fulltime_pt_prob_3m  
 
-    def get_reemp_prob_v11a(self):
-        '''
-        reemployment probability in 3 months
-        simplified from v10
-        '''
-        # reemployment to fulltime work
-        reemp_ft=np.zeros((100,6))
-        reemp_ft[0:25,0:3]=0.18 # miehet
-        reemp_ft[25:30,0:3]=0.20
-        reemp_ft[30:40,0:3]=0.25
-        reemp_ft[40:50,0:3]=0.25
-        reemp_ft[50:55,0:3]=0.21
-        reemp_ft[55:60,0:3]=0.18
-        reemp_ft[60:65,0:3]=0.16
-        reemp_ft[65:70,0:3]=0.13
-        reemp_ft[70:100,0:3]=0.05
-
-        reemp_ft[0:25,3:6]=0.17 # naiset
-        reemp_ft[25:30,3:6]=0.18
-        reemp_ft[30:40,3:6]=0.25
-        reemp_ft[40:50,3:6]=0.25
-        reemp_ft[50:55,3:6]=0.22
-        reemp_ft[55:60,3:6]=0.19
-        reemp_ft[60:65,3:6]=0.16
-        reemp_ft[65:70,3:6]=0.13
-        reemp_ft[70:100,3:6]=0.05
-        
-        # reemployment to parttime work
-        reemp_pt=np.zeros((100,6))
-        reemp_pt[0:25,0:3]=0.75 # miehet
-        reemp_pt[25:30,0:3]=0.75
-        reemp_pt[30:40,0:3]=0.65
-        reemp_pt[40:50,0:3]=0.55
-        reemp_pt[50:55,0:3]=0.45
-        reemp_pt[55:60,0:3]=0.33
-        reemp_pt[60:65,0:3]=0.27
-        reemp_pt[65:70,0:3]=0.25
-        reemp_pt[70:100,0:3]=0.10
-
-        reemp_pt[0:25,3:6]=0.75 # naiset
-        reemp_pt[25:30,3:6]=0.75
-        reemp_pt[30:40,3:6]=0.70
-        reemp_pt[40:50,3:6]=0.60
-        reemp_pt[50:55,3:6]=0.50
-        reemp_pt[55:60,3:6]=0.36
-        reemp_pt[60:65,3:6]=0.28
-        reemp_pt[65:70,3:6]=0.25
-        reemp_pt[70:100,3:6]=0.10
-
-        scale_men = 0.85
-        scale_women = 0.85
-
-        reemp_ft[0:100,0:3] *= scale_men
-        reemp_ft[0:100,3:6] *= scale_women
-        reemp_pt[0:100,0:3] *= scale_men
-        reemp_pt[0:100,3:6] *= scale_women    
-
-        if False:
-            for g in range(6):
-                print(f'-------------')
-                print(f'pt to ft rate ratio {g} 18-29',reemp_pt[18:30,g]/reemp_ft[18:30,g])
-                print(f'pt to ft rate ratio {g} 30-39',reemp_pt[30:40,g]/reemp_ft[30:40,g])
-                print(f'pt to ft rate ratio {g} 40-49',reemp_pt[40:50,g]/reemp_ft[40:50,g])
-                print(f'pt to ft rate ratio {g} 50-59',reemp_pt[50:60,g]/reemp_ft[50:60,g])
-                print(f'pt to ft rate ratio {g} 60-69',reemp_pt[60:70,g]/reemp_ft[60:70,g])
-
-        # keep the ratio of probabilities
-        parttime_fullemp_prob=np.minimum(1.0,reemp_ft/reemp_pt)
-
-        prob_3m_oa=0.2       
-        fulltime_pt_prob_3m=0.8
-        
-        return reemp_ft,reemp_pt,prob_3m_oa,parttime_fullemp_prob,fulltime_pt_prob_3m  
-
-    def get_reemp_prob_v11d(self):
+    def get_reemp_prob_v11(self):
         '''
         reemployment probability in 3 months
         refit
@@ -5031,15 +4957,12 @@ class Rates():
         reemp_ft = np.zeros((100,6))
         reemp_pt = np.zeros((100,6))
 
-        # reemployment to parttime work
-        
-        # miehet
         reemp_ft_x    = np.array([ 0,25,60, 70, 72,100])
-        reemp_ft_base = np.array([25,25,15, 10, 2,   1])/100
+        reemp_ft_base = np.array([35,35,15, 10, 2,   1])/100
         reemp_ft[:,0] = interp_reemp(reemp_ft_x,reemp_ft_base)[:,0]
 
         reemp_ft_x    = np.array([ 0,25,60,70, 72,100])
-        reemp_ft_base = np.array([25,25,15,10,2,1])/100
+        reemp_ft_base = np.array([30,30,15,10,2,1])/100
         reemp_ft[:,1] = interp_reemp(reemp_ft_x,reemp_ft_base)[:,0]
 
         reemp_ft_x    = np.array([ 0,25,60,70, 72,100])
@@ -5048,11 +4971,11 @@ class Rates():
 
         # naiset
         reemp_ft_x    = np.array([ 0,25,60, 70, 72,100])
-        reemp_ft_base = np.array([25,25,15, 10, 2,   1])/100
+        reemp_ft_base = np.array([35,35,15, 10, 2,   1])/100
         reemp_ft[:,3] = interp_reemp(reemp_ft_x,reemp_ft_base)[:,0]
 
         reemp_ft_x    = np.array([ 0,25,60,70, 72,100])
-        reemp_ft_base = np.array([25,25,15,10,2,1])/100
+        reemp_ft_base = np.array([30,30,15,10,2,1])/100
         reemp_ft[:,4] = interp_reemp(reemp_ft_x,reemp_ft_base)[:,0]
 
         reemp_ft_x    = np.array([ 0,25,60,70, 72,100])
@@ -5061,15 +4984,15 @@ class Rates():
 
         # miehet
         reemp_pt_x    = np.array([ 0,25,60,70, 72,100])
-        reemp_pt_base = np.array([80,80,35,20, 4, 2])/100
+        reemp_pt_base = np.array([70,70,35,20, 4, 2])/100
         reemp_pt[:,0] = interp_reemp(reemp_pt_x,reemp_pt_base)[:,0]
 
         reemp_pt_x    = np.array([ 0,25,60,70, 72,100])
-        reemp_pt_base = np.array([80,80,35,20, 4, 2])/100
+        reemp_pt_base = np.array([70,70,35,20, 4, 2])/100
         reemp_pt[:,1] = interp_reemp(reemp_pt_x,reemp_pt_base)[:,0]
 
         reemp_pt_x    = np.array([ 0,25,60,70, 72,100])
-        reemp_pt_base = np.array([80,80,35,20, 4,  2])/100
+        reemp_pt_base = np.array([70,70,35,20, 4,  2])/100
         reemp_pt[:,2] = interp_reemp(reemp_pt_x,reemp_pt_base)[:,0]
 
         # naiset
@@ -5085,13 +5008,13 @@ class Rates():
         reemp_pt_base = np.array([60,60,35,20, 4,  2])/100
         reemp_pt[:,5] = interp_reemp(reemp_pt_x,reemp_pt_base)[:,0]
 
-        scale_men = 1.00
+        scale_men = 0.10
         scale_women = 0.90
 
         reemp_ft[0:100,0:3] *= scale_men
         reemp_ft[0:100,3:6] *= scale_women
         reemp_pt[0:100,0:3] *= scale_men
-        reemp_pt[0:100,3:6] *= scale_women    
+        reemp_pt[0:100,3:6] *= scale_women
 
         if False:
             for g in range(6):
