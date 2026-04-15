@@ -1850,7 +1850,7 @@ class UnemploymentEnv_v11(gym.Env):
 
     def move_to_ove(self,employment_status: int,pension: float,tyoelake: float,ove_paid: bool,age: float,unemp_after_ra: float) -> Tuple[float,float,bool]:
         if not self.include_ove:
-            return pension,tyoelake,0
+            return pension,tyoelake,False
 
         if ove_paid:
             print('Moving to OVE twice')
@@ -4311,13 +4311,13 @@ class UnemploymentEnv_v11(gym.Env):
 
         # UPDATE työssäoloehto (toe)
         main_used_unemp_benefit,main_alkanut_ansiosidonnainen,main_unempwage_basis,main_pvr_jaljella,\
-         main_toe,main_toekesto,main_unempwage,children_under3,children_under7,children_under18,jasen = \
-            self.update_toes(t,age,main_toe,main_tyoura,main_toe58,main_empstate,main_paid_wage,main_basis_wage,main_unempwage_basis,False,
+         main_toe,main_toekesto,main_toe58,main_unempwage,children_under3,children_under7,children_under18,jasen = \
+            self.update_toes(t,age,main_tyoura,main_empstate,main_paid_wage,main_basis_wage,main_unempwage_basis,False,
                     main_used_unemp_benefit,main_alkanut_ansiosidonnainen,main_unempwage)
 
         spou_used_unemp_benefit,spou_alkanut_ansiosidonnainen,spou_unempwage_basis,spou_pvr_jaljella,\
-         spou_toe,spou_toekesto,spou_unempwage,_,_,_,jasen = \
-            self.update_toes(t,age,spou_toe,spou_tyoura,spou_toe58,spou_empstate,spou_paid_wage,spou_basis_wage,spou_unempwage_basis,True,
+         spou_toe,spou_toekesto,spou_toe58,spou_unempwage,_,_,_,jasen = \
+            self.update_toes(t,age,spou_tyoura,spou_empstate,spou_paid_wage,spou_basis_wage,spou_unempwage_basis,True,
                     spou_used_unemp_benefit,spou_alkanut_ansiosidonnainen,spou_unempwage)
 
         # compute utilities
@@ -4461,9 +4461,9 @@ class UnemploymentEnv_v11(gym.Env):
                  = self.states.state_decode(state)
         print(f'2.0: c3 {children_under3} c7 {children_under7} c18 {children_under18}')
 
-    def update_toes(self,t: float,age: float,toe: float,tyoura: float,toe58: bool,empstate: int,main_paid_wage: float,main_basis_wage: float,unempwage_basis: float,is_spouse: bool,
+    def update_toes(self,t: float,age: float,tyoura: float,empstate: int,main_paid_wage: float,main_basis_wage: float,unempwage_basis: float,is_spouse: bool,
                     used_unemp_benefit: float,alkanut_ansiosidonnainen: bool,unempwage_old: float):
-        toe58 = self.check_toe58(age,toe,tyoura,toe58)
+        toe58 = self.check_toe58(age,tyoura)
         work={1,10}
         retired={2,8,9}
         self.infostate_kassanjasenyys_update(age,empstate)
@@ -4495,7 +4495,7 @@ class UnemploymentEnv_v11(gym.Env):
 
         jasen = self.get_kassanjasenyys()
 
-        return used_unemp_benefit,alkanut_ansiosidonnainen,unempwage_basis,pvr_jaljella,toe,toekesto,unempwage,\
+        return used_unemp_benefit,alkanut_ansiosidonnainen,unempwage_basis,pvr_jaljella,toe,toekesto,toe58,unempwage,\
                children_under3,children_under7,children_under18,jasen
 
     def update_times(self,age,main_empstate,spouse_empstate,until_birth,main_life_left,spouse_life_left,main_until_disab,spouse_until_disab,
@@ -4604,8 +4604,8 @@ class UnemploymentEnv_v11(gym.Env):
         self.workfactor_w = 0.91
 
         # 2024 sopiva
-        self.workfactor_m = 1.00
-        self.workfactor_w = 1.03
+        self.workfactor_m = 1.07
+        self.workfactor_w = 1.10
 
         self.max_reduction_sigma = 0.50
 
@@ -4636,7 +4636,7 @@ class UnemploymentEnv_v11(gym.Env):
 
         # miesten utiliteetti-parametrit
         if True:
-            self.men_mu_scale_kokoaika_before = 0.050 # how much penalty is associated with work increase with age after mu_age
+            self.men_mu_scale_kokoaika_before = 0.070 # how much penalty is associated with work increase with age after mu_age
             self.men_mu_scale_kokoaika_after = 0.040 # how much penalty is associated with work increase with age after mu_age
             self.men_mu_age  =  self.min_retirementage - 3.0
         else:
@@ -4652,12 +4652,12 @@ class UnemploymentEnv_v11(gym.Env):
         self.men_kappa_pinkslip_middle = -0.20
         self.men_kappa_pinkslip_elderly = -0.10
         self.men_kappa_pinkslip_putki = -0.10
-        self.men_kappa_param =  self.workfactor_m * np.array([-0.380, -0.400, -0.425, -0.470, -0.540, -1.350 ]) # np.array([-0.420, -0.460, -0.490, -0.550, -0.680, -1.700]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
+        self.men_kappa_param =  self.workfactor_m * np.array([-0.400, -0.460, -0.490, -0.510, -0.590, -1.750 ]) # np.array([-0.420, -0.460, -0.490, -0.550, -0.680, -1.700]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
         self.men_student_kappa_param = np.array([0.0, 0.0, 0.0, -100.0, -100.0, -100.0]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
 
         # naisten utiliteetti-parametrit
         if True:
-            self.women_mu_scale_kokoaika_before = 0.050 # how much penalty is associated with work increase with age after mu_age
+            self.women_mu_scale_kokoaika_before = 0.070 # how much penalty is associated with work increase with age after mu_age
             self.women_mu_scale_kokoaika_after = 0.040  # how much penalty is associated with work increase with age after mu_age
             self.women_mu_age  =  self.min_retirementage - 3.0 
         else:
@@ -4673,7 +4673,7 @@ class UnemploymentEnv_v11(gym.Env):
         self.women_kappa_pinkslip_middle = -0.10
         self.women_kappa_pinkslip_elderly = -0.10
         self.women_kappa_pinkslip_putki = -0.40
-        self.women_kappa_param = self.workfactor_w * np.array([-0.290, -0.330, -0.370, -0.460, -0.530, -1.350]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
+        self.women_kappa_param = self.workfactor_w * np.array([-0.290, -0.330, -0.360, -0.470, -0.550, -1.350]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
         self.women_student_kappa_param = np.array([0.0, 0.0, 0.0, -100.0, -100.0, -100.0]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
 
         # miesten ja naisten utiliteetti-parametrit
@@ -6254,7 +6254,7 @@ class UnemploymentEnv_v11(gym.Env):
 
         return toes
 
-    def check_toe58(self,age: float,toe: float,tyoura: float,toe58: int,is_spouse:bool =False):
+    def check_toe58(self,age: float,tyoura: float,is_spouse:bool =False) -> bool:
         '''
         laske työttämyysjaksoa edeltävä työssäoloehto tarkasti
         58-vuotiainen erikoissääntö
@@ -6291,11 +6291,9 @@ class UnemploymentEnv_v11(gym.Env):
             elif emps in emp_states:
                 if self.infostate[palkka][t2]>self.min_toewage:
                     toes += self.timestep
-                #elif self.include_halftoe and self.infostate[palkka][t2] >= self.min_halftoewage: # and emps==10:
-                #    toes+=0.5*self.timestep
+                elif self.include_halftoe and self.infostate[palkka][t2] >= self.min_halftoewage: # and emps==10:
+                    toes+=0.5*self.timestep
                 nt=nt+1
-            #elif emps in unemp_states:
-            #    nt=nt+1
             else:
                 nt=nt+1
             t2=t2-1
