@@ -42,7 +42,7 @@ class Wages_v2():
     def setup_salaries(self,weights):
         # TK:n aineisto vuodelta 2018
         # iät 18-70
-        # päivitetty 2022
+        # päivitetty 2025
         
         infl_men = self.rates.get_wageinflation(gender=0)
         infl_women = self.rates.get_wageinflation(gender=1)
