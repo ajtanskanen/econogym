@@ -1,4 +1,4 @@
-from gym.envs.registration import register
+from gymnasium.envs.registration import register
 
 register(
     id='unemployment-v0',
@@ -66,19 +66,14 @@ register(
 )
 
 register(
+    id='unemployment-v12',
+    entry_point='gym_unemployment.envs:UnemploymentEnv_v12',
+)
+
+register(
     id='Qunemployment-v7',
     entry_point='gym_unemployment.envs:QUnemploymentLargeEnv_v7',
 )
-
-#register(
-#    id='unemploymentEK-v0',
-#    entry_point='gym_unemployment.envs:UnemploymentEKEnv',
-#)
-
-#register(
-#    id='unemploymentEK-v1',
-#    entry_point='gym_unemployment.envs:UnemploymentEKLargeEnv',
-#)
 
 register(
     id='unemploymentEK-v3',
@@ -93,16 +88,6 @@ register(
 register(
     id='unemploymentSteps-v1',
     entry_point='gym_unemployment.envs:UnemploymentStepsLargeEnv',
-)
-
-register(
-    id='test-v1',
-    entry_point='gym_unemployment.envs:TestEnv',
-)
-
-register(
-    id='unemployment-long-v0',
-    entry_point='gym_unemployment.envs:UnemploymentLongEnv_v0',
 )
 
 register(

@@ -10,7 +10,7 @@
 """
 
 import math
-import gym
+import gymnasium as gym
 import numpy as np
 import random
 from . util import compare_q_print,crosscheck_print,test_var

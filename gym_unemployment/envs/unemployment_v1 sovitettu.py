@@ -9,9 +9,10 @@
 """
 
 import math
-import gym
-from gym import spaces, logger, utils, error
-from gym.utils import seeding   
+import gymnasium as gym
+
+from gymnasium import spaces, logger, utils, error
+from gymnasium.utils import seeding
 import numpy as np
 import fin_benefits
 import random

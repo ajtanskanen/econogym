@@ -1,0 +1,1416 @@
+"""
+
+    state_v8
+
+
+    Sisäisen tilan hallinta unemployment_v8:lle
+
+    - lapsilukuun liityvät ongelmat korjatut
+
+"""
+
+import math
+import gymnasium as gym
+import numpy as np
+import random
+from . util import compare_q_print,crosscheck_print,test_var
+from typing import Dict, Tuple
+        
+class Statevector_v12():
+    '''
+    Implements class for handling of state vector 
+    '''
+    def __init__(self,n_empl: int,n_groups: int,n_parttime_action: int,include_mort: bool,min_age: float,max_age: float,include_preferencenoise: bool,
+                min_retirementage: float,min_ove_age: float,get_paid_wage,timestep: float):
+        self.eps:float = 1e-20
+        self.n_empl:int =n_empl
+        self.n_groups:int =n_groups # 3 per gender (6 in total)
+        self.n_parttime_action:int =n_parttime_action
+        self.include_mort=include_mort
+        self.setup_state_encoding()
+        self.state = None
+        self.log_transform:bool =False
+        self.log_eps:float = 1e-1
+        self.pensionscale:float = 50_000.0 # neuroverkon eläkeskaalaus
+        self.wagescale:float = 50_000.0 # neuroverkon palkkaskaalaus
+        self.time_scale:float = 20
+        self.time_intercept:float = 20
+        self.used_unemp_benefit_scale:float = 5.0
+        self.ura_scale:float = 30
+        self.ura_intercept:float = 30
+        self.lapsia_intercept:float = 5
+        self.lapsia_scale:float = 5
+        self.min_age:float = min_age
+        self.max_age:float = max_age
+        self.toe_scale:float = 14/12
+        self.age_scale:float = (self.max_age-self.min_age)/2
+        self.age_mid:float = (self.max_age+self.min_age)/2
+        self.age_dur:float = 2 * self.age_mid
+        self.uara_intercept = self.age_scale
+        self.uara_scale = self.age_scale
+        self.include_preferencenoise:bool = include_preferencenoise
+        self.min_retirementage:float = min_retirementage
+        self.min_ove_age:float = min_ove_age
+        self.get_paid_wage = get_paid_wage
+        self.age_maxdur:float = (100-self.min_age)/2
+        self.timestep:float = timestep
+        self.hc_scale:float = 4.0
+        self.n_states:int = self.n_empl+self.n_groups+self.n_groups+self.n_empl+self.n_parttime_action+self.n_parttime_action+58+3+4
+        #print('State vector initialized with', self.n_states, 'dimensions')
+
+    def state_encode(self,emp : int,g : int,p_g: int,pension : float,old_wage : float,age : float,time_in_state : float, # 7
+                        tyoelake_maksussa : float, # 1
+                        pink : bool,toe : float,toekesto : float,tyohist : float,next_wage : float,used_unemp_benefit : float, # 6
+                        wage_reduction : float,unemp_after_ra : float,unempwage : float,unempwage_basis : float, # 4
+                        children_under3 : int,children_under7 : int,children_under18 : int, # 3
+                        unemp_benefit_left : float,alkanut_ansiosidonnainen : bool,toe58 : bool,ove_paid : bool, # 4
+                        kassanjasenyys : bool, # 1
+                        puoliso : bool,puoliso_tila : int,puoliso_old_wage : float,puoliso_pension : float, # 4
+                        puoliso_wage_reduction : float,puoliso_tyoelake_maksussa : float,puoliso_next_wage : float, # 3
+                        puoliso_used_unemp_benefit : float,puoliso_unemp_benefit_left : float, # 2
+                        puoliso_unemp_after_ra : float,puoliso_unempwage : float,puoliso_unempwage_basis : float, # 3
+                        puoliso_alkanut_ansiosidonnainen : bool,puoliso_toe58 : float, # 2
+                        puoliso_toe : float,puoliso_toekesto : float,puoliso_tyoura : float,puoliso_time_in_state : float, # 4
+                        puoliso_pinkslip : bool,puoliso_ove_paid : float,kansanelake : float,puoliso_kansanelake : float, # 4
+                        main_paid_wage : float,spouse_paid_wage : float, # 2
+                        main_pt_action : int, spouse_pt_action : int, # 0
+                        main_wage_basis : float,spouse_wage_basis : float, # 2
+                        main_life_left: float,spouse_life_left: float, # 2
+                        main_until_disab: float,spouse_until_disab: float, # 2
+                        time_to_marriage: float,time_to_divorce: float,until_birth: float, # 2
+                        main_until_student: float,spouse_until_student: float, # 2
+                        main_until_outsider: float,spouse_until_outsider: float, # 2
+                        main_karenssia_jaljella: float,spouse_karenssia_jaljella: float, #2
+                        main_humancapital: float,spouse_humancapital: float,
+                        prefnoise : float):  # 0
+        '''
+        Tilan koodaus neuroverkkoa varten. Arvot skaalataan ja tilat one-hot-enkoodataan
+
+        Käytetään, jos kuolleisuus ei mukana
+        '''
+        n_states=self.n_states
+        if self.include_preferencenoise:
+            d=np.zeros(n_states,dtype=np.float64)
+        else:
+            d=np.zeros(n_states+1,dtype=np.float64)
+        
+        states=self.n_empl # 16
+        d[0:states]=self.state_encoding[emp,:]
+        if emp==15 and not self.include_mort:
+            print('no state 15 in state_encode_nomort')
+        elif emp>15:
+            print('state_encode error in emp '+str(emp))
+
+        if g>2 or g<0:
+            print('state_encode error in g='+str(g))
+        states2=states+self.n_groups # 22
+        states2b=states2+self.n_groups # 28
+        d[states:states2]=self.group_encoding[g,:]
+
+        if p_g>5 or p_g<3:
+            print('state_encode error in p_g='+str(p_g))
+        d[states2:states2b]=self.group_encoding[p_g-3,:]
+        
+        states3=states2b+self.n_empl # 44
+        d[states2b:states3]=self.spousestate_encoding[puoliso_tila,:]    
+        if puoliso_tila==15 and not self.include_mort:
+            print('no state 15 in state_encode_nomort')
+        elif puoliso_tila>15:
+            print('state_encode error in puoliso_tila '+str(puoliso_tila))
+
+        if main_pt_action>=self.n_parttime_action or main_pt_action<0:
+            print('state_encode error in main_pt_action='+str(main_pt_action))
+        states4=states3+self.n_parttime_action # 50
+        d[states3:states4]=self.ptstate_encoding[main_pt_action]
+            
+        if spouse_pt_action>=self.n_parttime_action or spouse_pt_action<0:
+            print('state_encode error in spouse_pt_action='+str(spouse_pt_action))
+        states5=states4+self.n_parttime_action # 56
+        d[states4:states5]=self.ptstate_encoding[spouse_pt_action]
+
+        # paikasta 56 alkaen
+        if self.log_transform:
+            d[states5]=math.log(pension/self.pensionscale+self.log_eps) # vastainen eläke
+            d[states5+1]=math.log(old_wage/self.wagescale+self.log_eps)
+            d[states5+4]=math.log(tyoelake_maksussa/self.pensionscale+self.log_eps) # alkanut eläke
+            d[states5+10]=math.log(next_wage/self.wagescale+self.log_eps)
+            d[states5+14]=math.log(unempwage/self.wagescale+self.log_eps)
+            d[states5+15]=math.log(unempwage_basis/self.wagescale+self.log_eps)
+        else:
+            d[states5]=(pension-self.pensionscale)/self.pensionscale # vastainen eläke
+            d[states5+1]=(old_wage-self.wagescale)/self.wagescale
+            d[states5+4]=(tyoelake_maksussa-self.pensionscale)/self.pensionscale # alkanut eläke
+            d[states5+10]=(next_wage-self.wagescale)/self.wagescale
+            d[states5+14]=(unempwage-self.wagescale)/self.wagescale
+            d[states5+15]=(unempwage_basis-self.wagescale)/self.wagescale
+
+        d[states5+2]=(age-self.age_mid)/self.age_scale
+        d[states5+3]=(time_in_state-self.time_intercept)/self.time_scale
+        if age>=self.min_retirementage:
+            retaged=1
+        else:
+            retaged=0
+
+        d[states5+5]=pink # irtisanottu vai ei 
+        d[states5+6]=(toe-self.toe_scale)/self.toe_scale # työssäoloehto **
+        d[states5+7]=(tyohist-self.ura_intercept)/self.ura_scale # tyohistoria: 300/400 pv
+        d[states5+8]=(self.min_retirementage-age)/self.age_dur
+        d[states5+9]=(unemp_benefit_left-self.used_unemp_benefit_scale)/self.used_unemp_benefit_scale
+        d[states5+11]=(used_unemp_benefit-self.used_unemp_benefit_scale)/self.used_unemp_benefit_scale
+        d[states5+12]=wage_reduction
+        d[states5+13]=(unemp_after_ra-self.uara_intercept)/self.uara_scale
+        d[states5+16]=retaged
+        d[states5+17]=alkanut_ansiosidonnainen
+        d[states5+18]=(children_under3-self.lapsia_intercept)/self.lapsia_scale
+        d[states5+19]=(children_under7-self.lapsia_intercept)/self.lapsia_scale
+        d[states5+20]=(children_under18-self.lapsia_intercept)/self.lapsia_scale
+        d[states5+21]=toe58
+        d[states5+22]=ove_paid
+        if age>=self.min_ove_age:
+            d[states5+23]=1
+        else:
+            d[states5+23]=0
+        
+        d[states5+24]=kassanjasenyys
+        d[states5+25]=(toekesto-self.toe_scale)/self.toe_scale
+        d[states5+26]=puoliso
+        
+        d[states5+27]=(puoliso_old_wage-self.wagescale)/self.wagescale
+        d[states5+28]=(puoliso_pension-self.pensionscale)/self.pensionscale
+        d[states5+29]=puoliso_wage_reduction
+        d[states5+30]=(puoliso_tyoelake_maksussa-self.pensionscale)/self.pensionscale # alkanut eläke
+        d[states5+31]=(puoliso_next_wage-self.wagescale)/self.wagescale
+        d[states5+32]=(puoliso_used_unemp_benefit-self.used_unemp_benefit_scale)/self.used_unemp_benefit_scale
+        d[states5+33]=(puoliso_unemp_benefit_left-self.used_unemp_benefit_scale)/self.used_unemp_benefit_scale
+        d[states5+34]=(puoliso_unemp_after_ra-self.uara_intercept)/self.uara_scale
+        d[states5+35]=(puoliso_unempwage-self.wagescale)/self.wagescale
+        d[states5+36]=(puoliso_unempwage_basis-self.wagescale)/self.wagescale
+        d[states5+37]=puoliso_alkanut_ansiosidonnainen
+        d[states5+38]=puoliso_toe58
+        d[states5+39]=(puoliso_toe-self.toe_scale)/self.toe_scale
+        d[states5+40]=(puoliso_toekesto-self.toe_scale)/self.toe_scale
+        d[states5+41]=(puoliso_tyoura-self.ura_intercept)/self.ura_scale
+        d[states5+42]=(puoliso_time_in_state-self.time_intercept)/self.time_scale
+        d[states5+43]=puoliso_pinkslip
+        d[states5+44]=puoliso_ove_paid
+        d[states5+45]=(kansanelake-self.pensionscale)/self.pensionscale
+        d[states5+46]=(puoliso_kansanelake-self.pensionscale)/self.pensionscale
+        d[states5+47]=(main_paid_wage-self.wagescale)/self.wagescale # vastainen eläke
+        d[states5+48]=(spouse_paid_wage-self.wagescale)/self.wagescale # vastainen eläke
+        d[states5+49]=(main_wage_basis-self.wagescale)/self.wagescale # vastainen eläke
+        d[states5+50]=(spouse_wage_basis-self.wagescale)/self.wagescale # vastainen eläke
+
+        
+        d[states5+51]=(main_life_left-self.age_maxdur)/self.age_maxdur # elinaikaa jäljellä
+        d[states5+52]=(spouse_life_left-self.age_maxdur)/self.age_maxdur # 
+        d[states5+53]=(main_until_disab-self.age_maxdur)/self.age_maxdur # elinaikaa jäljellä
+        d[states5+54]=(spouse_until_disab-self.age_maxdur)/self.age_maxdur # 
+
+        d[states5+55]=(time_to_marriage-self.age_maxdur)/self.age_maxdur # 
+        d[states5+56]=(time_to_divorce-self.age_maxdur)/self.age_maxdur # 
+        d[states5+57]=(until_birth-self.age_maxdur)/self.age_maxdur # 
+        d[states5+58]=(main_until_student-self.age_maxdur)/self.age_maxdur # elinaikaa jäljellä
+        d[states5+59]=(spouse_until_student-self.age_maxdur)/self.age_maxdur # 
+        d[states5+60]=(main_until_outsider-self.age_maxdur)/self.age_maxdur # elinaikaa jäljellä
+        d[states5+61]=(spouse_until_outsider-self.age_maxdur)/self.age_maxdur # 
+        d[states5+62] = main_karenssia_jaljella # max 1 y
+        d[states5+63] = spouse_karenssia_jaljella # max 1 y
+        d[states5+64] = (main_humancapital-self.hc_scale)/self.hc_scale
+        d[states5+65] = (spouse_humancapital-self.hc_scale)/self.hc_scale
+
+        if self.include_preferencenoise:
+            d[states5+66]=prefnoise
+            
+        return d
+
+    def get_state_name(self):
+        if self.include_preferencenoise:
+            d=np.empty(self.n_states, dtype='U256')
+        else:
+            d=np.empty(self.n_states+1, dtype='U256')
+                    
+        states=self.n_empl
+        states2=states+self.n_groups
+        states2b=states2+self.n_groups
+        states3=states2b+self.n_empl
+        states4=states3+self.n_parttime_action
+        states5=states4+self.n_parttime_action
+
+        d[0:states]='main_emp'
+        d[states:states2]='main_group'
+        d[states2:states2b]='puoliso_group'
+        d[states2b:states3]='puoliso_tila'
+        d[states3:states4]='main_pt_action'
+        d[states4:states5]='spouse_pt_action'
+        d[states5]='main_pension'
+        d[states5+1]='old_wage'
+        d[states5+4]='tyoelake_maksussa'
+        d[states5+10]='next_wage'
+        d[states5+14]='unempwage'
+        d[states5+15]='unempwage_basis'
+        d[states5+2]='age'
+        d[states5+3]='time_in_state'
+
+        d[states5+5]='pink'
+        d[states5+6]='toe'
+        d[states5+7]='tyohist'
+        d[states5+8]='time to ret'
+        d[states5+9]='unemp_benefit_left'
+        d[states5+11]='used_unemp_benefit'
+        d[states5+12]='wage_reduction'
+        d[states5+13]='unemp_after_ra'
+        d[states5+16]='retaged'
+        d[states5+17]='alkanut_ansiosidonnainen'
+        d[states5+18]='children_under3'
+        d[states5+19]='children_under7'
+        d[states5+20]='children_under18'
+        d[states5+21]='toe58'
+        d[states5+22]='ove_paid'
+        d[states5+23]='over_ove_age'
+        
+        d[states5+24]='kassanjasenyys'
+        d[states5+25]='toekesto'
+        d[states5+26]='puoliso'
+        
+        d[states5+27]='puoliso_old_wage'
+        d[states5+28]='puoliso_pension'
+        d[states5+29]='puoliso_wage_reduction'
+        d[states5+30]='puoliso_tyoelake_maksussa'
+        d[states5+31]='puoliso_next_wage'
+        d[states5+32]='puoliso_used_unemp_benefit'
+        d[states5+33]='puoliso_unemp_benefit_left'
+        d[states5+34]='puoliso_unemp_after_ra'
+        d[states5+35]='puoliso_unempwage'
+        d[states5+36]='puoliso_unempwage_basis'
+        d[states5+37]='puoliso_alkanut_ansiosidonnainen'
+        d[states5+38]='puoliso_toe58'
+        d[states5+39]='puoliso_toe'
+        d[states5+40]='puoliso_toekesto'
+        d[states5+41]='puoliso_tyoura'
+        d[states5+42]='puoliso_time_in_state'
+        d[states5+43]='puoliso_pinkslip'
+        d[states5+44]='puoliso_ove_paid'
+        d[states5+45]='puoliso_kansanelake'
+        d[states5+46]='puoliso_kansanelake'
+        d[states5+47]='main_paid_wage'
+        d[states5+48]='spouse_paid_wage'
+        d[states5+49]='main_wage_basis'
+        d[states5+50]='spouse_wage_basis'
+        d[states5+51]='main_life_left'
+        d[states5+52]='spouse_life_left'
+        d[states5+53]='main_until_disab'
+        d[states5+54]='spouse_until_disab'
+        d[states5+55]='time_to_marriage'
+        d[states5+56]='time_to_divorce'
+        d[states5+57]='until_birth'
+        d[states5+58]='main_until_student'
+        d[states5+59]='spouse_until_student'
+        d[states5+60]='main_until_outsider'
+        d[states5+61]='spouse_until_outsider'
+        d[states5+62] = "main_karenssia_jaljella" # max 1 y
+        d[states5+63] = "spouse_karenssia_jaljella" # max 1 y
+        d[states5+64] = "main_humancapital"
+        d[states5+65] = "spouse_humancapital"
+
+        if self.include_preferencenoise:
+            d[states5+66]='prefnoise'
+            
+        return d        
+
+    def print_state(self,vec:np.ndarray,decode:bool=True):
+        '''
+        Tulostaa tilan vektorin
+        '''
+        names=self.get_state_name()
+        for i in range(len(vec)):
+            print(f'{i}: {names[i]}: {vec[i]}')
+
+    def get_onehot(self,vec,a,n,desc):
+        g=-1
+        pos=a
+        for k in range(n):
+            if vec[pos+k]>0:
+                g=k
+                break
+
+        g:int=int(g)
+        if g<0:
+            print(f'{desc}:state error at {a} len {n}:'+str(vec[a:a+n]))
+        
+        return g  
+
+    def state_decode(self,vec:np.ndarray) -> Tuple[int,int,int,float,float,float,float,float,bool,float,\
+                float,float,float,float,float,float,float,bool,int,int,\
+                int,float,bool,bool,bool,bool,bool,int,float,float,\
+                float,float,float,float,float,float,float,float,bool,bool,\
+                float,float,float,float,bool,bool,float,float,float,float,\
+                float,float,float,int,int,float,float,float,float,float,\
+                float,float,float,float,float,float,float,float,\
+                float,float,float,float]:
+        '''
+        Tilan dekoodaus laskentaa varten
+
+        Käytetään, jos aina
+        '''
+
+        pos=0
+        main_emp:int=self.get_onehot(vec,pos,self.n_empl,'emp')
+
+        pos += self.n_empl
+        main_g:int = self.get_onehot(vec,pos,self.n_groups,'g')
+
+        pos += self.n_groups
+        spouse_g:int = self.get_onehot(vec,pos,self.n_groups,'p_g') + 3
+
+        pos += self.n_groups
+        puoliso_tila:int = self.get_onehot(vec,pos,self.n_empl,'s_emp')
+
+        pos += self.n_empl        
+        pt_act:int = self.get_onehot(vec,pos,self.n_parttime_action,'pt1')
+        
+        pos += self.n_parttime_action
+        sp_pt_act:int = self.get_onehot(vec,pos,self.n_parttime_action,'pt2')
+
+        pos += self.n_parttime_action
+
+        #if self.log_transform:
+        #    pension:float=(math.exp(vec[pos])-self.eps)*self.pensionscale
+        #    wage:float=(math.exp(vec[pos+1])-self.eps)*self.wagescale
+        #    next_wage:float=(math.exp(vec[pos+10])-self.eps)*self.wagescale
+        #    tyoelake_maksussa:float=(math.exp(vec[pos+4])-self.eps)*self.pensionscale
+        #    unempwage:float=(math.exp(vec[pos+14])-self.eps)*self.wagescale
+        #    unempwage_basis:float=(math.exp(vec[pos+15])-self.eps)*self.wagescale
+        #else:
+        main_pension:float=vec[pos]*self.pensionscale+self.pensionscale
+        main_wage:float=vec[pos+1]*self.wagescale+self.wagescale 
+        main_next_wage:float=vec[pos+10]*self.wagescale+self.wagescale
+        main_tyoelake_maksussa:float=vec[pos+4]*self.pensionscale+self.pensionscale
+        main_unempwage:float=vec[pos+14]*self.wagescale+self.wagescale 
+        main_unempwage_basis:float=vec[pos+15]*self.wagescale+self.wagescale 
+
+        age:float=vec[pos+2]*self.age_scale+self.age_mid
+        main_time_in_state:float=vec[pos+3]*self.time_intercept+self.time_scale
+        main_pink:bool=bool(round(vec[pos+5])) # irtisanottu vai ei 
+        main_toe:float=vec[pos+6]*self.toe_scale + self.toe_scale # työssäoloehto, kesto
+        main_tyohist:float=vec[pos+7]*self.ura_scale+self.ura_intercept # työhistoria
+        main_used_unemp_benefit:float=vec[pos+11]*self.used_unemp_benefit_scale+self.used_unemp_benefit_scale # käytetty työttämyyspäivärahapäivien määrä
+        main_wage_reduction:float=vec[pos+12]
+        main_unemp_after_ra:float=vec[pos+13]*self.uara_scale+self.uara_intercept
+        main_unemp_left:float=vec[pos+9]*self.used_unemp_benefit_scale+self.used_unemp_benefit_scale
+        main_alkanut_ansiosidonnainen:bool=bool(round(vec[pos+17]))
+        children_under3:int=round(vec[pos+18]*self.lapsia_scale+self.lapsia_intercept)
+        children_under7:int=round(vec[pos+19]*self.lapsia_scale+self.lapsia_intercept)
+        children_under18:int=round(vec[pos+20]*self.lapsia_scale+self.lapsia_intercept)
+        main_toe58:bool=bool(round(vec[pos+21]))
+        main_ove_paid:bool=bool(round(vec[pos+22]))
+        kassanjasen:bool=bool(round(vec[pos+24]))
+        main_toekesto:float=vec[pos+25]*self.toe_scale + self.toe_scale
+        puoliso:bool=bool(round(vec[pos+26])) # 30
+        puoliso_old_wage:float=vec[pos+27]*self.wagescale+self.wagescale
+        puoliso_pension:float=vec[pos+28]*self.pensionscale+self.pensionscale
+        puoliso_wage_reduction:float=vec[pos+29]
+        puoliso_tyoelake_maksussa:float=vec[pos+30]*self.pensionscale+self.pensionscale
+        puoliso_next_wage:float=vec[pos+31]*self.wagescale+self.wagescale
+        puoliso_used_unemp_benefit:float=vec[pos+32]*self.used_unemp_benefit_scale+self.used_unemp_benefit_scale
+        puoliso_unemp_benefit_left:float=vec[pos+33]*self.used_unemp_benefit_scale+self.used_unemp_benefit_scale
+        puoliso_unemp_after_ra:float=vec[pos+34]*self.uara_scale+self.uara_intercept
+        puoliso_unempwage:float=vec[pos+35]*self.wagescale+self.wagescale
+        puoliso_unempwage_basis:float=vec[pos+36]*self.wagescale+self.wagescale # 40
+        puoliso_alkanut_ansiosidonnainen:bool=bool(round(vec[pos+37]))
+        puoliso_toe58:bool=bool(round(vec[pos+38]))
+        puoliso_toe:float=vec[pos+39]*self.toe_scale + self.toe_scale
+        puoliso_toekesto:float=vec[pos+40]*self.toe_scale + self.toe_scale
+        puoliso_tyoura:float=vec[pos+41]*self.ura_scale+self.ura_intercept
+        puoliso_time_in_state:float=vec[pos+42]*self.time_scale+self.time_intercept
+        puoliso_pinkslip:bool=bool(round(vec[pos+43]))
+        puoliso_ove_paid:bool=bool(round(vec[pos+44]))
+        
+        main_kansanelake:float=vec[pos+45]*self.pensionscale+self.pensionscale
+        puoliso_kansanelake:float=vec[pos+46]*self.pensionscale+self.pensionscale # 50
+        main_paid_pension:float=main_tyoelake_maksussa+main_kansanelake
+        puoliso_paid_pension:float=puoliso_tyoelake_maksussa+puoliso_kansanelake
+
+        main_paid_wage:float=vec[pos+47]*self.wagescale+self.wagescale
+        spouse_paid_wage:float=vec[pos+48]*self.wagescale+self.wagescale
+        main_basis_wage:float=vec[pos+49]*self.wagescale+self.wagescale
+        spouse_basis_wage:float=vec[pos+50]*self.wagescale+self.wagescale
+
+        main_life_left:float=vec[pos+51]*self.age_maxdur+self.age_maxdur
+        spouse_life_left:float=vec[pos+52]*self.age_maxdur+self.age_maxdur
+        main_until_disab:float=vec[pos+53]*self.age_maxdur+self.age_maxdur
+        spouse_until_disab:float=vec[pos+54]*self.age_maxdur+self.age_maxdur # 60
+
+        time_to_marriage:float=vec[pos+55]*self.age_maxdur+self.age_maxdur
+        time_to_divorce:float=vec[pos+56]*self.age_maxdur+self.age_maxdur
+        until_birth:float=vec[pos+57]*self.age_maxdur+self.age_maxdur
+        main_until_student:float=vec[pos+58]*self.age_maxdur+self.age_maxdur
+        spouse_until_student:float=vec[pos+59]*self.age_maxdur+self.age_maxdur
+        main_until_outsider:float=vec[pos+60]*self.age_maxdur+self.age_maxdur
+        spouse_until_outsider:float=vec[pos+61]*self.age_maxdur+self.age_maxdur # 67
+        main_karenssia_jaljella:float = vec[pos+62]
+        spouse_karenssia_jaljella:float = vec[pos+63]
+        main_humancapital:float = vec[pos+64]*self.hc_scale+self.hc_scale
+        spouse_humancapital:float = vec[pos+65]*self.hc_scale+self.hc_scale
+
+        if self.include_preferencenoise:
+            prefnoise=vec[pos+66]
+        else:
+            prefnoise=bool(0)
+
+        # here are 70 variables including pref_noise that is not used => 69 state variables
+
+        return main_emp,main_g,spouse_g,main_pension,main_wage,age,main_time_in_state,main_paid_pension,main_pink,main_toe,\
+                main_toekesto,main_tyohist,main_used_unemp_benefit,main_wage_reduction,main_unemp_after_ra,main_unempwage,main_unempwage_basis,prefnoise,children_under3,children_under7,\
+                children_under18,main_unemp_left,main_alkanut_ansiosidonnainen,main_toe58,main_ove_paid,kassanjasen,puoliso,puoliso_tila,puoliso_old_wage,puoliso_pension,\
+                puoliso_wage_reduction,puoliso_paid_pension,puoliso_next_wage,puoliso_used_unemp_benefit,puoliso_unemp_benefit_left,puoliso_unemp_after_ra,puoliso_unempwage,puoliso_unempwage_basis,puoliso_alkanut_ansiosidonnainen,puoliso_toe58,\
+                puoliso_toe,puoliso_toekesto,puoliso_tyoura,puoliso_time_in_state,puoliso_pinkslip,puoliso_ove_paid,main_kansanelake,puoliso_kansanelake,main_tyoelake_maksussa,puoliso_tyoelake_maksussa,\
+                main_next_wage,main_paid_wage,spouse_paid_wage,pt_act,sp_pt_act,main_basis_wage,spouse_basis_wage,main_life_left,spouse_life_left,main_until_disab,\
+                spouse_until_disab,time_to_marriage,time_to_divorce,until_birth,main_until_student,spouse_until_student,main_until_outsider,spouse_until_outsider,\
+                main_karenssia_jaljella,spouse_karenssia_jaljella,main_humancapital,spouse_humancapital
+
+
+    def state_decode_dict(self,vec:np.ndarray) -> dict:
+        '''
+        Tilan dekoodaus laskentaa varten
+        '''
+
+        retdict = {}
+
+        pos=0
+        retdict['main_emp']=self.get_onehot(vec,pos,self.n_empl,'emp')
+        pos+=self.n_empl
+
+        retdict['main_g']:int=self.get_onehot(vec,pos,self.n_groups,'g')
+        #spouse_g=self.get_spouse_g(g)
+        pos += self.n_groups
+        retdict['spouse_g']:int = self.get_onehot(vec,pos,self.n_groups,'p_g')+3
+        pos += self.n_groups
+
+        retdict['puoliso_tila']:int = self.get_onehot(vec,pos,self.n_empl,'s_emp')
+        pos+=self.n_empl
+                
+        retdict['pt_act']:int = self.get_onehot(vec,pos,self.n_parttime_action,'pt1')
+        pos+=self.n_parttime_action
+
+        retdict['sp_pt_act']:int = self.get_onehot(vec,pos,self.n_parttime_action,'pt2')
+        pos+=self.n_parttime_action
+
+        retdict['main_pension']:float=vec[pos]*self.pensionscale+self.pensionscale
+        retdict['main_wage']:float=vec[pos+1]*self.wagescale+self.wagescale 
+        retdict['main_next_wage']:float=vec[pos+10]*self.wagescale+self.wagescale
+        retdict['main_tyoelake_maksussa']:float=vec[pos+4]*self.pensionscale+self.pensionscale
+        retdict['main_unempwage']:float=vec[pos+14]*self.wagescale+self.wagescale 
+        retdict['main_unempwage_basis']:float=vec[pos+15]*self.wagescale+self.wagescale 
+
+        retdict['age']:float = vec[pos+2]*self.age_scale+self.age_mid
+        retdict['main_time_in_state']:float=vec[pos+3]*self.time_scale+self.time_intercept
+        retdict['main_pink']:bool=bool(round(vec[pos+5])) # irtisanottu vai ei 
+        retdict['main_toe']:float=vec[pos+6]*self.toe_scale + self.toe_scale # työssäoloehto, kesto
+        retdict['main_tyohist']:float=vec[pos+7]*self.ura_scale+self.ura_intercept # työhistoria
+        retdict['main_used_unemp_benefit']:float=vec[pos+11]*self.used_unemp_benefit_scale+self.used_unemp_benefit_scale # käytetty työttämyyspäivärahapäivien määrä
+        retdict['main_wage_reduction']:float=vec[pos+12]
+        retdict['main_unemp_after_ra']:float=vec[pos+13]*self.uara_scale+self.uara_intercept
+        retdict['main_unemp_left']:float=vec[pos+9]*self.used_unemp_benefit_scale+self.used_unemp_benefit_scale
+        retdict['main_alkanut_ansiosidonnainen']:bool=bool(round(vec[pos+17]))
+        retdict['children_under3']:int=round(vec[pos+18]*self.lapsia_scale+self.lapsia_intercept)
+        retdict['children_under7']:int=round(vec[pos+19]*self.lapsia_scale+self.lapsia_intercept)
+        retdict['children_under18']:int=round(vec[pos+20]*self.lapsia_scale+self.lapsia_intercept)
+        retdict['main_toe58']:bool=bool(round(vec[pos+21]))
+        retdict['main_ove_paid']:bool=bool(round(vec[pos+22]))
+        retdict['kassanjasen']:bool=bool(round(vec[pos+24]))
+        retdict['main_toekesto']:float=vec[pos+25]*self.toe_scale + self.toe_scale
+        retdict['puoliso']:bool=bool(round(vec[pos+26])) # 30
+        retdict['puoliso_old_wage']:float=vec[pos+27]*self.wagescale+self.wagescale
+        retdict['puoliso_pension']:float=vec[pos+28]*self.pensionscale+self.pensionscale
+        retdict['puoliso_wage_reduction']:float=vec[pos+29]
+        retdict['puoliso_tyoelake_maksussa']:float=vec[pos+30]*self.pensionscale+self.pensionscale
+        retdict['puoliso_next_wage']:float=vec[pos+31]*self.wagescale+self.wagescale
+        retdict['puoliso_used_unemp_benefit']:float=vec[pos+32]*self.used_unemp_benefit_scale+self.used_unemp_benefit_scale
+        retdict['puoliso_unemp_benefit_left']:float=vec[pos+33]*self.used_unemp_benefit_scale+self.used_unemp_benefit_scale
+        retdict['puoliso_unemp_after_ra']:float=vec[pos+34]*self.uara_scale+self.uara_intercept
+        retdict['puoliso_unempwage']:float=vec[pos+35]*self.wagescale+self.wagescale
+        retdict['puoliso_unempwage_basis']:float=vec[pos+36]*self.wagescale+self.wagescale # 40
+        retdict['puoliso_alkanut_ansiosidonnainen']:bool=bool(round(vec[pos+37]))
+        retdict['puoliso_toe58']:bool=bool(round(vec[pos+38]))
+        retdict['puoliso_toe']:float=vec[pos+39]*self.toe_scale + self.toe_scale
+        retdict['puoliso_toekesto']:float=vec[pos+40]*self.toe_scale + self.toe_scale
+        retdict['puoliso_tyoura']:float=vec[pos+41]*self.ura_scale+self.ura_intercept
+        retdict['puoliso_time_in_state']:float=vec[pos+42]*self.time_scale+self.time_intercept
+        retdict['puoliso_pinkslip']:bool=bool(round(vec[pos+43]))
+        retdict['puoliso_ove_paid']:bool=round(vec[pos+44])
+        
+        retdict['main_kansanelake']:float=vec[pos+45]*self.pensionscale+self.pensionscale
+        retdict['puoliso_kansanelake']:float=vec[pos+46]*self.pensionscale+self.pensionscale # 50
+        retdict['main_paid_pension']:float=retdict['main_tyoelake_maksussa']+retdict['main_kansanelake']
+        retdict['puoliso_paid_pension']:float=retdict['puoliso_tyoelake_maksussa']+retdict['puoliso_kansanelake']
+
+        retdict['main_paid_wage']:float=vec[pos+47]*self.wagescale+self.wagescale
+        retdict['puoliso_paid_wage']:float=vec[pos+48]*self.wagescale+self.wagescale
+        retdict['main_basis_wage']:float=vec[pos+49]*self.wagescale+self.wagescale
+        retdict['puoliso_basis_wage']:float=vec[pos+50]*self.wagescale+self.wagescale
+    
+        retdict['main_life_left']:float=vec[pos+51]*self.age_maxdur+self.age_maxdur
+        retdict['puoliso_life_left']:float=vec[pos+52]*self.age_maxdur+self.age_maxdur
+        retdict['main_until_disab']:float=vec[pos+53]*self.age_maxdur+self.age_maxdur
+        retdict['puoliso_until_disab']:float=vec[pos+54]*self.age_maxdur+self.age_maxdur # 60
+
+        retdict['time_to_marriage']:float=vec[pos+55]*self.age_maxdur+self.age_maxdur
+        retdict['time_to_divorce']:float=vec[pos+56]*self.age_maxdur+self.age_maxdur
+        retdict['until_birth']:float=vec[pos+57]*self.age_maxdur+self.age_maxdur
+        retdict['main_until_student']:float=vec[pos+58]*self.age_maxdur+self.age_maxdur
+        retdict['puoliso_until_student']:float=vec[pos+59]*self.age_maxdur+self.age_maxdur
+        retdict['main_until_outsider']:float=vec[pos+60]*self.age_maxdur+self.age_maxdur
+        retdict['puoliso_until_outsider']:float=vec[pos+61]*self.age_maxdur+self.age_maxdur # 67
+        retdict['main_karenssia_jaljella']:float = vec[pos+62]
+        retdict['puoliso_karenssia_jaljella']:float = vec[pos+63]
+        retdict['main_humancapital']:float = vec[pos+64]*self.hc_scale+self.hc_scale
+        retdict['puoliso_humancapital']:float = vec[pos+65]*self.hc_scale+self.hc_scale
+
+        if self.include_preferencenoise:
+            retdict['prefnoise']=vec[pos+66]
+        else:
+            retdict['prefnoise']=bool(0)
+
+        # here are 70 variables including pref_noise that is not used => 69 state variables
+
+        return retdict
+                              
+    def random_init_state(self,minage: float=18,maxage: float=70):
+        emp=random.randint(0,15)
+        g=np.random.randint(0,3)
+        p_g=np.random.randint(3,6)
+        pension=np.random.uniform(0,80_000)
+        old_wage=np.random.uniform(0,80_000)
+        age=np.random.randint(minage/self.timestep,maxage/self.timestep-1)*self.timestep
+        time_in_state=np.random.uniform(0,30)
+        pink=np.random.randint(2)
+        toe=np.random.uniform(0,3)
+        tyohist=np.random.uniform(0,20)
+        next_wage=np.random.uniform(0,80_000)
+        used_unemp_benefit=np.random.uniform(0,20)
+        wage_reduction=np.random.uniform(0,1.0)
+        unemp_after_ra=np.random.uniform(0,10.0)
+        unempwage=np.random.uniform(0,80_000)
+        unempwage_basis=np.random.uniform(0,80_000)
+        prefnoise=np.random.uniform(-1,1)
+        children_under3=np.random.randint(0,15)
+        children_under7=np.random.randint(0,15)
+        children_under18=np.random.randint(0,15)
+        unemp_benefit_left=np.random.randint(0,10)
+        alkanut_ansiosidonnainen=np.random.randint(0,2)
+        toe58=bool(np.random.randint(0,2))
+        ove_paid=bool(np.random.randint(0,2))
+        kassanjasenyys=bool(np.random.randint(0,2))
+        toekesto=np.random.uniform(0,3)
+        puoliso=bool(np.random.randint(0,2))
+        puoliso_tila=np.random.randint(0,15)
+        puoliso_wage_reduction=np.random.uniform(0,1.0)
+        puoliso_pension=np.random.uniform(0,50000)
+        puoliso_old_wage=np.random.uniform(0,50000)
+        puoliso_next_wage=np.random.uniform(0,50000)
+        puoliso_used_unemp_benefit=np.random.uniform(0,10)
+        puoliso_unemp_benefit_left=np.random.uniform(0,10)
+        puoliso_unemp_after_ra=np.random.uniform(0,10)
+        puoliso_unempwage=np.random.uniform(0,50000)
+        puoliso_unempwage_basis=np.random.uniform(0,50000)
+        puoliso_alkanut_ansiosidonnainen=np.random.randint(0,3)
+        puoliso_toe58=bool(np.random.randint(0,2))
+        puoliso_toe=np.random.uniform(0,20)
+        puoliso_toekesto=np.random.uniform(0,20)
+        puoliso_tyoura=np.random.uniform(0,40)
+        puoliso_time_in_state=np.random.uniform(0,40)
+        puoliso_pinkslip=bool(np.random.randint(0,2))
+        puoliso_ove_paid=bool(np.random.randint(0,2))
+        kansanelake=np.random.uniform(0,10000)
+        puoliso_kansanelake=np.random.uniform(0,10000)
+        tyoelake_maksussa=np.random.uniform(0,50000)
+        puoliso_tyoelake_maksussa=np.random.uniform(0,50000)
+        main_wage_basis=np.random.uniform(0,50000)
+        spouse_wage_basis=np.random.uniform(0,50000)
+        paid_pension=kansanelake+tyoelake_maksussa
+        puoliso_paid_pension=puoliso_kansanelake+puoliso_tyoelake_maksussa
+        main_pt_action=np.random.randint(0,2)
+        spouse_pt_action=np.random.randint(0,2)
+        main_paid_wage,main_pt_factor,_= self.get_paid_wage(old_wage,emp,main_pt_action)
+        spouse_paid_wage,spouse_pt_factor,_= self.get_paid_wage(puoliso_old_wage,puoliso_tila,spouse_pt_action)
+        main_life_left,spouse_life_left=np.random.uniform(0,100.0),np.random.uniform(0,100.0)
+        main_until_disab,spouse_until_disab=np.random.uniform(0,100.0),np.random.uniform(0,100.0)
+        time_to_marriage,time_to_divorce=np.random.uniform(0,100.0),np.random.uniform(0,100.0)
+        until_birth=np.random.uniform(0,100.0)
+        main_until_student=np.random.uniform(0,100.0)
+        spouse_until_student=np.random.uniform(0,100.0)
+        main_until_outsider=np.random.uniform(0,100.0)
+        spouse_until_outsider=np.random.uniform(0,100.0)
+        main_karenssia_jaljella = np.random.uniform(0,1.0)
+        spouse_karenssia_jaljella = np.random.uniform(0,1.0)
+        main_humancapital = np.random.uniform(0,10.0)
+        spouse_humancapital = np.random.uniform(0,10.0)
+        
+        if age<63.5:
+            if puoliso_tila in set([2,8,9]):
+                puoliso_tila=0
+            if emp in set([2,8,9]):
+                emp=0
+            kansanelake=0
+            puoliso_kansanelake=0
+            tyoelake_maksussa=0
+            puoliso_tyoelake_maksussa=0
+        
+        vec=self.state_encode(emp,g,p_g,pension,old_wage,age,time_in_state,tyoelake_maksussa,pink,toe,
+                toekesto,tyohist,next_wage,used_unemp_benefit,wage_reduction,
+                unemp_after_ra,unempwage,unempwage_basis,
+                children_under3,children_under7,children_under18,
+                unemp_benefit_left,alkanut_ansiosidonnainen,toe58,ove_paid,kassanjasenyys,
+                puoliso,puoliso_tila,puoliso_old_wage,puoliso_pension,
+                puoliso_wage_reduction,puoliso_tyoelake_maksussa,puoliso_next_wage,
+                puoliso_used_unemp_benefit,puoliso_unemp_benefit_left,
+                puoliso_unemp_after_ra,puoliso_unempwage,puoliso_unempwage_basis,
+                puoliso_alkanut_ansiosidonnainen,puoliso_toe58,
+                puoliso_toe,puoliso_toekesto,puoliso_tyoura,puoliso_time_in_state,
+                puoliso_pinkslip,puoliso_ove_paid,kansanelake,puoliso_kansanelake,
+                main_paid_wage,spouse_paid_wage,
+                main_pt_action,spouse_pt_action,
+                main_wage_basis,spouse_wage_basis,
+                main_life_left,spouse_life_left,
+                main_until_disab,spouse_until_disab,
+                time_to_marriage,time_to_divorce,until_birth,
+                main_until_student,spouse_until_student,main_until_outsider,spouse_until_outsider,
+                main_karenssia_jaljella,spouse_karenssia_jaljella,main_humancapital,spouse_humancapital,
+                prefnoise)
+                            
+        return vec
+        
+    def unit_test_code_decode(self):
+        print('unit_test_code_decode')
+        for k in range(10):
+            emp=random.randint(0,15)
+            g=np.random.randint(0,3)
+            p_g=np.random.randint(3,6)
+            pension=np.random.uniform(0,80_000)
+            old_wage=np.random.uniform(0,80_000)
+            age=np.random.randint(0,70)
+            time_in_state=np.random.uniform(0,30)
+            pink=np.random.randint(2)
+            toe=np.random.uniform(0,3)
+            tyohist=np.random.uniform(0,20)
+            next_wage=np.random.uniform(0,80_000)
+            used_unemp_benefit=np.random.uniform(0,20)
+            wage_reduction=np.random.uniform(0,1.0)
+            unemp_after_ra=np.random.uniform(0,10.0)
+            unempwage=np.random.uniform(0,80_000)
+            unempwage_basis=np.random.uniform(0,80_000)
+            prefnoise=np.random.uniform(-1,1)
+            children_under3=np.random.randint(0,15)
+            children_under7=np.random.randint(0,15)
+            children_under18=np.random.randint(0,15)
+            unemp_benefit_left=np.random.randint(0,10)
+            alkanut_ansiosidonnainen=np.random.randint(0,2)
+            toe58=np.random.randint(0,2)
+            ove_paid=np.random.randint(0,2)
+            kassanjasenyys=np.random.randint(0,2)
+            toekesto=np.random.uniform(0,3)
+            puoliso=np.random.randint(0,2)
+            puoliso_tila=np.random.randint(0,15)
+            puoliso_wage_reduction=np.random.uniform(0,50000)
+            puoliso_pension=np.random.uniform(0,50000)
+            puoliso_old_wage=np.random.uniform(0,50000)
+            puoliso_next_wage=np.random.uniform(0,50000)
+            puoliso_used_unemp_benefit=np.random.uniform(0,10)
+            puoliso_unemp_benefit_left=np.random.uniform(0,10)
+            puoliso_unemp_after_ra=np.random.uniform(0,10)
+            puoliso_unempwage=np.random.uniform(0,50000)
+            puoliso_unempwage_basis=np.random.uniform(0,50000)
+            puoliso_alkanut_ansiosidonnainen=np.random.randint(0,3)
+            puoliso_toe58=np.random.randint(0,2)
+            puoliso_toe=np.random.uniform(0,20)
+            puoliso_toekesto=np.random.uniform(0,20)
+            puoliso_tyoura=np.random.uniform(0,40)
+            puoliso_time_in_state=np.random.uniform(0,40)
+            puoliso_pinkslip=np.random.randint(0,2)
+            puoliso_ove_paid=np.random.randint(0,2)
+            kansanelake=np.random.uniform(0,50000)
+            puoliso_kansanelake=np.random.uniform(0,50000)
+            tyoelake_maksussa=np.random.uniform(0,50000)
+            puoliso_tyoelake_maksussa=np.random.uniform(0,50000)
+            paid_pension=kansanelake+tyoelake_maksussa
+            puoliso_paid_pension=puoliso_kansanelake+puoliso_tyoelake_maksussa
+            main_pt_action=np.random.randint(0,3)
+            spouse_pt_action=np.random.randint(0,3)
+            old_paid=np.random.uniform(0,50000)
+            spouse_old_paid=np.random.uniform(0,50000)
+            main_paid_wage,main_pt_factor,_=self.get_paid_wage(old_wage,emp,main_pt_action)
+            spouse_paid_wage,spouse_pt_factor,_=self.get_paid_wage(puoliso_old_wage,puoliso_tila,spouse_pt_action)
+            main_wage_basis=np.random.uniform(0,50000)
+            spouse_wage_basis=np.random.uniform(0,50000)
+            main_life_left=np.random.uniform(0,100)
+            spouse_life_left=np.random.uniform(0,100)
+            main_until_disab=np.random.uniform(0,100)
+            spouse_until_disab=np.random.uniform(0,100)
+            time_to_marriage,time_to_divorce=np.random.uniform(0,100.0),np.random.uniform(0,100.0)
+            until_birth=np.random.uniform(0,100.0)
+            main_until_student=np.random.uniform(0,100.0)
+            spouse_until_student=np.random.uniform(0,100.0)
+            main_until_outsider=np.random.uniform(0,100.0)
+            spouse_until_outsider=np.random.uniform(0,100.0)
+            main_karenssia_jaljella = np.random.uniform(0,1.0)
+            spouse_karenssia_jaljella = np.random.uniform(0,1.0)
+            main_humancapital = np.random.uniform(0,10.0)
+            spouse_humancapital = np.random.uniform(0,10.0)
+        
+            vec=self.state_encode(emp,g,p_g,pension,old_wage,age,time_in_state,tyoelake_maksussa,pink,
+                                toe,toekesto,tyohist,next_wage,used_unemp_benefit,wage_reduction,
+                                unemp_after_ra,unempwage,unempwage_basis,children_under3,
+                                children_under7,children_under18,unemp_benefit_left,alkanut_ansiosidonnainen,
+                                toe58,ove_paid,kassanjasenyys,puoliso,puoliso_tila,puoliso_old_wage,puoliso_pension,
+                                puoliso_wage_reduction,puoliso_tyoelake_maksussa,puoliso_next_wage,
+                                puoliso_used_unemp_benefit,puoliso_unemp_benefit_left,
+                                puoliso_unemp_after_ra,puoliso_unempwage,puoliso_unempwage_basis,
+                                puoliso_alkanut_ansiosidonnainen,puoliso_toe58,
+                                puoliso_toe,puoliso_toekesto,puoliso_tyoura,puoliso_time_in_state,
+                                puoliso_pinkslip,puoliso_ove_paid,kansanelake,puoliso_kansanelake,
+                                main_paid_wage,spouse_paid_wage,
+                                main_pt_action,spouse_pt_action,
+                                main_wage_basis,spouse_wage_basis,
+                                main_life_left,spouse_life_left,
+                                main_until_disab,spouse_until_disab,
+                                time_to_marriage,time_to_divorce,until_birth,
+                                main_until_student,spouse_until_student,main_until_outsider,spouse_until_outsider,
+                                main_karenssia_jaljella,spouse_karenssia_jaljella,main_humancapital,spouse_humancapital,
+                                prefnoise)
+
+            # test vectorization
+            vec = np.array(vec,dtype=np.float32)
+                                
+            emp2,g2,p2_g,pension2,wage2,age2,time_in_state2,paid_pension2,pink2,toe2,toekesto2,\
+                tyohist2,used_unemp_benefit2,wage_reduction2,unemp_after_ra2,\
+                unempwage2,unempwage_basis2,prefnoise2,\
+                children_under3_2,children_under7_2,children_under18_2,unemp_benefit_left2,\
+                alkanut_ansiosidonnainen2,toe58_2,ove_paid_2,jasen_2,p2,p2_tila,p2_old_wage,p2_pension,\
+                p2_wage_reduction,p2_paid_pension,p2_next_wage,p2_used_unemp_benefit,p2_unemp_benefit_left,\
+                p2_unemp_after_ra,p2_unempwage,p2_unempwage_basis,p2_alkanut_ansiosidonnainen,p2_toe58,p2_toe,\
+                p2_toekesto,p2_tyoura,p2_time_in_state,p2_pinkslip,p2_ove_paid,\
+                kansanelake2,puoliso_kansanelake2,tyoelake_maksussa2,puoliso_tyoelake_maksussa2,next_wage2,\
+                main_paid_wage2,spouse_paid_wage2,pt_act2,s_pt_act2,\
+                main_wage_basis2,spouse_wage_basis2,\
+                main_life_left2,spouse_life_left2,\
+                main_until_disab2,spouse_until_disab2,time_to_marriage2,time_to_divorce2,until_birth2,\
+                main_until_student2,spouse_until_student2,main_until_outsider2,spouse_until_outsider2,\
+                main_karenssia_jaljella2,spouse_karenssia_jaljella2,main_humancapital2,spouse_humancapital2\
+                 = self.state_decode(vec)
+                
+            self.check_state(emp,g,p_g,pension,old_wage,age,time_in_state,paid_pension,pink,
+                                toe,tyohist,next_wage,used_unemp_benefit,wage_reduction,
+                                unemp_after_ra,unempwage,unempwage_basis,
+                                prefnoise,children_under3,children_under7,children_under18,
+                                unemp_benefit_left,alkanut_ansiosidonnainen,toe58,ove_paid,
+                                kassanjasenyys,puoliso,puoliso_tila,puoliso_old_wage,puoliso_pension,
+                                puoliso_wage_reduction,puoliso_paid_pension,puoliso_next_wage,
+                                puoliso_used_unemp_benefit,puoliso_unemp_benefit_left,
+                                puoliso_unemp_after_ra,puoliso_unempwage,puoliso_unempwage_basis,
+                                puoliso_alkanut_ansiosidonnainen,puoliso_toe58,
+                                puoliso_toe,puoliso_toekesto,puoliso_tyoura,puoliso_time_in_state,puoliso_pinkslip,puoliso_ove_paid,
+                                kansanelake,puoliso_kansanelake,tyoelake_maksussa,puoliso_tyoelake_maksussa,
+                                main_paid_wage,spouse_paid_wage,main_pt_action,spouse_pt_action,main_wage_basis,spouse_wage_basis,
+                                emp2,g2,p2_g,pension2,wage2,age2,time_in_state2,paid_pension2,pink2,toe2,
+                                tyohist2,used_unemp_benefit2,wage_reduction2,unemp_after_ra2,
+                                unempwage2,unempwage_basis2,prefnoise2,
+                                children_under3_2,children_under7_2,children_under18_2,
+                                unemp_benefit_left2,alkanut_ansiosidonnainen2,toe58_2,
+                                ove_paid_2,jasen_2,p2,p2_tila,p2_old_wage,p2_pension,
+                                p2_wage_reduction,p2_paid_pension,p2_next_wage,
+                                p2_used_unemp_benefit,p2_unemp_benefit_left,
+                                p2_unemp_after_ra,p2_unempwage,p2_unempwage_basis,p2_alkanut_ansiosidonnainen,p2_toe58,
+                                p2_toe,p2_toekesto,p2_tyoura,p2_time_in_state,p2_pinkslip,p2_ove_paid,
+                                kansanelake2,puoliso_kansanelake2,tyoelake_maksussa2,puoliso_tyoelake_maksussa2,
+                                next_wage2,main_paid_wage2,spouse_paid_wage2,pt_act2,s_pt_act2,
+                                main_wage_basis2,spouse_wage_basis2,
+                                main_life_left,spouse_life_left,main_life_left2,spouse_life_left2,
+                                main_until_disab,spouse_until_disab,main_until_disab2,spouse_until_disab2,
+                                time_to_marriage,time_to_divorce,time_to_marriage2,time_to_divorce2,
+                                until_birth,until_birth2,
+                                main_until_student,main_until_student2,
+                                spouse_until_student,spouse_until_student2,
+                                main_until_outsider,main_until_outsider2,
+                                spouse_until_outsider,spouse_until_outsider2,
+                                main_karenssia_jaljella,main_karenssia_jaljella2,
+                                spouse_karenssia_jaljella,spouse_karenssia_jaljella2,
+                                main_humancapital2,main_humancapital,
+                                spouse_humancapital,spouse_humancapital2)
+
+        print('Done')
+        
+    def check_state(self,emp,g,p_g,pension,old_wage,age,time_in_state,paid_pension,pink,
+                    toe,tyohist,next_wage,used_unemp_benefit,wage_reduction,
+                    unemp_after_ra,unempwage,unempwage_basis,
+                    prefnoise,children_under3,children_under7,children_under18,
+                    unemp_benefit_left,alkanut_ansiosidonnainen,toe58,ove_paid,
+                    jasen,puoliso,puoliso_tila,puoliso_old_wage,puoliso_pension,
+                    puoliso_wage_reduction,puoliso_paid_pension,puoliso_next_wage,
+                    puoliso_used_unemp_benefit,puoliso_unemp_benefit_left,
+                    puoliso_unemp_after_ra,puoliso_unempwage,puoliso_unempwage_basis,
+                    puoliso_alkanut_ansiosidonnainen,puoliso_toe58,
+                    puoliso_toe,puoliso_toekesto,puoliso_tyoura,puoliso_time_in_state,puoliso_pinkslip,puoliso_ove_paid,
+                    kansanelake,puoliso_kansanelake,tyoelake_maksussa,puoliso_tyoelake_maksussa,
+                    old_paid,spouse_old_paid,main_pt_action,spouse_pt_action,
+                    main_wage_basis,spouse_wage_basis,
+                    emp2,g2,p2_g,pension2,old_wage2,age2,time_in_state2,paid_pension2,pink2,toe2,
+                    tyohist2,used_unemp_benefit2,wage_reduction2,unemp_after_ra2,
+                    unempwage2,unempwage_basis2,prefnoise2,
+                    children_under3_2,children_under7_2,children_under18_2,
+                    unemp_benefit_left2,alkanut_ansiosidonnainen2,toe58_2,
+                    ove_paid_2,jasen_2,p2,p2_tila,p2_old_wage,p2_pension,
+                    p2_wage_reduction,p2_paid_pension,p2_next_wage,
+                    p2_used_unemp_benefit,p2_unemp_benefit_left,
+                    p2_unemp_after_ra,p2_unempwage,p2_unempwage_basis,p2_alkanut_ansiosidonnainen,p2_toe58,
+                    p2_toe,p2_toekesto,p2_tyoura,p2_time_in_state,p2_pinkslip,p2_ove_paid,
+                    kansanelake2,puoliso_kansanelake2,tyoelake_maksussa2,puoliso_tyoelake_maksussa2,
+                    next_wage2,old_paid2,spouse_old_paid2,pt_act2,s_pt_act2,main_wage_basis2,spouse_wage_basis2,
+                    main_life_left,spouse_life_left,main_life_left2,spouse_life_left2,
+                    main_until_disab,spouse_until_disab,main_until_disab2,spouse_until_disab2,
+                    time_to_marriage,time_to_divorce,time_to_marriage2,time_to_divorce2,until_birth,until_birth2,
+                    main_until_student,main_until_student2,
+                    spouse_until_student,spouse_until_student2,
+                    main_until_outsider,main_until_outsider2,
+                    spouse_until_outsider,spouse_until_outsider2,
+                    main_karenssia_jaljella,main_karenssia_jaljella2,
+                    spouse_karenssia_jaljella,spouse_karenssia_jaljella2,
+                    main_humancapital,main_humancapital2,
+                    spouse_humancapital,spouse_humancapital2):
+                    
+        if not emp==emp2:  
+            print('emp: {} vs {}'.format(emp,emp2))
+        if not g==g2:  
+            print('g: {} vs {}'.format(g,g2))
+        if not p_g==p2_g:  
+            print('p_g: {} vs {}'.format(p_g,p2_g))
+        self.test_var(pension,pension2,'pension')
+        self.test_var(old_wage,old_wage2,'old_wage')
+        self.test_var(age,age2,'age')
+        self.test_var(time_in_state,time_in_state2,'time_in_state')
+        self.test_var(paid_pension,paid_pension2,'paid_pension')
+        if not pink==pink2:  
+            print('pink: {} vs {}'.format(pink,pink2))
+        self.test_var(tyohist,tyohist2,'tyohist')
+        self.test_var(next_wage,next_wage2,'next_wage')
+        self.test_var(used_unemp_benefit,used_unemp_benefit2,'used_unemp_benefit')
+        self.test_var(wage_reduction,wage_reduction2,'wage_reduction')
+        
+        self.test_var(next_wage,next_wage2,'next_wage')
+        self.test_var(unempwage,unempwage2,'unempwage')
+        self.test_var(unempwage_basis,unempwage_basis2,'unempwage_basis')
+        if self.include_preferencenoise:
+            if not prefnoise==prefnoise2:  
+                print('prefnoise: {} vs {}'.format(prefnoise,prefnoise2))
+        if not children_under3==children_under3_2:  
+            print('children_under3: {} vs {}'.format(children_under3,children_under3_2))
+        if not children_under7==children_under7_2:  
+            print('children_under7: {} vs {}'.format(children_under7,children_under7_2))
+        if not children_under18==children_under18_2:  
+            print('children_under18: {} vs {}'.format(children_under18,children_under18_2))
+        self.test_var(unemp_benefit_left,unemp_benefit_left2,'unemp_benefit_left')
+        if not alkanut_ansiosidonnainen==alkanut_ansiosidonnainen2:  
+            print('alkanut_ansiosidonnainen: {} vs {}'.format(alkanut_ansiosidonnainen,alkanut_ansiosidonnainen2))
+        if not toe58==toe58_2:  
+            print('toe58: {} vs {}'.format(toe58,toe58_2))
+        if not ove_paid==ove_paid_2:  
+            print('ove_paid: {} vs {}'.format(ove_paid,ove_paid_2))
+        if not jasen==jasen_2:  
+            print('jasen: {} vs {}'.format(jasen,jasen_2))
+        if not puoliso==p2:  
+            print('puoliso: {} vs {}'.format(puoliso,p2))
+        if not puoliso_tila==p2_tila:  
+            print('puoliso_tila: {} vs {}'.format(puoliso_tila,p2_tila))
+        self.test_var(puoliso_old_wage,p2_old_wage,'puoliso_old_wage')
+        self.test_var(puoliso_wage_reduction,p2_wage_reduction,'puoliso_wage_reduction')
+        self.test_var(puoliso_paid_pension,p2_paid_pension,'puoliso_paid_pension')
+        self.test_var(puoliso_next_wage,p2_next_wage,'puoliso_next_wage')
+        self.test_var(puoliso_used_unemp_benefit,p2_used_unemp_benefit,'puoliso_used_unemp_benefit')
+        self.test_var(puoliso_unemp_benefit_left,p2_unemp_benefit_left,'puoliso_unemp_benefit_left')
+        self.test_var(puoliso_unemp_after_ra,p2_unemp_after_ra,'puoliso_unemp_after_ra')
+        self.test_var(puoliso_unempwage,p2_unempwage,'puoliso_unempwage')
+        self.test_var(puoliso_unempwage_basis,p2_unempwage_basis,'puoliso_unempwage_basis')
+        self.test_var(puoliso_toe,p2_toe,'puoliso_toe')
+        self.test_var(puoliso_toekesto,p2_toekesto,'puoliso_toekesto')
+        self.test_var(puoliso_tyoura,p2_tyoura,'puoliso_tyoura')
+        self.test_var(puoliso_time_in_state,p2_time_in_state,'puoliso_time_in_state')
+        self.test_var(puoliso_alkanut_ansiosidonnainen,p2_alkanut_ansiosidonnainen,'puoliso_alkanut_ansiosidonnainen')
+        self.test_var(puoliso_toe58,p2_toe58,'puoliso_toe58')
+        if not math.isclose(puoliso_pinkslip,p2_pinkslip):  
+            print('puoliso_pinkslip: {} vs {}'.format(puoliso_pinkslip,p2_pinkslip))
+        self.test_var(puoliso_ove_paid,p2_ove_paid,'puoliso_ove_paid')
+        self.test_var(kansanelake,kansanelake2,'kansanelake')
+        self.test_var(puoliso_kansanelake,puoliso_kansanelake2,'puoliso_kansanelake')
+        self.test_var(tyoelake_maksussa,tyoelake_maksussa2,'tyoelake_maksussa')
+        self.test_var(puoliso_tyoelake_maksussa,puoliso_tyoelake_maksussa2,'puoliso_tyoelake_maksussa')
+        self.test_var(old_paid,old_paid2,'old_paid')
+        self.test_var(spouse_old_paid,spouse_old_paid2,'puoliso_tyoespouse_old_paidlake_maksussa')
+        self.test_var(main_wage_basis,main_wage_basis2,'main_wage_basis')
+        if not math.isclose(main_pt_action,pt_act2):  
+            print('main_pt_action: {} vs {}'.format(main_pt_action,pt_act2))
+        if not math.isclose(spouse_pt_action,s_pt_act2):  
+            print('spouse_pt_action: {} vs {}'.format(spouse_pt_action,s_pt_act2))
+        self.test_var(spouse_wage_basis,spouse_wage_basis2,'spouse_wage_basis')
+        self.test_var(main_life_left,main_life_left2,'main_life_left')
+        self.test_var(spouse_life_left,spouse_life_left2,'spouse_life_left')
+        self.test_var(main_until_disab,main_until_disab2,'main_until_disab')
+        self.test_var(spouse_until_disab,spouse_until_disab2,'spouse_until_disab')
+        self.test_var(time_to_marriage,time_to_marriage2,'time_to_marriage')
+        self.test_var(time_to_divorce,time_to_divorce2,'time_to_divorce')
+        self.test_var(until_birth,until_birth2,'until_birth')
+        self.test_var(main_until_student,main_until_student2,'main_until_student')
+        self.test_var(spouse_until_student,spouse_until_student2,'spouse_until_student')
+        self.test_var(main_until_outsider,main_until_outsider2,'main_until_outsider')
+        self.test_var(spouse_until_outsider,spouse_until_outsider2,'spouse_until_outsider')
+        self.test_var(main_karenssia_jaljella,main_karenssia_jaljella2,'main_karenssia_jaljella')
+        self.test_var(spouse_karenssia_jaljella,spouse_karenssia_jaljella2,'spouse_karenssia_jaljella')
+        self.test_var(main_humancapital,main_humancapital2,'main_humancapital')
+        self.test_var(spouse_humancapital,spouse_humancapital2,'spouse_humancapital')
+
+    def test_var(self,v1,v2,vname):
+        if not math.isclose(v1,v2):  
+            print(f'{vname}: {v1} vs {v2}')
+    
+    def check_state_vec(self,vec1,vec2):
+
+        emp2,g2,p2_g,pension2,old_wage2,age2,time_in_state2,paid_pension2,pink2,toe2,toekesto2,\
+            tyohist2,used_unemp_benefit2,wage_reduction2,unemp_after_ra2,\
+            unempwage2,unempwage_basis2,prefnoise2,\
+            children_under3_2,children_under7_2,children_under18_2,unemp_benefit_left2,\
+            alkanut_ansiosidonnainen2,toe58_2,ove_paid_2,jasen_2,p2,p2_tila,p2_old_wage,p2_pension,\
+            p2_wage_reduction,p2_paid_pension,p2_next_wage,p2_used_unemp_benefit,p2_unemp_benefit_left,\
+            p2_unemp_after_ra,p2_unempwage,p2_unempwage_basis,p2_alkanut_ansiosidonnainen,p2_toe58,p2_toe,\
+            p2_toekesto,p2_tyoura,p2_time_in_state,p2_pinkslip,p2_ove_paid,\
+            kansanelake2,p2_kansanelake,tyoelake_maksussa2,p2_tyoelake_maksussa,next_wage2,\
+            main_paid_wage2,spouse_paid_wage2,\
+            pt_act2,s_pt_act2,\
+            main_wage_basis2,spouse_wage_basis2,main_life_left2,spouse_life_left2,\
+            main_until_disab2,spouse_until_disab2,time_to_marriage2,time_to_divorce2,until_birth2,\
+            main_until_student2,spouse_until_student2,main_until_outsider2,spouse_until_outsider2,\
+            main_karenssia_jaljella2,spouse_karenssia_jaljella2,main_humancapital2,spouse_humancapital2\
+                = self.state_decode(vec2)
+
+        emp,g,p_g,pension,old_wage,age,time_in_state,paid_pension,pink,toe,toekesto,\
+            tyohist,used_unemp_benefit,wage_reduction,unemp_after_ra,\
+            unempwage,unempwage_basis,prefnoise,\
+            children_under3,children_under7,children_under18,unemp_benefit_left,\
+            alkanut_ansiosidonnainen,toe58,ove_paid,jasen,puoliso,p_tila,p_old_wage,p_pension,\
+            p_wage_reduction,p_paid_pension,p_next_wage,p_used_unemp_benefit,p_unemp_benefit_left,\
+            p_unemp_after_ra,p_unempwage,p_unempwage_basis,p_alkanut_ansiosidonnainen,p_toe58,p_toe,\
+            p_toekesto,p_tyoura,p_time_in_state,p_pinkslip,p_ove_paid,\
+            kansanelake,p_kansanelake,tyoelake_maksussa,p_tyoelake_maksussa,next_wage,\
+            main_paid_wage,spouse_paid_wage,\
+            pt_act,s_pt_act,\
+            main_wage_basis,spouse_wage_basis,main_life_left,spouse_life_left,main_until_disab,spouse_until_disab,\
+            time_to_marriage,time_to_divorce,until_birth,main_until_student,spouse_until_student,main_until_outsider,spouse_until_outsider,\
+            main_karenssia_jaljella,spouse_karenssia_jaljella,main_humancapital,spouse_humancapital \
+                = self.state_decode(vec1)
+    
+        if not emp==emp2:  
+            print('emp: {} vs {}'.format(emp,emp2))
+        if not g==g2:  
+            print('g: {} vs {}'.format(g,g2))
+        if not p_g==p2_g:  
+            print('p_g: {} vs {}'.format(p_g,p2_g))
+        if not math.isclose(pension,pension2):  
+            print('pension: {} vs {}'.format(pension,pension2))
+        if not math.isclose(old_wage,old_wage2):  
+            print('old_wage: {} vs {}'.format(old_wage,old_wage2))
+        if not age==age2:  
+            print('age: {} vs {}'.format(age,age2))
+        if not math.isclose(time_in_state,time_in_state2):  
+            print('time_in_state: {} vs {}'.format(time_in_state,time_in_state2))
+        if not math.isclose(paid_pension,paid_pension2):
+            print('paid_pension: {} vs {}'.format(paid_pension,paid_pension2))
+        if not pink==pink2:  
+            print('pink: {} vs {}'.format(pink,pink2))
+        if not math.isclose(tyohist,tyohist2):  
+            print('tyohist: {} vs {}'.format(tyohist,tyohist2))
+        if not math.isclose(next_wage,next_wage2):
+            print('next_wage: {} vs {}'.format(next_wage,next_wage2))
+        if not math.isclose(used_unemp_benefit,used_unemp_benefit2):  
+            print('used_unemp_benefit: {} vs {}'.format(used_unemp_benefit,used_unemp_benefit2))
+        if not math.isclose(wage_reduction,wage_reduction2):  
+            print('wage_reduction: {} vs {}'.format(wage_reduction,wage_reduction2))
+        if not unemp_after_ra==unemp_after_ra2:  
+            print('unemp_after_ra: {} vs {}'.format(unemp_after_ra,unemp_after_ra2))
+        if not math.isclose(unempwage,unempwage2):  
+            print('unempwage: {} vs {}'.format(unempwage,unempwage2))
+        if not math.isclose(unempwage_basis,unempwage_basis2):  
+            print('unempwage_basis: {} vs {}'.format(unempwage_basis,unempwage_basis2))
+        if self.include_preferencenoise:
+            if not prefnoise==prefnoise2:  
+                print('prefnoise: {} vs {}'.format(prefnoise,prefnoise2))
+        if not children_under3==children_under3_2:  
+            print('children_under3: {} vs {}'.format(children_under3,children_under3_2))
+        if not children_under7==children_under7_2:  
+            print('children_under7: {} vs {}'.format(children_under7,children_under7_2))
+        if not children_under18==children_under18_2:  
+            print('children_under18: {} vs {}'.format(children_under18,children_under18_2))
+        if not math.isclose(unemp_benefit_left,unemp_benefit_left2):  
+            print('unemp_benefit_left2: {} vs {}'.format(unemp_benefit_left,unemp_benefit_left2))
+        if not alkanut_ansiosidonnainen==alkanut_ansiosidonnainen2:  
+            print('alkanut_ansiosidonnainen: {} vs {}'.format(alkanut_ansiosidonnainen,alkanut_ansiosidonnainen2))
+        if not toe58==toe58_2:  
+            print('toe58: {} vs {}'.format(toe58,toe58_2))
+        if not ove_paid==ove_paid_2:  
+            print('ove_paid: {} vs {}'.format(ove_paid,ove_paid_2))
+        if not jasen==jasen_2:  
+            print('jasen: {} vs {}'.format(jasen,jasen_2))
+        if not puoliso==p2:  
+            print('puoliso: {} vs {}'.format(puoliso,p2))
+        if not p_tila==p2_tila:  
+            print('p_tila: {} vs {}'.format(p_tila,p2_tila))
+        if not math.isclose(p_old_wage,p2_old_wage):  
+            print('p_old_wage: {} vs {}'.format(p_old_wage,p2_old_wage))
+        if not math.isclose(p_wage_reduction,p2_wage_reduction):  
+            print('p_wage_reduction: {} vs {}'.format(p_wage_reduction,p2_wage_reduction))
+        if not math.isclose(p_paid_pension,p2_paid_pension):  
+            print('p_paid_pension: {} vs {}'.format(p_paid_pension,p2_paid_pension))
+        if not math.isclose(p_next_wage,p2_next_wage):  
+            print('p_next_wage: {} vs {}'.format(p_next_wage,p2_next_wage))
+        if not math.isclose(p_used_unemp_benefit,p2_used_unemp_benefit):  
+            print('p_next_wage: {} vs {}'.format(p_used_unemp_benefit,p2_used_unemp_benefit))
+        if not math.isclose(p_unemp_benefit_left,p2_unemp_benefit_left):  
+            print('p_unemp_benefit_left: {} vs {}'.format(p_unemp_benefit_left,p2_unemp_benefit_left))
+        if not math.isclose(p_unemp_after_ra,p2_unemp_after_ra):  
+            print('p_unemp_after_ra: {} vs {}'.format(p_unemp_after_ra,p2_unemp_after_ra))
+        if not math.isclose(p_unempwage,p2_unempwage):  
+            print('p_unempwage: {} vs {}'.format(p_unempwage,p2_unempwage))
+        if not math.isclose(p_unempwage_basis,p2_unempwage_basis):  
+            print('p_unempwage_basis: {} vs {}'.format(p_unempwage_basis,p2_unempwage_basis))
+        if not math.isclose(p_alkanut_ansiosidonnainen,p2_alkanut_ansiosidonnainen):  
+            print('p_alkanut_ansiosidonnainen: {} vs {}'.format(p_alkanut_ansiosidonnainen,p2_alkanut_ansiosidonnainen))
+        if not math.isclose(p_toe58,p2_toe58):  
+            print('p_toe58: {} vs {}'.format(p_toe58,p2_toe58))
+        if not math.isclose(p_toe,p2_toe):  
+            print('p_toe: {} vs {}'.format(p_toe,p2_toe))
+        if not math.isclose(p_toekesto,p2_toekesto):  
+            print('p_toekesto: {} vs {}'.format(p_toekesto,p2_toekesto))
+        if not math.isclose(p_tyoura,p2_tyoura):  
+            print('p_tyoura: {} vs {}'.format(p_tyoura,p2_tyoura))
+        if not math.isclose(p_time_in_state,p2_time_in_state):  
+            print('p_time_in_state: {} vs {}'.format(p_time_in_state,p2_time_in_state))
+        if not math.isclose(p_pinkslip,p2_pinkslip):  
+            print('p_pinkslip: {} vs {}'.format(p_pinkslip,p2_pinkslip))
+        if not math.isclose(p_ove_paid,p2_ove_paid):  
+            print('p_ove_paid: {} vs {}'.format(p_ove_paid,p2_ove_paid))
+        if not math.isclose(kansanelake,kansanelake2):  
+            print('kansanelake: {} vs {}'.format(kansanelake2,kansanelake2))
+        if not math.isclose(p_kansanelake,p2_kansanelake):  
+            print('p_kansanelake: {} vs {}'.format(p_kansanelake,p2_kansanelake))
+        if not math.isclose(tyoelake_maksussa,tyoelake_maksussa2):  
+            print('tyoelake_maksussa: {} vs {}'.format(tyoelake_maksussa,tyoelake_maksussa2))
+        if not math.isclose(p_tyoelake_maksussa,p2_tyoelake_maksussa):  
+            print('p_tyoelake_maksussa: {} vs {}'.format(p_tyoelake_maksussa,p2_tyoelake_maksussa))    
+        if not math.isclose(main_paid_wage,main_paid_wage2):  
+            print('main_paid_wage: {} vs {}'.format(main_paid_wage,main_paid_wage2))    
+        if not math.isclose(spouse_paid_wage,spouse_paid_wage2):  
+            print('spouse_paid_wage: {} vs {}'.format(spouse_paid_wage,spouse_paid_wage2))    
+        if not math.isclose(pt_act,pt_act2):  
+            print('main_pt_action: {} vs {}'.format(pt_act,pt_act2))
+        if not math.isclose(s_pt_act,s_pt_act2):  
+            print('spouse_pt_action: {} vs {}'.format(s_pt_act,s_pt_act2))
+        self.test_var(main_wage_basis,main_wage_basis2,'main_wage_basis')
+        self.test_var(spouse_wage_basis,spouse_wage_basis2,'spouse_wage_basis')
+        self.test_var(spouse_life_left,spouse_life_left2,'spouse_life_left')
+        self.test_var(main_until_disab,main_until_disab2,'main_until_disab')
+        self.test_var(spouse_until_disab,spouse_until_disab2,'spouse_until_disab')
+        self.test_var(time_to_marriage,time_to_marriage2,'time_to_marriage')
+        self.test_var(time_to_divorce,time_to_divorce2,'time_to_divorce')
+        self.test_var(until_birth,until_birth2,'until_birth')
+        self.test_var(main_until_student,main_until_student2,'main_until_student')
+        self.test_var(spouse_until_student,spouse_until_student2,'spouse_until_student')
+        self.test_var(main_until_outsider,main_until_outsider2,'main_until_outsider')
+        self.test_var(spouse_until_outsider,spouse_until_outsider2,'spouse_until_outsider')
+        self.test_var(main_karenssia_jaljella,main_karenssia_jaljella2,'main_karenssia_jaljella')
+        self.test_var(spouse_karenssia_jaljella,spouse_karenssia_jaljella2,'spouse_karenssia_jaljella')
+
+
+    def setup_state_encoding(self):
+        self.state_encoding=np.zeros((self.n_empl,self.n_empl))
+        for s in range(self.n_empl):
+            self.state_encoding[s,s]=1
+        self.group_encoding=np.zeros((self.n_groups,self.n_groups))
+        for s in range(self.n_groups):
+            self.group_encoding[s,s]=1
+        self.spousestate_encoding=np.zeros((self.n_empl,self.n_empl))
+        for s in range(self.n_empl):
+            self.spousestate_encoding[s,s]=1
+        self.ptstate_encoding=np.zeros((self.n_parttime_action,self.n_parttime_action))
+        for s in range(self.n_parttime_action):
+            self.ptstate_encoding[s,s]=1
+
+    def swap_spouses(self,vec):
+        employment_status,g,spouse_g,pension,wage,age,time_in_state,paid_pension,pinkslip,toe,\
+            toekesto,tyoura,used_unemp_benefit,wage_reduction,unemp_after_ra,unempwage,\
+            unempwage_basis,prefnoise,children_under3,children_under7,children_under18,\
+            unemp_left,alkanut_ansiosidonnainen,toe58,ove_paid,jasen,\
+            puoliso,puoliso_tila,puoliso_wage,puoliso_pension,puoliso_wage_reduction,\
+            puoliso_paid_pension,puoliso_next_wage,puoliso_used_unemp_benefit,\
+            puoliso_unemp_benefit_left,puoliso_unemp_after_ra,puoliso_unempwage,\
+            puoliso_unempwage_basis,puoliso_alkanut_ansiosidonnainen,puoliso_toe58,\
+            puoliso_toe,puoliso_toekesto,puoliso_tyoura,puoliso_time_in_state,puoliso_pinkslip,\
+            puoliso_ove_paid,kansanelake,puoliso_kansanelake,tyoelake_maksussa,\
+            puoliso_tyoelake_maksussa,next_wage,\
+            main_paid_wage,spouse_paid_wage,main_pt_action,spouse_pt_action,\
+            main_wage_basis,spouse_wage_basis,main_life_left,spouse_life_left,spouse_until_disab,main_until_disab,\
+            time_to_marriage,time_to_divorce,until_child,main_until_student,spouse_until_student,main_until_outsider,spouse_until_outsider,\
+            main_karenssia_jaljella,spouse_karenssia_jaljella,main_humancapital,spouse_humancapital \
+                =self.state_decode(vec)           
+
+        if g>=3:
+            g=g-3
+        if spouse_g>=3:
+            spouse_g=spouse_g-3
+
+        return self.state_encode(puoliso_tila,g,spouse_g,puoliso_pension,puoliso_wage,age,puoliso_time_in_state,
+            puoliso_tyoelake_maksussa,puoliso_pinkslip,puoliso_toe,puoliso_toekesto,puoliso_tyoura,puoliso_next_wage,puoliso_used_unemp_benefit,
+            puoliso_wage_reduction,puoliso_unemp_after_ra,puoliso_unempwage,puoliso_unempwage_basis,
+            children_under3,children_under7,children_under18,
+            puoliso_unemp_benefit_left,puoliso_alkanut_ansiosidonnainen,puoliso_toe58,puoliso_ove_paid,jasen,
+            puoliso,
+            employment_status,wage,pension,
+            wage_reduction,tyoelake_maksussa,next_wage,
+            used_unemp_benefit,unemp_left,
+            unemp_after_ra,unempwage,unempwage_basis,
+            alkanut_ansiosidonnainen,toe58,
+            toe,toekesto,tyoura,time_in_state,
+            pinkslip,ove_paid,puoliso_kansanelake,kansanelake,
+            spouse_paid_wage,main_paid_wage,
+            spouse_pt_action,main_pt_action,
+            spouse_wage_basis,main_wage_basis,
+            spouse_life_left,main_life_left,
+            spouse_until_disab,main_until_disab,
+            time_to_marriage,time_to_divorce,until_child,
+            spouse_until_student,main_until_student,spouse_until_outsider,main_until_outsider,spouse_karenssia_jaljella,main_karenssia_jaljella,
+            main_humancapital,spouse_humancapital,
+            prefnoise)            
+            
+    def set_state_limits(self,debug=True):
+        '''
+        Rajat tiloille
+        '''
+        if self.log_transform:
+            pension_min=math.log(0/self.pensionscale+self.eps) # vastainen eläke
+            pension_max=math.log(200_000/self.pensionscale+self.eps) # vastainen eläke
+            wage_max=math.log(500_000/self.wagescale+self.eps)
+            wage_min=math.log(0/self.wagescale+self.eps)
+            paid_pension_max=math.log(200_00/self.pensionscale+self.eps) # alkanut eläke
+            paid_pension_min=math.log(0/self.pensionscale+self.eps) # alkanut eläke
+        else:
+            pension_max=(200_000-self.pensionscale)/self.pensionscale # vastainen eläke
+            pension_min=(0-self.pensionscale)/self.pensionscale # vastainen eläke
+            wage_max=(300_000-self.wagescale)/self.wagescale
+            wage_min=(0-self.wagescale)/self.wagescale
+            paid_pension_min=(0-self.pensionscale)/self.pensionscale # alkanut eläke
+            paid_pension_max=(200_000-self.pensionscale)/self.pensionscale # alkanut eläke
+
+        age_max=(self.max_age+1-(self.max_age+self.min_age)/2)/20
+        age_min=(self.min_age-1-(self.max_age+self.min_age)/2)/20
+        tis_max=(self.max_age-self.min_age-10)/10
+        tis_min=-10/10
+        pink_min=0 # irtisanottu vai ei 
+        pink_max=1 # irtisanottu vai ei 
+        toe_min=-1.0 # työssäoloehto
+        toe_max=1.0 # työssäoloehto
+        thist_min=-1.0 # tyohistoria: 300/400 pv
+        thist_max=(self.max_age-self.min_age-10)/20 # tyohistoria: 300/400 pv
+
+        group_min=0
+        group_max=1
+        state_min=0
+        state_max=1
+        ben_min=-1
+        ben_max=2
+        wr_min=-0.1
+        wr_max=1
+        pref_min=-5
+        pref_max=5
+        unra_min=-1
+        unra_max=1
+        child_min=-1
+        child_max=1
+        tr_min=(63-self.max_age)/(self.max_age-self.min_age)
+        tr_max=(68-self.min_age)/(self.max_age-self.min_age)
+        left_min=-1
+        left_max=1
+        lleftmin=-2
+        lleftmax=2
+        humancap_min=-1
+        humancap_max=1
+        
+        low=[]
+        high=[]
+        low_mid = [
+            pension_min, # vastainen eläke
+            wage_min, # old_wage
+            age_min, # age
+            tis_min, # time_in_state
+            paid_pension_min, # maksussa oleva eläke
+            state_min, # pink
+            toe_min, # työssäoloehto
+            thist_min, # tyhistoria
+            tr_min, # aikaa vanhuuseläkeikään
+            left_min, # unemp_left
+            wage_min, # next_wage
+            ben_min, # used_unemp_ben
+            wr_min, # wage_reduction
+            unra_min, # unemp after ret.age
+            wage_min, # unempwage
+            wage_min, # unempwage_basis
+            state_min, # retaged
+            state_min, # alkanut_ansiosidonnainen
+            child_min, # children under 3
+            child_min, # children under 7
+            child_min, # children under 18
+            state_min, # toe58
+            pension_min,  # ove määrä
+            state_min, # ove aged
+            state_min, # kassan jäsen 0/1
+            toe_min, # uuden toen laskenta
+            state_min, # on puolisoa tai ei
+            ]
+        
+        low_end=[wage_min, # puoliso old wage
+            paid_pension_min, # puoliso pension
+            wr_min, # puoliso wr
+            paid_pension_min, # työeläke maksussa
+            wage_min, # puoliso next wage
+            ben_min, # puoliso_used_unemp_benefit
+            ben_min, # puoliso_unemp_benefit_left
+            unra_min, # puoliso_unemp_after_ra
+            wage_min, # puoliso_unempwage
+            wage_min, # puoliso_unempwage_basis
+            state_min, # puoliso alkanut ansiosidonnainen
+            toe_min, # puoliso toe58
+            toe_min, # puoliso_toe
+            toe_min, # puoliso_toekesto
+            thist_min, # puoliso_tyoura
+            tis_min, # puoliso_time_in_state
+            state_min, # puoliso_pinkslip
+            state_min, # puoliso_ove_paid
+            paid_pension_min, # kansanelake
+            paid_pension_min, # puoliso_kansanelake        
+            wage_min, # main_paid_wage
+            wage_min, # spouse_paid_wage
+            wage_min, # main_wage_basis
+            wage_min, # spouse_wage_basis
+            lleftmin,
+            lleftmin,
+            lleftmin,
+            lleftmin,
+            lleftmin,
+            lleftmin,
+            lleftmin,
+            lleftmin,
+            lleftmin,
+            lleftmin,
+            lleftmin,
+            0,
+            0,
+            humancap_min,
+            humancap_min
+            ] 
+            
+        high_mid = [
+            pension_max,
+            wage_max,
+            age_max,
+            tis_max,
+            paid_pension_max,
+            pink_max,
+            toe_max,
+            thist_max,
+            tr_max,
+            left_max,
+            wage_max,
+            ben_max,
+            wr_max,
+            unra_max,
+            wage_max,
+            wage_max,
+            state_max, # retaged
+            state_max, # alkanut_ansiosidonnainen
+            child_max,
+            child_max,
+            child_max,
+            state_max, # toe58
+            pension_max,  # ove määrä
+            state_max, # ove aged
+            state_max, # kassan jäsen 0/1
+            toe_max, # uuden toen laskenta
+            state_max # on puolisoa tai ei
+            ]
+
+        high_end=[wage_max, # puoliso old wage
+            paid_pension_max, # puoliso pension
+            wr_max, # puoliso wr
+            paid_pension_max, # työeläke maksussa
+            wage_max, # puoliso next wage
+            ben_max,
+            ben_max,
+            unra_max,
+            wage_max,
+            wage_max,
+            state_max, # puoliso alkanut ansiosidonnainen
+            toe_max, # puoliso toe58
+            toe_max,
+            toe_max,
+            thist_max,
+            tis_max,
+            state_max,
+            state_max,
+            paid_pension_max, #kansaneläke
+            paid_pension_max, #kansaneläke
+            wage_max, # main_paid_wage
+            wage_max, # spouse_paid_wage
+            wage_max, # main_wage_basis
+            wage_max, # spouse_wage_basis
+            lleftmax, # left
+            lleftmax,  # puoliso left
+            lleftmax, # left
+            lleftmax,  # puoliso left
+            lleftmax, # left
+            lleftmax,  # puoliso left
+            lleftmax, # left
+            lleftmax,  # puoliso left
+            lleftmax, # left
+            lleftmax,  # puoliso left
+            lleftmax, # left
+            1,
+            1,
+            humancap_max,
+            humancap_max
+            ]
+                    
+        for k in range(self.n_empl):
+            low.append(state_min)
+            high.append(state_max)
+        for k in range(self.n_groups):
+            low.append(group_min)
+            high.append(group_max)
+        for k in range(self.n_groups):
+            low.append(group_min)
+            high.append(group_max)
+        for k in range(self.n_empl):
+            low.append(state_min)
+            high.append(state_max)
+        for k in range(2*(self.n_parttime_action)):
+            low.append(state_min)
+            high.append(state_max)
+            
+        low.extend(low_mid)
+        high.extend(high_mid)
+            
+        low.extend(low_end)
+        high.extend(high_end)
+              
+        if self.include_preferencenoise:
+            low.append(pref_min)
+            high.append(pref_max)
+                
+        low=np.array(low,dtype=np.float32)
+        high=np.array(high,dtype=np.float32)            
+        
+        return low,high
+        

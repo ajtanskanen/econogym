@@ -48,9 +48,9 @@
 
 import math
 import random
-import gym # type: ignore
-from gym import spaces, logger, utils, error # type: ignore
-from gym.utils import seeding # type: ignore
+import gymnasium as gym
+from gymnasium import spaces, logger, utils, error
+from gymnasium.utils import seeding
 import numpy as np # type: ignore
 import fin_benefits # type: ignore
 from . rates import Rates
