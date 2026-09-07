@@ -52,7 +52,7 @@ class Statevector_v12():
         self.min_retirementage:float = min_retirementage
         self.min_ove_age:float = min_ove_age
         self.get_paid_wage = get_paid_wage
-        self.age_maxdur:float = (100-self.min_age)/2
+        self.age_maxdur:float = 50 # (100-self.min_age)/2
         self.timestep:float = timestep
         self.hc_scale:float = 4.0
         self.n_states:int = self.n_empl+self.n_groups+self.n_groups+self.n_empl+self.n_parttime_action+self.n_parttime_action+58+3+4
@@ -208,15 +208,15 @@ class Statevector_v12():
 
         d[states5+55]=(time_to_marriage-self.age_maxdur)/self.age_maxdur # 
         d[states5+56]=(time_to_divorce-self.age_maxdur)/self.age_maxdur # 
-        d[states5+57]=(until_birth-self.age_maxdur)/self.age_maxdur # 
-        d[states5+58]=(main_until_student-self.age_maxdur)/self.age_maxdur # elinaikaa jäljellä
-        d[states5+59]=(spouse_until_student-self.age_maxdur)/self.age_maxdur # 
-        d[states5+60]=(main_until_outsider-self.age_maxdur)/self.age_maxdur # elinaikaa jäljellä
-        d[states5+61]=(spouse_until_outsider-self.age_maxdur)/self.age_maxdur # 
-        d[states5+62] = main_karenssia_jaljella # max 1 y
-        d[states5+63] = spouse_karenssia_jaljella # max 1 y
-        d[states5+64] = (main_humancapital-self.hc_scale)/self.hc_scale
-        d[states5+65] = (spouse_humancapital-self.hc_scale)/self.hc_scale
+        d[states5+57]=(until_birth-self.age_maxdur)/self.age_maxdur #  # 1.43902439
+        d[states5+58]=(main_until_student-self.age_maxdur)/self.age_maxdur # elinaikaa jäljellä -.97560976
+        d[states5+59]=(spouse_until_student-self.age_maxdur)/self.age_maxdur # .14634146
+        d[states5+60]=(main_until_outsider-self.age_maxdur)/self.age_maxdur # elinaikaa jäljellä .14634146
+        d[states5+61]=(spouse_until_outsider-self.age_maxdur)/self.age_maxdur # ,14634146
+        d[states5+62] = main_karenssia_jaljella # max 1 y # .08333333
+        d[states5+63] = spouse_karenssia_jaljella # max 1 y # 0
+        d[states5+64] = (main_humancapital-self.hc_scale)/self.hc_scale # -0.3125
+        d[states5+65] = (spouse_humancapital-self.hc_scale)/self.hc_scale # -1
 
         if self.include_preferencenoise:
             d[states5+66]=prefnoise
