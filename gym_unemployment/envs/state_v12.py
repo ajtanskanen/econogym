@@ -10,7 +10,7 @@
 """
 
 import math
-import gymnasium as gym
+#import gymnasium as gym
 import numpy as np
 import random
 from . util import compare_q_print,crosscheck_print,test_var
@@ -18,10 +18,9 @@ from typing import Dict, Tuple
         
 class Statevector_v12():
     '''
-    Implements class for handling of state vector 
+    Implements class for handling of state vector
     '''
-    def __init__(self,n_empl: int,n_groups: int,n_parttime_action: int,include_mort: bool,min_age: float,max_age: float,include_preferencenoise: bool,
-                min_retirementage: float,min_ove_age: float,get_paid_wage,timestep: float):
+    def __init__(self,n_empl: int,n_groups: int,n_parttime_action: int,include_mort: bool,include_preferencenoise: bool,get_paid_wage):
         self.eps:float = 1e-20
         self.n_empl:int =n_empl
         self.n_groups:int =n_groups # 3 per gender (6 in total)
@@ -40,26 +39,28 @@ class Statevector_v12():
         self.ura_intercept:float = 30
         self.lapsia_intercept:float = 5
         self.lapsia_scale:float = 5
+        self.toe_scale:float = 14/12
+        self.n_states:int = self.n_empl+self.n_groups+self.n_groups+self.n_empl+self.n_parttime_action+self.n_parttime_action+58+3+4+1
+        #self.update_state_encoding(min_age,max_age,min_retirementage,min_ove_age,timestep)
+        self.include_preferencenoise:bool = include_preferencenoise
+        self.get_paid_wage = get_paid_wage
+
+    def update_state_encoding(self,min_age: float,max_age: float,min_retirementage: float,min_ove_age: float,timestep: float):
         self.min_age:float = min_age
         self.max_age:float = max_age
-        self.toe_scale:float = 14/12
         self.age_scale:float = (self.max_age-self.min_age)/2
         self.age_mid:float = (self.max_age+self.min_age)/2
         self.age_dur:float = 2 * self.age_mid
         self.uara_intercept = self.age_scale
         self.uara_scale = self.age_scale
-        self.include_preferencenoise:bool = include_preferencenoise
         self.min_retirementage:float = min_retirementage
         self.min_ove_age:float = min_ove_age
-        self.get_paid_wage = get_paid_wage
         self.age_maxdur:float = 50 # (100-self.min_age)/2
         self.timestep:float = timestep
         self.hc_scale:float = 4.0
-        self.n_states:int = self.n_empl+self.n_groups+self.n_groups+self.n_empl+self.n_parttime_action+self.n_parttime_action+58+3+4
-        #print('State vector initialized with', self.n_states, 'dimensions')
 
     def state_encode(self,emp : int,g : int,p_g: int,pension : float,old_wage : float,age : float,time_in_state : float, # 7
-                        tyoelake_maksussa : float, # 1
+                        main_tyoelake_maksussa : float, # 1
                         pink : bool,toe : float,toekesto : float,tyohist : float,next_wage : float,used_unemp_benefit : float, # 6
                         wage_reduction : float,unemp_after_ra : float,unempwage : float,unempwage_basis : float, # 4
                         children_under3 : int,children_under7 : int,children_under18 : int, # 3
@@ -90,9 +91,9 @@ class Statevector_v12():
         '''
         n_states=self.n_states
         if self.include_preferencenoise:
-            d=np.zeros(n_states,dtype=np.float64)
-        else:
             d=np.zeros(n_states+1,dtype=np.float64)
+        else:
+            d=np.zeros(n_states,dtype=np.float64)
         
         states=self.n_empl # 16
         d[0:states]=self.state_encoding[emp,:]
@@ -132,14 +133,14 @@ class Statevector_v12():
         if self.log_transform:
             d[states5]=math.log(pension/self.pensionscale+self.log_eps) # vastainen eläke
             d[states5+1]=math.log(old_wage/self.wagescale+self.log_eps)
-            d[states5+4]=math.log(tyoelake_maksussa/self.pensionscale+self.log_eps) # alkanut eläke
+            d[states5+4]=math.log(main_tyoelake_maksussa/self.pensionscale+self.log_eps) # alkanut eläke
             d[states5+10]=math.log(next_wage/self.wagescale+self.log_eps)
             d[states5+14]=math.log(unempwage/self.wagescale+self.log_eps)
             d[states5+15]=math.log(unempwage_basis/self.wagescale+self.log_eps)
         else:
             d[states5]=(pension-self.pensionscale)/self.pensionscale # vastainen eläke
             d[states5+1]=(old_wage-self.wagescale)/self.wagescale
-            d[states5+4]=(tyoelake_maksussa-self.pensionscale)/self.pensionscale # alkanut eläke
+            d[states5+4]=(main_tyoelake_maksussa-self.pensionscale)/self.pensionscale # alkanut eläke
             d[states5+10]=(next_wage-self.wagescale)/self.wagescale
             d[states5+14]=(unempwage-self.wagescale)/self.wagescale
             d[states5+15]=(unempwage_basis-self.wagescale)/self.wagescale
@@ -225,9 +226,9 @@ class Statevector_v12():
 
     def get_state_name(self):
         if self.include_preferencenoise:
-            d=np.empty(self.n_states, dtype='U256')
-        else:
             d=np.empty(self.n_states+1, dtype='U256')
+        else:
+            d=np.empty(self.n_states, dtype='U256')
                     
         states=self.n_empl
         states2=states+self.n_groups
@@ -243,55 +244,53 @@ class Statevector_v12():
         d[states3:states4]='main_pt_action'
         d[states4:states5]='spouse_pt_action'
         d[states5]='main_pension'
-        d[states5+1]='old_wage'
-        d[states5+4]='tyoelake_maksussa'
-        d[states5+10]='next_wage'
-        d[states5+14]='unempwage'
-        d[states5+15]='unempwage_basis'
-        d[states5+2]='age'
-        d[states5+3]='time_in_state'
+        d[states5+1]='main_old_wage'
+        d[states5+4]='main_tyoelake_maksussa'
+        d[states5+10]='main_next_wage'
+        d[states5+14]='main_unempwage'
+        d[states5+15]='main_unempwage_basis'
+        d[states5+2]='both_age'
+        d[states5+3]='main_time_in_state'
 
-        d[states5+5]='pink'
-        d[states5+6]='toe'
-        d[states5+7]='tyohist'
-        d[states5+8]='time to ret'
-        d[states5+9]='unemp_benefit_left'
-        d[states5+11]='used_unemp_benefit'
-        d[states5+12]='wage_reduction'
-        d[states5+13]='unemp_after_ra'
-        d[states5+16]='retaged'
-        d[states5+17]='alkanut_ansiosidonnainen'
+        d[states5+5]='main_pink'
+        d[states5+6]='main_toe'
+        d[states5+7]='main_tyohist'
+        d[states5+8]='main_time to ret'
+        d[states5+9]='main_unemp_benefit_left'
+        d[states5+11]='main_used_unemp_benefit'
+        d[states5+12]='main_wage_reduction'
+        d[states5+13]='main_unemp_after_ra'
+        d[states5+16]='both_retaged'
+        d[states5+17]='main_alkanut_ansiosidonnainen'
         d[states5+18]='children_under3'
         d[states5+19]='children_under7'
         d[states5+20]='children_under18'
-        d[states5+21]='toe58'
-        d[states5+22]='ove_paid'
-        d[states5+23]='over_ove_age'
-        
-        d[states5+24]='kassanjasenyys'
-        d[states5+25]='toekesto'
-        d[states5+26]='puoliso'
-        
-        d[states5+27]='puoliso_old_wage'
-        d[states5+28]='puoliso_pension'
-        d[states5+29]='puoliso_wage_reduction'
-        d[states5+30]='puoliso_tyoelake_maksussa'
-        d[states5+31]='puoliso_next_wage'
-        d[states5+32]='puoliso_used_unemp_benefit'
-        d[states5+33]='puoliso_unemp_benefit_left'
-        d[states5+34]='puoliso_unemp_after_ra'
-        d[states5+35]='puoliso_unempwage'
-        d[states5+36]='puoliso_unempwage_basis'
-        d[states5+37]='puoliso_alkanut_ansiosidonnainen'
-        d[states5+38]='puoliso_toe58'
-        d[states5+39]='puoliso_toe'
-        d[states5+40]='puoliso_toekesto'
-        d[states5+41]='puoliso_tyoura'
-        d[states5+42]='puoliso_time_in_state'
-        d[states5+43]='puoliso_pinkslip'
-        d[states5+44]='puoliso_ove_paid'
-        d[states5+45]='puoliso_kansanelake'
-        d[states5+46]='puoliso_kansanelake'
+        d[states5+21]='main_toe58'
+        d[states5+22]='main_ove_paid'
+        d[states5+23]='main_over_ove_age'
+        d[states5+24]='both_kassanjasenyys'
+        d[states5+25]='main_toekesto'
+        d[states5+26]='both_married'
+        d[states5+27]='spouse_old_wage'
+        d[states5+28]='spouse_pension'
+        d[states5+29]='spouse_wage_reduction'
+        d[states5+30]='spouse_tyoelake_maksussa'
+        d[states5+31]='spouse_next_wage'
+        d[states5+32]='spouse_used_unemp_benefit'
+        d[states5+33]='spouse_unemp_benefit_left'
+        d[states5+34]='spouse_unemp_after_ra'
+        d[states5+35]='spouse_unempwage'
+        d[states5+36]='spouse_unempwage_basis'
+        d[states5+37]='spouse_alkanut_ansiosidonnainen'
+        d[states5+38]='spouse_toe58'
+        d[states5+39]='spouse_toe'
+        d[states5+40]='spouse_toekesto'
+        d[states5+41]='spouse_tyoura'
+        d[states5+42]='spouse_time_in_state'
+        d[states5+43]='spouse_pinkslip'
+        d[states5+44]='spouse_ove_paid'
+        d[states5+45]='main_kansanelake'
+        d[states5+46]='spouse_kansanelake'
         d[states5+47]='main_paid_wage'
         d[states5+48]='spouse_paid_wage'
         d[states5+49]='main_wage_basis'
@@ -300,9 +299,9 @@ class Statevector_v12():
         d[states5+52]='spouse_life_left'
         d[states5+53]='main_until_disab'
         d[states5+54]='spouse_until_disab'
-        d[states5+55]='time_to_marriage'
-        d[states5+56]='time_to_divorce'
-        d[states5+57]='until_birth'
+        d[states5+55]='both_time_to_marriage'
+        d[states5+56]='both_time_to_divorce'
+        d[states5+57]='both_until_birth'
         d[states5+58]='main_until_student'
         d[states5+59]='spouse_until_student'
         d[states5+60]='main_until_outsider'
@@ -389,7 +388,7 @@ class Statevector_v12():
         main_unempwage_basis:float=vec[pos+15]*self.wagescale+self.wagescale 
 
         age:float=vec[pos+2]*self.age_scale+self.age_mid
-        main_time_in_state:float=vec[pos+3]*self.time_intercept+self.time_scale
+        main_time_in_state:float=vec[pos+3]*self.time_scale+self.time_intercept
         main_pink:bool=bool(round(vec[pos+5])) # irtisanottu vai ei 
         main_toe:float=vec[pos+6]*self.toe_scale + self.toe_scale # työssäoloehto, kesto
         main_tyohist:float=vec[pos+7]*self.ura_scale+self.ura_intercept # työhistoria
@@ -459,11 +458,11 @@ class Statevector_v12():
 
         # here are 70 variables including pref_noise that is not used => 69 state variables
 
-        return main_emp,main_g,spouse_g,main_pension,main_wage,age,main_time_in_state,main_paid_pension,main_pink,main_toe,\
+        return main_emp,main_g,spouse_g,main_pension,main_wage,age,main_time_in_state,main_tyoelake_maksussa,main_pink,main_toe,\
                 main_toekesto,main_tyohist,main_used_unemp_benefit,main_wage_reduction,main_unemp_after_ra,main_unempwage,main_unempwage_basis,prefnoise,children_under3,children_under7,\
                 children_under18,main_unemp_left,main_alkanut_ansiosidonnainen,main_toe58,main_ove_paid,kassanjasen,puoliso,puoliso_tila,puoliso_old_wage,puoliso_pension,\
-                puoliso_wage_reduction,puoliso_paid_pension,puoliso_next_wage,puoliso_used_unemp_benefit,puoliso_unemp_benefit_left,puoliso_unemp_after_ra,puoliso_unempwage,puoliso_unempwage_basis,puoliso_alkanut_ansiosidonnainen,puoliso_toe58,\
-                puoliso_toe,puoliso_toekesto,puoliso_tyoura,puoliso_time_in_state,puoliso_pinkslip,puoliso_ove_paid,main_kansanelake,puoliso_kansanelake,main_tyoelake_maksussa,puoliso_tyoelake_maksussa,\
+                puoliso_wage_reduction,puoliso_tyoelake_maksussa,puoliso_next_wage,puoliso_used_unemp_benefit,puoliso_unemp_benefit_left,puoliso_unemp_after_ra,puoliso_unempwage,puoliso_unempwage_basis,puoliso_alkanut_ansiosidonnainen,puoliso_toe58,\
+                puoliso_toe,puoliso_toekesto,puoliso_tyoura,puoliso_time_in_state,puoliso_pinkslip,puoliso_ove_paid,main_kansanelake,puoliso_kansanelake,main_paid_pension,puoliso_tyoelake_maksussa,\
                 main_next_wage,main_paid_wage,spouse_paid_wage,pt_act,sp_pt_act,main_basis_wage,spouse_basis_wage,main_life_left,spouse_life_left,main_until_disab,\
                 spouse_until_disab,time_to_marriage,time_to_divorce,until_birth,main_until_student,spouse_until_student,main_until_outsider,spouse_until_outsider,\
                 main_karenssia_jaljella,spouse_karenssia_jaljella,main_humancapital,spouse_humancapital
@@ -1153,7 +1152,7 @@ class Statevector_v12():
             puoliso_ove_paid,kansanelake,puoliso_kansanelake,tyoelake_maksussa,\
             puoliso_tyoelake_maksussa,next_wage,\
             main_paid_wage,spouse_paid_wage,main_pt_action,spouse_pt_action,\
-            main_wage_basis,spouse_wage_basis,main_life_left,spouse_life_left,spouse_until_disab,main_until_disab,\
+            main_wage_basis,spouse_wage_basis,main_life_left,spouse_life_left,main_until_disab,spouse_until_disab,\
             time_to_marriage,time_to_divorce,until_child,main_until_student,spouse_until_student,main_until_outsider,spouse_until_outsider,\
             main_karenssia_jaljella,spouse_karenssia_jaljella,main_humancapital,spouse_humancapital \
                 =self.state_decode(vec)           
@@ -1183,7 +1182,7 @@ class Statevector_v12():
             spouse_until_disab,main_until_disab,
             time_to_marriage,time_to_divorce,until_child,
             spouse_until_student,main_until_student,spouse_until_outsider,main_until_outsider,spouse_karenssia_jaljella,main_karenssia_jaljella,
-            main_humancapital,spouse_humancapital,
+            spouse_humancapital,main_humancapital,
             prefnoise)            
             
     def set_state_limits(self,debug=True):
@@ -1205,8 +1204,10 @@ class Statevector_v12():
             paid_pension_min=(0-self.pensionscale)/self.pensionscale # alkanut eläke
             paid_pension_max=(200_000-self.pensionscale)/self.pensionscale # alkanut eläke
 
-        age_max=(self.max_age+1-(self.max_age+self.min_age)/2)/20
-        age_min=(self.min_age-1-(self.max_age+self.min_age)/2)/20
+        age_max=(self.max_age+1-(self.max_age+self.min_age)/2)/self.age_scale
+        age_min=(self.min_age-1-(self.max_age+self.min_age)/2)/self.age_scale
+        ove_min = 0
+        ove_max = 1
         tis_max=(self.max_age-self.min_age-10)/10
         tis_min=-10/10
         pink_min=0 # irtisanottu vai ei 
@@ -1264,7 +1265,7 @@ class Statevector_v12():
             child_min, # children under 7
             child_min, # children under 18
             state_min, # toe58
-            pension_min,  # ove määrä
+            ove_min,  # ove määrä
             state_min, # ove aged
             state_min, # kassan jäsen 0/1
             toe_min, # uuden toen laskenta
@@ -1335,7 +1336,7 @@ class Statevector_v12():
             child_max,
             child_max,
             state_max, # toe58
-            pension_max,  # ove määrä
+            ove_max,  # ove määrä
             state_max, # ove aged
             state_max, # kassan jäsen 0/1
             toe_max, # uuden toen laskenta

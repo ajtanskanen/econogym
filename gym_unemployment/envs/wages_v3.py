@@ -33,15 +33,15 @@ class Wages_v3():
         
         self.setup_salaries(weights)
 
-    def map_age(self,age,start_zero: bool=False):
+    def map_age(self,age: float,start_zero: bool=False):
         if start_zero:
-            return int((age)*self.inv_timestep)
+            return round((age)*self.inv_timestep)
         else:
-            return int((age-self.min_age)*self.inv_timestep)
+            return round((age-self.min_age)*self.inv_timestep)
     
-    def get_salaries(self):
-        self.setup_salaries(self.group_weights)
-        return self.palkat_ika_miehet,self.palkat_ika_naiset,self.g_r_men,self.g_r_women
+    #def get_salaries(self):
+    #    self.setup_salaries(self.group_weights)
+    #    return self.palkat_ika_miehet,self.palkat_ika_naiset,self.g_r_men,self.g_r_women
 
     def setup_salaries(self,weights):
         # TK:n aineisto vuodelta 2018
@@ -55,14 +55,14 @@ class Wages_v3():
         def ifunc(x,palkat,x1,x2):
             f = interp1d(x, palkat, fill_value='extrapolate')
             n_time = int(np.round((x2-x1)*self.inv_timestep))+2
-            palkat_x = np.linspace(x1, x2, num=n_time, endpoint=True)
+            palkat_x = x1 + np.arange(n_time)*self.timestep # np.linspace(x1, x2, num=n_time, endpoint=True)
         
             return f(palkat_x)        
 
         def gfunc(palkat,x1,x2):
             x = np.linspace(18, 73, num=55, endpoint=True)
             n_time = int(np.round((x2-x1)*self.inv_timestep))+2
-            palkat_x = np.linspace(x1, x2, num=n_time, endpoint=True)
+            palkat_x = x1 + np.arange(n_time)*self.timestep # np.linspace(x1, x2, num=n_time, endpoint=True)
             g=np.zeros((n_time,3))
             for k in range(3):
                 f = interp1d(x, palkat[:,k],fill_value='extrapolate')
@@ -130,8 +130,7 @@ class Wages_v3():
                                 [2304,2917,3938,4305,4626,4945,5208,5434,5468,5478,5456]])*ind_women
             interpol = True
         else:
-            print('Unknown year ',self.year)
-            error(1001)
+            raise ValueError('Unknown year ',self.year)
             
         if interpol:
             x = np.arange(0,75)
@@ -143,10 +142,8 @@ class Wages_v3():
             # filtteri
             m_age=int(self.min_retirementage-1)
             for k in range(3):
-                palkat_miehet_ve = palkat_ika_miehet[k,map_age18(m_age)]
-                palkat_ika_miehet[k,map_age18(m_age):] = np.minimum(palkat_ika_miehet[k,map_age18(m_age):],palkat_miehet_ve)
-                palkat_naiset_ve = palkat_ika_naiset[k,map_age18(m_age)]
-                palkat_ika_naiset[k,map_age18(m_age):] = np.minimum(palkat_ika_naiset[k,map_age18(m_age):],palkat_naiset_ve)
+                palkat_ika_miehet[k,m_age:]=np.minimum(palkat_ika_miehet[k,m_age:],palkat_ika_miehet[k,m_age])
+                palkat_ika_naiset[k,m_age:]=np.minimum(palkat_ika_naiset[k,m_age:],palkat_ika_naiset[k,m_age])
 
             n_time = int(np.round((self.max_age-self.min_age)*self.inv_timestep))+2
             self.palkat_ika_miehet = np.empty((3,n_time))
@@ -158,12 +155,10 @@ class Wages_v3():
 
         else:
             # filtteri
-            m_age=int(self.min_retirementage-1)
+            m_age=map_age18(int(self.min_retirementage-1))
 
-            palkat_miehet_ve=palkat_ika_miehet[map_age18(m_age)]
-            palkat_ika_miehet[map_age18(m_age):]=np.minimum(palkat_ika_miehet[map_age18(m_age):],palkat_miehet_ve)
-            palkat_naiset_ve=palkat_ika_naiset[map_age18(m_age)]
-            palkat_ika_naiset[map_age18(m_age):]=np.minimum(palkat_ika_naiset[map_age18(m_age):],palkat_naiset_ve)
+            palkat_ika_miehet[m_age:]=np.minimum(palkat_ika_miehet[m_age:],palkat_ika_miehet[m_age])
+            palkat_ika_naiset[m_age:]=np.minimum(palkat_ika_naiset[m_age:],palkat_ika_naiset[m_age])
 
             x = np.arange(18,72)
             palkat_ika_miehet2=ifunc(x,palkat_ika_miehet,self.min_age,self.max_age)
