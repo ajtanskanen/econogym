@@ -4616,8 +4616,8 @@ class UnemploymentEnv_v12(gym.Env):
         #self.workfactor_w = 0.91
 
         # 2024 sopiva
-        self.workfactor_m = 1.70
-        self.workfactor_w = 1.60
+        self.workfactor_m = 1.80
+        self.workfactor_w = 1.70
 
         self.max_reduction_sigma = 0.60
 
