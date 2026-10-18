@@ -194,17 +194,21 @@ class Wages_v3():
                 self.palkat_ika_naiset[k,:]=g_r_women[:,k] * palkat_ika_naiset2
 
     
-    def wage_process_TK_v4(self,w: float,a0: float=3300*12,a1: float=3300*12,g: int=1):
+    def wage_process_TK_v4(self,w: float,a0: float=3300*12,a1: float=3300*12,g: int=1,rng=None):
         '''
         Palkkaprosessi muokattu lähteestä Määttänen, 2013 
+
+        rng: numpy Generator; None käyttää globaalia np.random-tilaa (vanhat versiot)
         '''
+        if rng is None:
+            rng = np.random
         #group_sigmas=np.array([0.05,0.07,0.10])*math.sqrt(self.timestep)
         if g<3:
             group_sigmas=np.array([0.05,0.07,0.10])*math.sqrt(self.timestep)
         else:
             group_sigmas=np.array([0.05,0.06,0.08])*math.sqrt(self.timestep)
         sigma=group_sigmas[g]
-        eps=np.random.normal(loc=0,scale=sigma,size=1)[0]
+        eps=rng.normal(loc=0,scale=sigma,size=1)[0]
         c1=0.89**self.timestep
         if w>0:
              # pidetään keskiarvo/a1 samana kuin w/a0
@@ -217,10 +221,14 @@ class Wages_v3():
 
         return wt
                 
-    def compute_salary(self,group: int=1,debug: bool=False,initial_salary=None):
+    def compute_salary(self,group: int=1,debug: bool=False,initial_salary=None,rng=None):
         '''
         Alussa ajettava funktio, joka tekee palkat yhtä episodia varten
+
+        rng: numpy Generator; None käyttää globaalia np.random-tilaa (vanhat versiot)
         '''
+        if rng is None:
+            rng = np.random
         n_time = int(np.round((self.max_age-self.min_age)*self.inv_timestep))+2
         salary=np.zeros(n_time)
 
@@ -234,7 +242,7 @@ class Wages_v3():
             
             #a1=self.palkat_ika_naiset[0]*r/5
             a1=self.palkat_ika_naiset[group-3,0]/5
-            salary[0]=np.maximum(self.min_salary,np.random.normal(loc=a0,scale=a1,size=1)[0]) # e/y
+            salary[0]=np.maximum(self.min_salary,rng.normal(loc=a0,scale=a1,size=1)[0]) # e/y
 
             k=0
             #r0=self.g_r_women[0,group-3]
@@ -246,7 +254,7 @@ class Wages_v3():
                 #a1=self.palkat_ika_naiset[k]*r1
                 #r1=self.g_r_women[k,group-3]
                 a1=self.palkat_ika_naiset[group-3,k]
-                salary[self.map_age(age)]=self.wage_process_TK_v4(s0,a0,a1,g=group-3)
+                salary[self.map_age(age)]=self.wage_process_TK_v4(s0,a0,a1,g=group-3,rng=rng)
                 k=k+1
                 s0=salary[self.map_age(age)]
                 a0=a1
@@ -261,7 +269,7 @@ class Wages_v3():
                 
             a1=self.palkat_ika_miehet[group,0]/5
             #a1=self.palkat_ika_miehet[0]*r/5
-            salary[0]=np.maximum(self.min_salary,np.random.normal(loc=a0,scale=a1,size=1)[0]) # e/y
+            salary[0]=np.maximum(self.min_salary,rng.normal(loc=a0,scale=a1,size=1)[0]) # e/y
 
             k=0
             #r0=self.g_r_men[0,group]
@@ -272,7 +280,7 @@ class Wages_v3():
                 #r1=self.g_r_men[k,group]
                 #a1=self.palkat_ika_miehet[k]*r1
                 a1=self.palkat_ika_miehet[group,k]
-                salary[self.map_age(age)]=self.wage_process_TK_v4(s0,a0,a1,g=group)
+                salary[self.map_age(age)]=self.wage_process_TK_v4(s0,a0,a1,g=group,rng=rng)
                 k=k+1
                 s0=salary[self.map_age(age)]
                 a0=a1

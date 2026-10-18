@@ -48,7 +48,8 @@
 """
 
 import math
-import random
+import bisect
+import itertools
 import gymnasium as gym # type: ignore
 from gymnasium import spaces, logger, utils, error # type: ignore
 from gymnasium.utils import seeding # type: ignore
@@ -730,7 +731,7 @@ class UnemploymentEnv_v12(gym.Env):
         npv0 <- ei ole diskontattu
         '''
         docont = True
-        sattuma = random.uniform(0,1)
+        sattuma = self.np_random.random()
         x = age #+ self.timestep
         b = intensity[int(np.floor(x))]
         if sattuma > b:
@@ -850,7 +851,7 @@ class UnemploymentEnv_v12(gym.Env):
         syntyneita_basic = np.zeros(self.n_groups)
         for g in range(self.n_groups):
             num = int(np.ceil(max_age-min_age+2)/self.timestep)
-            sattuma = np.random.uniform(0,1,size=(reps,num))
+            sattuma = self.np_random.uniform(0,1,size=(reps,num))
             for r in range(reps):
                 i = 0
                 for x in np.arange(min_age,max_age,self.timestep):
@@ -1631,17 +1632,35 @@ class UnemploymentEnv_v12(gym.Env):
 
     def env_seed(self, move_seed=None,init_seed=None):
         '''
-        Alustetaan numpy.random enviä varten
+        Alustetaan envin oma satunnaislukugeneraattori self.np_random.
+        Globaaliin numpy- tai Python-satunnaislukutilaan ei kosketa, joten saman prosessin
+        envit ja muu koodi eivät vaikuta toistensa satunnaislukuihin.
+        Kaikki satunnaisuus tulee yhdestä generaattorista, joten init_seed on
+        käytössä vain jos move_seed puuttuu.
         '''
-        if move_seed is not None:
-            np.random.seed(move_seed)
+        seed = move_seed if move_seed is not None else init_seed
+        if seed is not None:
+            self.np_random, _ = seeding.np_random(seed)
             if self.plotdebug:
-                print('move_seed',move_seed)
+                print('env seed',seed)
 
-        if init_seed is not None:
-            random.seed(init_seed)
-            if self.plotdebug:
-                print('init_seed',init_seed)
+    def rng_uniform(self,low: float,high: float) -> float:
+        '''
+        Tasajakauma välillä [low,high) envin omalla generaattorilla.
+        Sama kaava kuin Pythonin uniform-funktiossa, joten toimii myös kun low > high.
+        '''
+        return low + (high-low)*self.np_random.random()
+
+    def rng_choice(self,values,weights):
+        '''
+        Arpoo yhden alkion values-taulukosta painoilla weights envin omalla generaattorilla.
+        Sama algoritmi kuin Pythonin choices-funktiossa (kumulatiiviset painot + bisect),
+        jotta jakauma ei muutu myöskään silloin, kun painoissa on negatiivisia arvoja
+        (initial_weights-taulukossa on niitä joillakin ryhmillä).
+        '''
+        cum_weights = list(itertools.accumulate(float(w) for w in weights))
+        r = self.np_random.random()*cum_weights[-1]
+        return values[bisect.bisect(cum_weights,r,0,len(values)-1)]
 
     def scale_pension(self,pension: float,age: float,scale: bool = True,unemp_after_ra: float = 0,elinaikakerroin: bool = True):
         '''
@@ -4148,8 +4167,8 @@ class UnemploymentEnv_v12(gym.Env):
 
         if self.randomness: # can be disabled for testing purposes
             # kaikki satunnaisuus kerralla
-            sattuma = np.random.uniform(size=9)
-            sattuma2 = np.random.uniform(size=9)
+            sattuma = self.np_random.uniform(size=9)
+            sattuma2 = self.np_random.uniform(size=9)
 
             if self.include_spouses:
                 #puoliso = self.update_family(puoliso,age,main_empstate,spou_empstate,sattuma)
@@ -4597,8 +4616,8 @@ class UnemploymentEnv_v12(gym.Env):
         #self.workfactor_w = 0.91
 
         # 2024 sopiva
-        self.workfactor_m = 1.90
-        self.workfactor_w = 1.70
+        self.workfactor_m = 1.70
+        self.workfactor_w = 1.60
 
         self.max_reduction_sigma = 0.60
 
@@ -5211,20 +5230,20 @@ class UnemploymentEnv_v12(gym.Env):
             pink = pink
             wage_reduction = 0.0
             if employment_state==0:
-                wage_reduction=random.uniform(0.0,0.25)
+                wage_reduction=self.rng_uniform(0.0,0.25)
             elif employment_state==13:
-                wage_reduction=random.uniform(0.10,0.40) # 20-70
+                wage_reduction=self.rng_uniform(0.10,0.40) # 20-70
             elif employment_state==1:
-                wage_reduction=random.uniform(maxred,0.05) # 20-70
+                wage_reduction=self.rng_uniform(maxred,0.05) # 20-70
             elif employment_state in {5,6,7}:
-                wage_reduction=random.uniform(maxred,0.10) # 20-70
+                wage_reduction=self.rng_uniform(maxred,0.10) # 20-70
                 pink=True
             elif employment_state==10: # Parttime
-                wage_reduction=random.uniform(maxred,0.10) # 20-70
+                wage_reduction=self.rng_uniform(maxred,0.10) # 20-70
             elif employment_state==12:
-                wage_reduction=random.uniform(maxred,0.05)
+                wage_reduction=self.rng_uniform(maxred,0.05)
             elif employment_state==11:
-                wage_reduction=random.uniform(0.10,0.30) # 15-50
+                wage_reduction=self.rng_uniform(0.10,0.30) # 15-50
             elif employment_state==3:
                 wage_reduction=0.60
             elif employment_state==2:
@@ -5274,13 +5293,12 @@ class UnemploymentEnv_v12(gym.Env):
 
         if is_spouse:
             gender=1
-            group = random.choices(np.array([3,4,5],dtype=int),weights=self.group_weights[1,:])[0]
+            group = self.rng_choice(np.array([3,4,5],dtype=int),self.group_weights[1,:])
         else:
             gender=0
-            group=random.choices(np.array([0,1,2],dtype=int),weights=self.group_weights[0,:])[0]
+            group=self.rng_choice(np.array([0,1,2],dtype=int),self.group_weights[0,:])
 
-        employment_state=random.choices(np.array([13,0,1,10,3,11,12],dtype=int),
-                weights = self.initial_weights[group,:])[0]
+        employment_state=self.rng_choice(np.array([13,0,1,10,3,11,12],dtype=int),self.initial_weights[group,:])
 
         self.init_infostate(age=age,spouse=is_spouse)
 
@@ -5288,9 +5306,9 @@ class UnemploymentEnv_v12(gym.Env):
 
         # set up salary for the entire career
         if is_spouse:
-            self.wages_spouse.compute_salary(group=group,initial_salary=initial_salary)
+            self.wages_spouse.compute_salary(group=group,initial_salary=initial_salary,rng=self.np_random)
         else:
-            self.wages_main.compute_salary(group=group,initial_salary=initial_salary)
+            self.wages_main.compute_salary(group=group,initial_salary=initial_salary,rng=self.np_random)
 
         maxred = self.get_min_wagereduction(group)
         wage_reduction,pink,main_pt_action = get_wagereduction(employment_state,maxred=maxred,pink=pink)
@@ -5350,20 +5368,20 @@ class UnemploymentEnv_v12(gym.Env):
                 pension=0
         else:
             if employment_state==0:
-                tyohist=random.uniform(0.0,age-18)
-                toe=random.uniform(0.0,28/12)
+                tyohist=self.rng_uniform(0.0,age-18)
+                toe=self.rng_uniform(0.0,28/12)
                 toekesto=toe
-                used_unemp_benefit=random.uniform(0.0,2.0)
+                used_unemp_benefit=self.rng_uniform(0.0,2.0)
                 unempwage_basis=old_wage
                 alkanut_ansiosidonnainen=True
-                unempwage=random.uniform(0.0,90_000.0)
+                unempwage=self.rng_uniform(0.0,90_000.0)
             elif employment_state==13:
-                tyohist=random.uniform(0.0,age-18)
+                tyohist=self.rng_uniform(0.0,age-18)
                 toe=0.0
                 toekesto=toe
                 used_unemp_benefit=2.0
             elif employment_state==10:
-                tyohist=random.uniform(0.0,age-18)
+                tyohist=self.rng_uniform(0.0,age-18)
                 toe=0.0
                 toekesto=toe
                 used_unemp_benefit=2.0
@@ -5376,7 +5394,7 @@ class UnemploymentEnv_v12(gym.Env):
                 toe=0.0
             elif employment_state==3:
                 wage5y=next_wage
-                tyoelake_maksussa=random.uniform(0.0,30_000)
+                tyoelake_maksussa=self.rng_uniform(0.0,30_000)
                 # takuueläke voidaan huomioida jo tässä
                 kansanelake = self.ben.laske_kansanelake(age,tyoelake_maksussa/12,1-puoliso,disability=True)*12 # ben-modulissa palkat kk-tasolla
                 if self.plotdebug:
@@ -5384,7 +5402,7 @@ class UnemploymentEnv_v12(gym.Env):
                 pension=0
             elif employment_state==2:
                 wage5y=next_wage
-                tyoelake_maksussa=random.uniform(0.0,40_000)
+                tyoelake_maksussa=self.rng_uniform(0.0,40_000)
                 # takuueläke voidaan huomioida jo tässä
                 kansanelake = self.ben.laske_kansanelake(age,tyoelake_maksussa/12,1-puoliso)*12 # ben-modulissa palkat kk-tasolla
                 if self.plotdebug:
@@ -5401,7 +5419,7 @@ class UnemploymentEnv_v12(gym.Env):
             self.set_kassanjasenyys(1)
             kassanjasenyys=1
         else:
-            sattuma = random.uniform(0,1)
+            sattuma = self.np_random.random()
             t=round((age-self.min_age)/self.timestep)
 
             toissa = self.initial_weights[group,2]+self.initial_weights[group,3] # kokoaika + osa-aika
@@ -5450,20 +5468,20 @@ class UnemploymentEnv_v12(gym.Env):
             pink = pink
             wage_reduction = 0.0
             if employment_state==0:
-                wage_reduction=random.uniform(0.0,0.25)
+                wage_reduction=self.rng_uniform(0.0,0.25)
             elif employment_state==13:
-                wage_reduction=random.uniform(0.10,0.40) # 20-70
+                wage_reduction=self.rng_uniform(0.10,0.40) # 20-70
             elif employment_state==1:
-                wage_reduction=random.uniform(maxred,0.05) # 20-70
+                wage_reduction=self.rng_uniform(maxred,0.05) # 20-70
             elif employment_state in {5,6,7}:
-                wage_reduction=random.uniform(maxred,0.10) # 20-70
+                wage_reduction=self.rng_uniform(maxred,0.10) # 20-70
                 pink=True
             elif employment_state==10: # Parttime
-                wage_reduction=random.uniform(maxred,0.10) # 20-70
+                wage_reduction=self.rng_uniform(maxred,0.10) # 20-70
             elif employment_state==12:
-                wage_reduction=random.uniform(maxred,0.05)
+                wage_reduction=self.rng_uniform(maxred,0.05)
             elif employment_state==11:
-                wage_reduction=random.uniform(0.10,0.30) # 15-50
+                wage_reduction=self.rng_uniform(0.10,0.30) # 15-50
             elif employment_state==3:
                 wage_reduction=0.60
             elif employment_state==2:
@@ -5513,13 +5531,12 @@ class UnemploymentEnv_v12(gym.Env):
 
         if is_spouse:
             gender=1
-            group = random.choices(np.array([3,4,5],dtype=int),weights=self.group_weights[1,:])[0]
+            group = self.rng_choice(np.array([3,4,5],dtype=int),self.group_weights[1,:])
         else:
             gender=0
-            group=random.choices(np.array([0,1,2],dtype=int),weights=self.group_weights[0,:])[0]
+            group=self.rng_choice(np.array([0,1,2],dtype=int),self.group_weights[0,:])
 
-        employment_state=random.choices(np.array([13,0,1,10,3,11,12],dtype=int),
-                weights = self.initial_weights[group,:])[0]
+        employment_state=self.rng_choice(np.array([13,0,1,10,3,11,12],dtype=int),self.initial_weights[group,:])
 
         self.init_infostate(age=age,spouse=is_spouse)
 
@@ -5527,9 +5544,9 @@ class UnemploymentEnv_v12(gym.Env):
 
         # set up salary for the entire career
         if is_spouse:
-            self.wages_spouse.compute_salary(group=group,initial_salary=initial_salary)
+            self.wages_spouse.compute_salary(group=group,initial_salary=initial_salary,rng=self.np_random)
         else:
-            self.wages_main.compute_salary(group=group,initial_salary=initial_salary)
+            self.wages_main.compute_salary(group=group,initial_salary=initial_salary,rng=self.np_random)
 
         maxred = self.get_min_wagereduction(group)
         wage_reduction,pink,main_pt_action = get_wagereduction(employment_state,maxred=maxred,pink=pink)
@@ -5589,20 +5606,20 @@ class UnemploymentEnv_v12(gym.Env):
                 pension=0
         else:
             if employment_state==0:
-                tyohist=random.uniform(0.0,age-18)
-                toe=random.uniform(0.0,28/12)
+                tyohist=self.rng_uniform(0.0,age-18)
+                toe=self.rng_uniform(0.0,28/12)
                 toekesto=toe
-                used_unemp_benefit=random.uniform(0.0,2.0)
+                used_unemp_benefit=self.rng_uniform(0.0,2.0)
                 unempwage_basis=old_wage
                 alkanut_ansiosidonnainen=True
-                unempwage=random.uniform(0.0,90_000.0)
+                unempwage=self.rng_uniform(0.0,90_000.0)
             elif employment_state==13:
-                tyohist=random.uniform(0.0,age-18)
+                tyohist=self.rng_uniform(0.0,age-18)
                 toe=0.0
                 toekesto=toe
                 used_unemp_benefit=2.0
             elif employment_state==10:
-                tyohist=random.uniform(0.0,age-18)
+                tyohist=self.rng_uniform(0.0,age-18)
                 toe=0.0
                 toekesto=toe
                 used_unemp_benefit=2.0
@@ -5615,7 +5632,7 @@ class UnemploymentEnv_v12(gym.Env):
                 toe=0.0
             elif employment_state==3:
                 wage5y=next_wage
-                tyoelake_maksussa=random.uniform(0.0,30_000)
+                tyoelake_maksussa=self.rng_uniform(0.0,30_000)
                 # takuueläke voidaan huomioida jo tässä
                 kansanelake = self.ben.laske_kansanelake(age,tyoelake_maksussa/12,1-puoliso,disability=True)*12 # ben-modulissa palkat kk-tasolla
                 if self.plotdebug:
@@ -5623,7 +5640,7 @@ class UnemploymentEnv_v12(gym.Env):
                 pension=0
             elif employment_state==2:
                 wage5y=next_wage
-                tyoelake_maksussa=random.uniform(0.0,40_000)
+                tyoelake_maksussa=self.rng_uniform(0.0,40_000)
                 # takuueläke voidaan huomioida jo tässä
                 kansanelake = self.ben.laske_kansanelake(age,tyoelake_maksussa/12,1-puoliso)*12 # ben-modulissa palkat kk-tasolla
                 if self.plotdebug:
@@ -5640,7 +5657,7 @@ class UnemploymentEnv_v12(gym.Env):
             self.set_kassanjasenyys(1)
             kassanjasenyys=1
         else:
-            sattuma = random.uniform(0,1)
+            sattuma = self.np_random.random()
             t=round((age-self.min_age)/self.timestep)
 
             toissa = self.initial_weights[group,2]+self.initial_weights[group,3] # kokoaika + osa-aika
@@ -5679,7 +5696,7 @@ class UnemploymentEnv_v12(gym.Env):
     def init_state(self):
 
         if self.randomness:
-            rn = random.uniform(0,1)
+            rn = self.np_random.random()
         else:
             rn = 0
 
@@ -5724,7 +5741,7 @@ class UnemploymentEnv_v12(gym.Env):
             # lognormaali
             #prefnoise=np.random.normal(loc=-0.5*self.preferencenoise_std*self.preferencenoise_std,scale = self.preferencenoise_std,size=1)[0]
             # normaali
-            prefnoise=min(2.0,max(1e-6,np.random.normal(loc=1.0,scale = self.preferencenoise_std,size=1)[0]))
+            prefnoise=min(2.0,max(1e-6,self.np_random.normal(loc=1.0,scale=self.preferencenoise_std)))
         else:
             prefnoise=0
 
@@ -5757,7 +5774,7 @@ class UnemploymentEnv_v12(gym.Env):
     def init_immigration_state(self):
 
         if self.randomness:
-            rn = random.uniform(0,1)
+            rn = self.np_random.random()
         else:
             rn = 0
 
@@ -5804,7 +5821,7 @@ class UnemploymentEnv_v12(gym.Env):
             # lognormaali
             #prefnoise=np.random.normal(loc=-0.5*self.preferencenoise_std*self.preferencenoise_std,scale = self.preferencenoise_std,size=1)[0]
             # normaali
-            prefnoise=min(2.0,max(1e-6,np.random.normal(loc=1.0,scale = self.preferencenoise_std,size=1)[0]))
+            prefnoise=min(2.0,max(1e-6,self.np_random.normal(loc=1.0,scale=self.preferencenoise_std)))
         else:
             prefnoise=0
 
@@ -6160,10 +6177,10 @@ class UnemploymentEnv_v12(gym.Env):
     def infostate_kassanjasenyys_update(self,age: float,empstate: int):
         if self.infostate['kassanjasen']<1 and age<45:
             if empstate in {0,1,10}:
-                if random.uniform(0,1) < 1.5*self.kassanjasenyys_joinrate[self.map_age(age)] and self.randomness:
+                if self.np_random.random() < 1.5*self.kassanjasenyys_joinrate[self.map_age(age)] and self.randomness:
                     self.set_kassanjasenyys(1)
             else:
-                if random.uniform(0,1) < 0.1*self.kassanjasenyys_joinrate[self.map_age(age)] and self.randomness:
+                if self.np_random.random() < 0.1*self.kassanjasenyys_joinrate[self.map_age(age)] and self.randomness:
                     self.set_kassanjasenyys(1)
 
     def comp_toe_wage_nykytila(self,is_spouse:bool =False):
@@ -6651,10 +6668,10 @@ class UnemploymentEnv_v12(gym.Env):
             self.steps_beyond_done=None
             vec0 = self.states.random_init_state(minage=minage,maxage=maxage)
             self.state=vec0
-            action0=random.randint(0,self.n_actions-1)
-            action1=random.randint(0,self.n_actions-1)
-            ptaction0=random.randint(0,2)
-            ptaction1=random.randint(0,2)
+            action0=self.np_random.integers(0,self.n_actions)
+            action1=self.np_random.integers(0,self.n_actions)
+            ptaction0=self.np_random.integers(0,3)
+            ptaction1=self.np_random.integers(0,3)
             a=np.array([action0,action1,ptaction0,ptaction1])
             print(a)
             _,r0,_,_,q0 = self.step(a)
