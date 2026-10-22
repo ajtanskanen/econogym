@@ -1644,6 +1644,24 @@ class UnemploymentEnv_v12(gym.Env):
             if self.plotdebug:
                 print('env seed',seed)
 
+    def make_head_mask(self,main_used: bool,spouse_used: bool,main_hours_used: bool,spouse_hours_used: bool) -> np.ndarray:
+        '''
+        Toimintopäiden relevanssimaski action_spacen järjestyksessä.
+        Pää on relevantti, jos sen valinta vaikutti askeleeseen: henkilön oma valinta
+        käytettiin (elossa, ei pakotettua siirtymää) ja tuntivalinta vain työssä
+        (tilat 1, 8, 9, 10), joissa parttime_actions vaihtelee.
+        '''
+        n = len(self.action_space.nvec)
+        if n == 6:   # toiminta, puolison toiminta, tunnit, puolison tunnit, säästö, puolison säästö
+            mask = [main_used,spouse_used,main_hours_used,spouse_hours_used,main_used,spouse_used]
+        elif n == 4 and self.include_savings: # toiminta, puolison toiminta, säästö, puolison säästö
+            mask = [main_used,spouse_used,main_used,spouse_used]
+        elif n == 4: # toiminta, puolison toiminta, tunnit, puolison tunnit
+            mask = [main_used,spouse_used,main_hours_used,spouse_hours_used]
+        else:
+            mask = [main_used,spouse_used][:n]
+        return np.asarray(mask,dtype=np.float32)
+
     def rng_uniform(self,low: float,high: float) -> float:
         '''
         Tasajakauma välillä [low,high) envin omalla generaattorilla.
@@ -4078,6 +4096,7 @@ class UnemploymentEnv_v12(gym.Env):
 
         reward=0
         equivalent=0
+        benq['head_mask'] = self.make_head_mask(False,False,False,False) # molemmat kuolleet
         return np.array(self.state,dtype=np.float32), reward, terminated, truncated, benq
 
     def get_paid_wage(self,raw_wage: float,empstate: int,pt_act: int,old_wage: float=0,time_in_state: float=0):
@@ -4164,6 +4183,8 @@ class UnemploymentEnv_v12(gym.Env):
         t=round((age-self.min_age)/self.timestep)
         main_moved=False
         spou_moved=False
+        main_action_forced=False # pakotettu siirtymä ohittaa agentin valinnan
+        spou_action_forced=False
 
         if self.randomness: # can be disabled for testing purposes
             # kaikki satunnaisuus kerralla
@@ -4216,6 +4237,7 @@ class UnemploymentEnv_v12(gym.Env):
                     main_moved = True
                 elif main_until_disab <= 0 and main_empstate not in {3,14,15}:
                     emp_action=11 # disability
+                    main_action_forced=True
                 elif main_until_student <= 0.0 and main_empstate in {0,1,4,10,13} and age<self.min_retirementage and not main_moved: # opiskelu sisään, not in set([2,3,5,6,7,8,9,11,12,15]):
                     main_empstate,main_paid_wage,main_pension,main_tyoelake_maksussa,main_tis,main_pinkslip,main_basis_wage,main_until_student,main_karenssia_jaljella,main_pt_factor=\
                         self.move_to_student(main_wage,main_pt_action,main_pension,main_tyoelake_maksussa,age,main_tis,main_tyoura,main_pinkslip,main_g,main_karenssia_jaljella)
@@ -4239,6 +4261,7 @@ class UnemploymentEnv_v12(gym.Env):
                     spou_moved = True
                 elif spou_until_disab <= 0 and spou_empstate not in {3,14,15}:
                     spou_action=11 # disability
+                    spou_action_forced=True
                 elif spou_until_student <= 0.0 and spou_empstate in {0,1,4,10,13} and age<self.min_retirementage and not spou_moved: # opiskelu sisään, not in set([2,3,5,6,7,8,9,11,12,15]):
                     spou_empstate,spou_paid_wage,spou_pension,spou_tyoelake_maksussa,spou_tis,spou_pinkslip,spou_basis_wage,spou_until_student,spou_karenssia_jaljella,spou_pt_factor=\
                         self.move_to_student(spou_wage,spou_pt_action,spou_pension,spou_tyoelake_maksussa,age,spou_tis,spou_tyoura,spou_pinkslip,spou_g,spou_karenssia_jaljella)
@@ -4278,6 +4301,7 @@ class UnemploymentEnv_v12(gym.Env):
                 spou_karenssia_jaljella=0
                 spou_moved = True
 
+        main_action_used = (not main_moved) and main_empstate != 15 and not main_action_forced
         if (not main_moved) and main_empstate != 15:
             # hoidetaan tilasiirtymät ja -pysymiset alirutiineilla, joita kutsutaan mäppäämällä tila funktioksi,
             # jota sitten kutsutaan
@@ -4292,6 +4316,7 @@ class UnemploymentEnv_v12(gym.Env):
                                 main_until_disab,main_until_student,main_until_outsider,main_life_left,main_humancapital,main_karenssia_jaljella)
             main_wage_reduction = self.update_wage_reduction(main_empstate,main_wage_reduction,main_pinkslip,main_tis,main_g,age)
 
+        spou_action_used = (not spou_moved) and spou_empstate != 15 and not spou_action_forced
         if (not spou_moved) and spou_empstate != 15:
             # hoidetaan tilasiirtymät ja -pysymiset alirutiineilla, joita kutsutaan mäppäämällä tila funktioksi,
             # jota sitten kutsutaan
@@ -4470,6 +4495,8 @@ class UnemploymentEnv_v12(gym.Env):
 
         rew = np.float32(reward)
 
+        # mitkä toimintopäät vaikuttivat tähän askeleeseen (ACKTR head_mask_key='head_mask')
+        benq['head_mask'] = self.make_head_mask(main_action_used,spou_action_used,main_empstate in {1,8,9,10},spou_empstate in {1,8,9,10})
         return np.array(self.state,dtype=np.float32), reward, terminated, truncated, benq
 
     def update_toes(self,t: float,age: float,tyoura: float,empstate: int,main_paid_wage: float,main_basis_wage: float,unempwage_basis: float,is_spouse: bool,
