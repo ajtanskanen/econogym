@@ -19,7 +19,7 @@ class Statevector_v12():
     '''
     Implements class for handling of state vector
     '''
-    def __init__(self,n_empl: int,n_groups: int,n_parttime_action: int,include_mort: bool,include_preferencenoise: bool,get_paid_wage):
+    def __init__(self,n_empl: int,n_groups: int,n_parttime_action: int,include_mort: bool,get_paid_wage):
         self.eps:float = 1e-20
         self.n_empl:int =n_empl
         self.n_groups:int =n_groups # 3 per gender (6 in total)
@@ -41,7 +41,7 @@ class Statevector_v12():
         self.toe_scale:float = 14/12
         self.n_states:int = self.n_empl+self.n_groups+self.n_groups+self.n_empl+self.n_parttime_action+self.n_parttime_action+58+3+4+1
         #self.update_state_encoding(min_age,max_age,min_retirementage,min_ove_age,timestep)
-        self.include_preferencenoise:bool = include_preferencenoise
+        self.include_preferencenoise:bool = True # include_preferencenoise
         self.get_paid_wage = get_paid_wage
 
     def update_state_encoding(self,min_age: float,max_age: float,min_retirementage: float,min_ove_age: float,timestep: float):
@@ -89,10 +89,10 @@ class Statevector_v12():
         Käytetään, jos kuolleisuus ei mukana
         '''
         n_states=self.n_states
-        if self.include_preferencenoise:
-            d=np.zeros(n_states+2,dtype=np.float64)
-        else:
-            d=np.zeros(n_states,dtype=np.float64)
+        #if self.include_preferencenoise:
+        d=np.zeros(n_states+2,dtype=np.float64)
+        #else:
+        #    d=np.zeros(n_states,dtype=np.float64)
         
         states=self.n_empl # 16
         d[0:states]=self.state_encoding[emp,:]
@@ -218,17 +218,17 @@ class Statevector_v12():
         d[states5+64] = (main_humancapital-self.hc_scale)/self.hc_scale # -0.3125
         d[states5+65] = (spouse_humancapital-self.hc_scale)/self.hc_scale # -1
 
-        if self.include_preferencenoise:
-            d[states5+66]=main_prefnoise
-            d[states5+67]=spouse_prefnoise
+        #if self.include_preferencenoise:
+        d[states5+66]=main_prefnoise
+        d[states5+67]=spouse_prefnoise
 
         return d
 
     def get_state_name(self):
-        if self.include_preferencenoise:
-            d=np.empty(self.n_states+2, dtype='U256')
-        else:
-            d=np.empty(self.n_states, dtype='U256')
+        #if self.include_preferencenoise:
+        d=np.empty(self.n_states+2, dtype='U256')
+        #else:
+        #    d=np.empty(self.n_states, dtype='U256')
                     
         states=self.n_empl
         states2=states+self.n_groups
@@ -311,9 +311,9 @@ class Statevector_v12():
         d[states5+64] = "main_humancapital"
         d[states5+65] = "spouse_humancapital"
 
-        if self.include_preferencenoise:
-            d[states5+66]='main_prefnoise'
-            d[states5+67]='spouse_prefnoise'
+        #if self.include_preferencenoise:
+        d[states5+66]='main_prefnoise'
+        d[states5+67]='spouse_prefnoise'
 
         return d        
 
@@ -444,12 +444,12 @@ class Statevector_v12():
         main_humancapital:float = vec[pos+64]*self.hc_scale+self.hc_scale
         spouse_humancapital:float = vec[pos+65]*self.hc_scale+self.hc_scale
 
-        if self.include_preferencenoise:
-            main_prefnoise=vec[pos+66]
-            spouse_prefnoise=vec[pos+67]
-        else:
-            main_prefnoise=float(0)
-            spouse_prefnoise=float(0)
+        #if self.include_preferencenoise:
+        main_prefnoise=vec[pos+66]
+        spouse_prefnoise=vec[pos+67]
+        #else:
+        #    main_prefnoise=float(0)
+        #     spouse_prefnoise=float(0)
 
         return main_emp,main_g,spouse_g,main_pension,main_wage,age,main_time_in_state,main_tyoelake_maksussa,main_pink,main_toe,\
                 main_toekesto,main_tyohist,main_used_unemp_benefit,main_wage_reduction,main_unemp_after_ra,main_unempwage,main_unempwage_basis,main_prefnoise,spouse_prefnoise,children_under3,children_under7,\
@@ -558,12 +558,12 @@ class Statevector_v12():
         retdict['main_humancapital']:float = vec[pos+64]*self.hc_scale+self.hc_scale
         retdict['puoliso_humancapital']:float = vec[pos+65]*self.hc_scale+self.hc_scale
 
-        if self.include_preferencenoise:
-            retdict['main_prefnoise']=vec[pos+66]
-            retdict['spouse_prefnoise']=vec[pos+67]
-        else:
-            retdict['main_prefnoise']=float(0)
-            retdict['spouse_prefnoise']=float(0)
+        #if self.include_preferencenoise:
+        retdict['main_prefnoise']=vec[pos+66]
+        retdict['spouse_prefnoise']=vec[pos+67]
+        #else:
+        #    retdict['main_prefnoise']=float(0)
+        #    retdict['spouse_prefnoise']=float(0)
 
         # here are 70 variables including pref_noise that is not used => 69 state variables
 
@@ -898,11 +898,11 @@ class Statevector_v12():
         self.test_var(next_wage,next_wage2,'next_wage')
         self.test_var(unempwage,unempwage2,'unempwage')
         self.test_var(unempwage_basis,unempwage_basis2,'unempwage_basis')
-        if self.include_preferencenoise:
-            if not main_prefnoise==main_prefnoise2:  
-                print('main_prefnoise: {} vs {}'.format(main_prefnoise,main_prefnoise2))
-            if not spouse_prefnoise==spouse_prefnoise2:  
-                print('spouse_prefnoise: {} vs {}'.format(spouse_prefnoise,spouse_prefnoise2))
+        #if self.include_preferencenoise:
+        if not main_prefnoise==main_prefnoise2:  
+            print('main_prefnoise: {} vs {}'.format(main_prefnoise,main_prefnoise2))
+        if not spouse_prefnoise==spouse_prefnoise2:  
+            print('spouse_prefnoise: {} vs {}'.format(spouse_prefnoise,spouse_prefnoise2))
         if not children_under3==children_under3_2:  
             print('children_under3: {} vs {}'.format(children_under3,children_under3_2))
         if not children_under7==children_under7_2:  
@@ -1039,11 +1039,11 @@ class Statevector_v12():
             print('unempwage: {} vs {}'.format(unempwage,unempwage2))
         if not math.isclose(unempwage_basis,unempwage_basis2):  
             print('unempwage_basis: {} vs {}'.format(unempwage_basis,unempwage_basis2))
-        if self.include_preferencenoise:
-            if not main_prefnoise==main_prefnoise2:  
-                print('main_prefnoise: {} vs {}'.format(main_prefnoise,main_prefnoise2))
-            if not spouse_prefnoise==spouse_prefnoise2:  
-                print('spouse_prefnoise: {} vs {}'.format(spouse_prefnoise,spouse_prefnoise2))
+        #if self.include_preferencenoise:
+        if not main_prefnoise==main_prefnoise2:  
+            print('main_prefnoise: {} vs {}'.format(main_prefnoise,main_prefnoise2))
+        if not spouse_prefnoise==spouse_prefnoise2:  
+            print('spouse_prefnoise: {} vs {}'.format(spouse_prefnoise,spouse_prefnoise2))
         if not children_under3==children_under3_2:  
             print('children_under3: {} vs {}'.format(children_under3,children_under3_2))
         if not children_under7==children_under7_2:  
@@ -1411,9 +1411,9 @@ class Statevector_v12():
         low.extend(low_end)
         high.extend(high_end)
               
-        if self.include_preferencenoise:
-            low.extend([pref_min,pref_min]) # main_prefnoise, spouse_prefnoise
-            high.extend([pref_max,pref_max])
+        #if self.include_preferencenoise:
+        low.extend([pref_min,pref_min]) # main_prefnoise, spouse_prefnoise
+        high.extend([pref_max,pref_max])
                 
         low=np.array(low,dtype=np.float32)
         high=np.array(high,dtype=np.float32)            

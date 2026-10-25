@@ -256,7 +256,7 @@ class UnemploymentEnv_v12(gym.Env):
                 self.action_space = spaces.MultiDiscrete([self.n_actions,self.n_spouse_actions])
                 self.parttime_actions = self.setup_parttime_actions(debug=True)
 
-        self.states=Statevector_v12(self.n_empl,self.n_groups_encoding,self.n_parttime_action,self.include_mort,self.include_preferencenoise,self.get_paid_wage)
+        self.states=Statevector_v12(self.n_empl,self.n_groups_encoding,self.n_parttime_action,self.include_mort,self.get_paid_wage)
         self.set_year(self.year)
 
         #self.setup_state_encoding()
@@ -438,7 +438,7 @@ class UnemploymentEnv_v12(gym.Env):
         self.include_spouses:bool=True # Puolisot mukana?
         self.include_mort:bool=True # onko kuolleisuus mukana laskelmissa
         self.include_npv_mort:bool=False # onko kuolleisuus eläkeaikana mukana laskelmissa
-        self.include_preferencenoise:bool=True # onko työllisyyspreferenssissä hajonta mukana
+        #self.include_preferencenoise:bool=True # onko työllisyyspreferenssissä hajonta mukana
         self.perustulo:bool=False # onko Kelan perustulo laskelmissa
         self.universalcredit:bool=False # Yleistuki
         self.randomness:bool=True # onko stokastiikka mukana
@@ -448,9 +448,12 @@ class UnemploymentEnv_v12(gym.Env):
         self.use_sigma_reduction:bool=True # kumpi palkkareduktio
         self.include_kansanelake:bool=True
         self.include_takuuelake:bool=True
-        self.preferencenoise_ini_std:float=0.3
-        self.preferencenoise_std:float=0.1 # per Q
-        self.preferencenoise_rho:float=0.9
+        self.preferencenoise_men_ini_std:float=0.3
+        self.preferencenoise_men_std:float=0.09 # per Q
+        self.preferencenoise_men_rho:float=0.95
+        self.preferencenoise_women_ini_std:float=0.2
+        self.preferencenoise_women_std:float=0.06 # per Q
+        self.preferencenoise_women_rho:float=0.95
         self.silent:bool=False
         self.include_emtr:bool=False
 
@@ -4375,8 +4378,8 @@ class UnemploymentEnv_v12(gym.Env):
 
         # compute utilities
         if not done:
-            reward_main,main_equivalent = self.log_utility(netto_main,main_empstate,old_age,g=main_g,pinkslip=main_pinkslip,pt_factor=main_pt_factor,children_under_3y=children_under3,spouse=puoliso,spouse_empstate=spou_empstate)
-            reward_spou,spou_equivalent = self.log_utility(netto_spou,spou_empstate,old_age,g=spou_g,pinkslip=spou_pinkslip,pt_factor=spou_pt_factor,children_under_3y=children_under3,spouse=puoliso,spouse_empstate=main_empstate)
+            reward_main,main_equivalent = self.log_utility(netto_main,main_empstate,old_age,g=main_g,pinkslip=main_pinkslip,prefnoise=main_prefnoise,pt_factor=main_pt_factor,children_under_3y=children_under3,spouse=puoliso,spouse_empstate=spou_empstate)
+            reward_spou,spou_equivalent = self.log_utility(netto_spou,spou_empstate,old_age,g=spou_g,pinkslip=spou_pinkslip,prefnoise=spou_prefnoise,pt_factor=spou_pt_factor,children_under_3y=children_under3,spouse=puoliso,spouse_empstate=main_empstate)
             reward=reward_main+reward_spou
             equivalent=main_equivalent+spou_equivalent
             
@@ -4404,7 +4407,7 @@ class UnemploymentEnv_v12(gym.Env):
                 spou_tis,spou_unempwage,spou_unempwage_basis,spou_used_unemp_benefit,0,0,main_g,spou_g,potential_wage=pot_main_wage,potential_spouse_wage=pot_spou_wage)
 
             if main_empstate in {2,3,8,9}: # retired
-                reward_main,main_equivalent = self.log_utility(netto_main,main_empstate,old_age,g=main_g,pinkslip=main_pinkslip,children_under_3y=children_under3,spouse_empstate=spou_empstate)
+                reward_main,main_equivalent = self.log_utility(netto_main,main_empstate,old_age,g=main_g,pinkslip=main_pinkslip,prefnoise=main_prefnoise,children_under_3y=children_under3,spouse_empstate=spou_empstate)
                 k=round(main_life_left/self.timestep)
                 reward_main *= self.npv_gpension[k] # discounting with pension index & gamma
                 npv0 = k
@@ -4415,7 +4418,7 @@ class UnemploymentEnv_v12(gym.Env):
                 npv,npv0 = 0.0,0.0
 
             if spou_empstate in {2,3,8,9}: # retired
-                reward_spou,spou_equivalent = self.log_utility(netto_spou,spou_empstate,old_age,g=spou_g,pinkslip=spou_pinkslip,children_under_3y=children_under3,spouse_empstate=main_empstate)
+                reward_spou,spou_equivalent = self.log_utility(netto_spou,spou_empstate,old_age,g=spou_g,pinkslip=spou_pinkslip,prefnoise=spou_prefnoise,children_under_3y=children_under3,spouse_empstate=main_empstate)
                 k=round(spou_life_left/self.timestep)
                 reward_spou *= self.npv_gpension[k] # discounting with pension index & gamma
                 p_npv0 = k
@@ -4452,6 +4455,12 @@ class UnemploymentEnv_v12(gym.Env):
             benq['omat_dis_wage5y'] = 0
             benq['puoliso_dis_wage5y'] = 0
             benq['eq'] = equivalent
+
+        # työllisyyspreferenssin AR(1)-päivitys palkkion jälkeen, kerran neljänneksessä
+        if main_empstate != 15:
+            main_prefnoise = self.update_prefnoise(main_prefnoise)
+        if spou_empstate != 15:
+            spou_prefnoise = self.update_prefnoise(spou_prefnoise)
 
         # seuraava palkka tiedoksi valuaatioapproksimaattorille
         if main_empstate in {15}:
@@ -4685,16 +4694,16 @@ class UnemploymentEnv_v12(gym.Env):
             self.men_mu_scale_kokoaika_after = self.workfactor_m * 0.025 # how much penalty is associated with work increase with age after mu_age
             self.men_mu_age  =  self.min_retirementage - 10.0
 
-        self.men_kappa_hoitovapaa = 0.030 # hyöty henkilölle hoitovapaalla olosta
-        self.men_kappa_under_3y = 0.030
+        self.men_kappa_hoitovapaa = 0.050 # hyöty henkilölle hoitovapaalla olosta
+        self.men_kappa_under_3y = 0.050
         self.men_kappa_ve = 0.0
         self.men_kappa_ve_spouse = 0.200
         self.men_kappa_pinkslip_young = -0.100
-        self.men_kappa_pinkslip_young_tmtuki = -0.200 # kuvaa sitä, että toimeentulotuessa huomioidaan varat (joita ei ole mallissa)
+        self.men_kappa_pinkslip_young_tmtuki = -0.100 # kuvaa sitä, että toimeentulotuessa huomioidaan varat (joita ei ole mallissa)
         self.men_kappa_pinkslip_middle = -0.100
         self.men_kappa_pinkslip_elderly = -0.200
         self.men_kappa_pinkslip_putki = -1.20
-        self.men_kappa_param =  self.workfactor_m * np.array([-0.340, -0.350, -0.410, -0.480, -0.595, -1.200 ]) # np.array([-0.410, -0.450, -0.470, -0.500, -0.590, -1.650 ]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
+        self.men_kappa_param =  self.workfactor_m * np.array([-0.310, -0.330, -0.390, -0.480, -0.595, -1.200 ]) # np.array([-0.410, -0.450, -0.470, -0.500, -0.590, -1.650 ]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
         self.men_student_kappa_param = np.array([0.0, 0.0, 0.0, -100.0, -100.0, -100.0]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
 
         # naisten utiliteetti-parametrit
@@ -4707,16 +4716,16 @@ class UnemploymentEnv_v12(gym.Env):
             self.women_mu_scale_kokoaika_after = self.workfactor_w * 0.030  # how much penalty is associated with work increase with age after mu_age
             self.women_mu_age  =  self.min_retirementage - 10.0 
 
-        self.women_kappa_hoitovapaa = 0.080
-        self.women_kappa_under_3y = 0.080
+        self.women_kappa_hoitovapaa = 0.100
+        self.women_kappa_under_3y = 0.100
         self.women_kappa_ve = 0.0
         self.women_kappa_ve_spouse = 0.2
         self.women_kappa_pinkslip_young = -0.100
-        self.women_kappa_pinkslip_young_tmtuki = -0.200 # kuvaa sitä, että toimeentulotuessa huomioidaan varat (joita ei ole mallissa)
+        self.women_kappa_pinkslip_young_tmtuki = -0.100 # kuvaa sitä, että toimeentulotuessa huomioidaan varat (joita ei ole mallissa)
         self.women_kappa_pinkslip_middle = -0.100
         self.women_kappa_pinkslip_elderly = -0.100
-        self.women_kappa_pinkslip_putki = -1.00
-        self.women_kappa_param = self.workfactor_w * np.array([-0.330, -0.360, -0.400, -0.470, -0.580, -1.200]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
+        self.women_kappa_pinkslip_putki = -0.70
+        self.women_kappa_param = self.workfactor_w * np.array([-0.300, -0.330, -0.380, -0.470, -0.580, -1.200]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
         self.women_student_kappa_param = np.array([0.0, 0.0, 0.0, -100.0, -100.0, -100.0]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
 
         self.both_kappa_hoitovapaa = -1.0 # penalty, joka estää molempia menemästä hoitovapaalle yhtävaikaa
@@ -4740,9 +4749,9 @@ class UnemploymentEnv_v12(gym.Env):
         map_of_reduction=np.array([8/40,16/40,24/40,32/40,40/40,48/40])
         n = (np.abs(map_of_reduction - pt_factor)).argmin()
         if g<3:
-            return self.men_kappa_param[n]+prefnoise
+            return self.men_kappa_param[n]+prefnoise*pt_factor
         else:
-            return self.women_kappa_param[n]+prefnoise
+            return self.women_kappa_param[n]+prefnoise*pt_factor
 
     def map_pt_kappa_v3_student(self,pt_factor,g):
         map_of_reduction=np.array([0/40,8/40,16/40,32/40,40/40,48/40])
@@ -4936,7 +4945,7 @@ class UnemploymentEnv_v12(gym.Env):
         if income<1 and debug:
             print(f'inf: state {employment_state} spouse {spouse} sp_state {spouse_empstate} netto {income}')
 
-        return u/150.0,equ # tulot ovat vuositasolla, skaalataan hyöty välille 0,1
+        return u/10.0,equ # tulot ovat vuositasolla, skaalataan hyöty välille 0,1
 
 
     def CRRA(self,net: float):
@@ -4958,7 +4967,7 @@ class UnemploymentEnv_v12(gym.Env):
         if employment_state==15:
             return 0,0
 
-        kappa = self.log_get_kappa(age,g,employment_state,pinkslip,pt_factor,children_under_7,spouse,spouse_empstate,spouse_prefnoise)
+        kappa = self.log_get_kappa(age,g,employment_state,pinkslip,pt_factor,children_under_7,spouse,spouse_empstate,prefnoise)
 
         # hyäty/score
         u = self.CRRA(income/self.salaryinflationfactor)+kappa
@@ -5090,9 +5099,9 @@ class UnemploymentEnv_v12(gym.Env):
             elif key=='plotdebug':
                 if value is not None:
                     self.plotdebug=value
-            elif key=='preferencenoise_level':
-                if value is not None:
-                    self.preferencenoise_std=value
+            #elif key=='preferencenoise_level':
+            #    if value is not None:
+            #        self.preferencenoise_std=value
             elif key=='additional_income_tax':
                 if value is not None:
                     self.additional_income_tax=value
@@ -5690,21 +5699,21 @@ class UnemploymentEnv_v12(gym.Env):
 
     def update_prefnoise(self,prefnoise) -> float:
         '''
-        Henkilökohtainen työllisyyspreferenssin hajonta alkutilassa
+        Työllisyyspreferenssin AR(1)-päivitys yhdelle neljännekselle
         '''
-        if self.include_preferencenoise:
-            return min(1.0,max(-1.0,self.preferencenoise_rho * prefnoise + self.np_random.normal(loc=0.0,scale=self.preferencenoise_std)))
-        else:
-            return 0.0
+        #if self.include_preferencenoise:
+        return min(1.0,max(-1.0,self.preferencenoise_rho * prefnoise + self.np_random.normal(loc=0.0,scale=self.preferencenoise_std)))
+        #else:
+        #    return 0.0
 
     def draw_prefnoise(self) -> float:
         '''
         Henkilökohtainen työllisyyspreferenssin hajonta alkutilassa
         '''
-        if self.include_preferencenoise:
-            return min(1.0,max(-1.0,self.np_random.normal(loc=0.0,scale=self.preferencenoise_ini_std)))
-        else:
-            return 0.0
+        #if self.include_preferencenoise:
+        return min(1.0,max(-1.0,self.np_random.normal(loc=0.0,scale=self.preferencenoise_ini_std)))
+        #else:
+        #     return 0.0
 
     def init_state(self):
 
@@ -5852,207 +5861,80 @@ class UnemploymentEnv_v12(gym.Env):
     ### RENDER
     ##############
 
+    # state_decode_dict-avaimet, joiden nimi ei ole muotoa main_X / puoliso_X
+    RENDER_KEYS = {
+        False: dict(emp='main_emp',g='main_g',pt_act='pt_act',old_wage='main_wage',tyoura='main_tyohist',
+                    unemp_left='main_unemp_left',pink='main_pink',prefnoise='main_prefnoise'),
+        True: dict(emp='puoliso_tila',g='spouse_g',pt_act='sp_pt_act',old_wage='puoliso_old_wage',tyoura='puoliso_tyoura',
+                   unemp_left='puoliso_unemp_benefit_left',pink='puoliso_pinkslip',prefnoise='spouse_prefnoise'),
+    }
+
     def render(self,mode: str='human',close:bool =False,done:bool =False,reward: Optional[float] =None,netto: Optional[float] =None,render_omat: bool=False,
-                render_puoliso: bool=True,benq: Optional[dict] =None,netto_omat: Optional[float] =None,netto_puoliso: Optional[float] =None,p: Optional[dict] =None):
+                render_puoliso: bool=True,benq: Optional[dict] =None,netto_omat: Optional[float] =None,netto_puoliso: Optional[float] =None,p: Optional[np.ndarray] =None):
         '''
-        Tulostus-rutiini
+        Tulostus-rutiini: yksi rivi kummallekin henkilölle tilasta p (oletuksena nykyinen tila)
         '''
-        #print(self.state)
-        if p is None:
-            emp,g,spouse_g,pension,main_old_wage,age,time_in_state,tyoelake_maksussa,pink,toe,toekesto,tyohist,used_unemp_benefit,\
-                wage_red,unemp_after_ra,unempwage,unempwage_basis,prefnoise,spouse_prefnoise,c3,c7,c18,\
-                unemp_left,oikeus,toe58,ove_paid,jasen,\
-                puoliso,spouse_empstate,spouse_old_wage,spouse_pension,\
-                spouse_wage_reduction,spouse_tyoelake_maksussa,spouse_next_wage,\
-                puoliso_used_unemp_benefit,puoliso_unemp_benefit_left,\
-                puoliso_unemp_after_ra,puoliso_unempwage,puoliso_unempwage_basis,\
-                puoliso_alkanut_ansiosidonnainen,puoliso_toe58,puoliso_toe,\
-                puoliso_toekesto,puoliso_tyohist,spouse_time_in_state,puoliso_pink,puoliso_ove_paid,\
-                kansanelake,spouse_kansanelake,paid_pension,puoliso_paid_pension,\
-                main_next_wage,main_old_paid_wage,spouse_old_paid_wage,pt_act,s_pt_act,main_wage_basis,spouse_wage_basis,\
-                main_life_left,spouse_life_left,main_until_disab,spouse_until_disab,\
-                time_to_marriage,time_to_divorce,until_child,main_until_student,spouse_until_student,main_until_outsider,spouse_until_outsider,\
-                main_karenssia_jaljella,spouse_karenssia_jaljella,main_humancapital,spouse_humancapital\
-                    = self.states.state_decode(self.state)
-        else:
-            emp,g,spouse_g,pension,main_old_wage,age,time_in_state,tyoelake_maksussa,pink,toe,toekesto,tyohist,used_unemp_benefit,\
-                wage_red,unemp_after_ra,unempwage,unempwage_basis,prefnoise,spouse_prefnoise,c3,c7,c18,\
-                unemp_left,oikeus,toe58,ove_paid,jasen,\
-                puoliso,spouse_empstate,spouse_old_wage,spouse_pension,\
-                spouse_wage_reduction,spouse_tyoelake_maksussa,spouse_next_wage,\
-                puoliso_used_unemp_benefit,puoliso_unemp_benefit_left,\
-                puoliso_unemp_after_ra,puoliso_unempwage,puoliso_unempwage_basis,\
-                puoliso_alkanut_ansiosidonnainen,puoliso_toe58,puoliso_toe,\
-                puoliso_toekesto,puoliso_tyohist,spouse_time_in_state,puoliso_pink,puoliso_ove_paid,\
-                kansanelake,spouse_kansanelake,paid_pension,puoliso_paid_pension,\
-                main_next_wage,main_old_paid_wage,spouse_old_paid_wage,pt_act,s_pt_act,main_wage_basis,spouse_wage_basis,\
-                main_life_left,spouse_life_left,main_until_disab,spouse_until_disab,\
-                time_to_marriage,time_to_divorce,until_child,main_until_student,spouse_until_student,main_until_outsider,spouse_until_outsider,\
-                main_karenssia_jaljella,spouse_karenssia_jaljella,main_humancapital,spouse_humancapital\
-                    = self.states.state_decode(p)
-        if jasen:
-            kassassa='+'
-        else:
-            kassassa='-'
-
-        if puoliso:
-            onpuoliso='+'
-        else:
-            onpuoliso=''
-
-        if emp==15:
-            m='*'
-        else:
-            m=''
-
-        if emp in set([0,1,10,4,5,6,7,13,14]):
-            var=f' wb {main_wage_basis:.0f}'
-        elif emp in set([2,3,8,9]):
-            var=f' pd_k {kansanelake:.0f}'
-        else:
-            var=''
-
-        main_next_paid_wage,pt_factor,pot_main_wage = self.get_paid_wage(main_next_wage,emp,pt_act,main_old_paid_wage,time_in_state) # CHECK!
-        kappa = self.log_get_kappa(age,g,emp,pink,pt_factor,c3,puoliso,spouse_empstate,spouse_prefnoise)
-
-        if False:
-            uo=f' ud {main_until_disab:.1f} uo {main_until_outsider:.1f} us {main_until_student:.1f}'
-            ue = ''
-        else:
-            uo=''
-            ue= f' toe {toe:.2f}({toe58:.0f}){kassassa} tk {toekesto:.2f} ura {tyohist:.2f} uew {unempwage:.0f}'+\
-                f' (b {unempwage_basis:.0f}) ult {unemp_left:.2f} aa {oikeus:.0f} ove {ove_paid:.0f}'
-
-        out=f'{m}m{onpuoliso} {emp:2d} g {g:d} a {age:.2f} w {main_old_wage:.0f} ({main_old_paid_wage:.0f}) nw {main_next_wage:.0f} ({main_next_paid_wage:.0f} #{pt_act:d})'+\
-            f' red {wage_red:.2f} tis {time_in_state:.2f} kr {main_karenssia_jaljella:.2f}'+\
-            f' pen {pension:.0f} pd_e {tyoelake_maksussa:.0f}{var} ueb {used_unemp_benefit:.2f}'+ue+\
-            f' pk{pink:d} hc {main_humancapital:.1f} lf{main_life_left:.1f}{uo} k {kappa:.2f}'
-        if self.include_preferencenoise:
-            out+=f' pn {prefnoise:.2f}'
-
-        if reward is not None:
-            out+=f' r {reward:.4f}'
-        if netto_omat is not None:
-            out+=f' n {netto_omat:.0f}'
+        d = self.states.state_decode_dict(self.state if p is None else p)
 
         if render_omat:
-            print(out)
-
-        if spouse_empstate==15:
-            m='*'
-        else:
-            m=''
-
-        spouse_paid_wage,s_pt_factor,pot_spouse_wage = self.get_paid_wage(spouse_next_wage,spouse_empstate,s_pt_act,spouse_old_paid_wage,spouse_time_in_state) # CHECK!
-        kappa = self.log_get_kappa(age,spouse_g,spouse_empstate,puoliso_pink,s_pt_factor,c3,puoliso,emp,spouse_prefnoise)
-
-        if spouse_empstate in set([0,1,4,10,5,6,7,13,14]):
-            var=f' wb {spouse_wage_basis:.0f}'
-        elif spouse_empstate in set([2,3,8,9]):
-            var=f' pd_k {spouse_kansanelake:.0f}'
-        else:
-            var=''
-
-        if False:
-            uo=f' ud {spouse_until_disab:.1f} uo {spouse_until_outsider:.1f} us {spouse_until_student:.1f}'
-            ue=''
-        else:
-            uo=''
-            ue =f' toe {puoliso_toe:.2f}({puoliso_toe58:d}){kassassa} tk {puoliso_toekesto:.2f} ura {puoliso_tyohist:.2f} uew {puoliso_unempwage:.0f} (b {puoliso_unempwage_basis:.0f})'+\
-                f' ult {puoliso_unemp_benefit_left:.2f} aa {puoliso_alkanut_ansiosidonnainen:d}'
-
-        puoliso=f'{m}s{onpuoliso} {spouse_empstate:d} g {spouse_g:d} a {age:.2f} w {spouse_old_wage:.0f} ({spouse_old_paid_wage:.0f}) nw {spouse_next_wage:.0f} ({spouse_paid_wage:.0f} #{s_pt_act:d}) red {spouse_wage_reduction:.2f} tis {spouse_time_in_state:.2f}'+\
-                f' kr {spouse_karenssia_jaljella:.2f} pen {spouse_pension:.0f} pd_e {spouse_tyoelake_maksussa:.0f}{var} ueb {puoliso_used_unemp_benefit:.2f}'+ue+\
-                f' pk {puoliso_pink:d} lf{spouse_life_left:.1f}{uo} hc {spouse_humancapital:.1f} c{c3:.0f}/{c7:.0f}/{c18:.0f}  k {kappa:.2f}'
-        if self.include_preferencenoise:
-            puoliso+=f' pn {spouse_prefnoise:.2f}'
-
-        if reward is not None:
-            puoliso+=f' r {reward:.4f}'
-        if netto_puoliso is not None:
-            puoliso+=f' n {netto_puoliso:.0f}'
-
+            print(self.render_person(d,spouse=False,reward=reward,netto=netto_omat))
         if render_puoliso:
-            print(puoliso)
-
+            print(self.render_person(d,spouse=True,reward=reward,netto=netto_puoliso))
         if done:
-            print('-------------------------------------------------------------------------------------------------------')
+            print('-'*103)
+
+    def render_person(self,d: dict,spouse: bool,reward: Optional[float]=None,netto: Optional[float]=None) -> str:
+        '''
+        Yhden henkilön tilarivi state_decode_dict:n tuloksesta
+        '''
+        keys = self.RENDER_KEYS[spouse]
+        prefix = 'puoliso_' if spouse else 'main_'
+        def v(name):
+            return d[keys[name]] if name in keys else d[prefix+name]
+
+        emp = v('emp')
+        other_emp = d['main_emp'] if spouse else d['puoliso_tila']
+        next_paid_wage,pt_factor,_ = self.get_paid_wage(v('next_wage'),emp,v('pt_act'),v('paid_wage'),v('time_in_state'))
+        kappa = self.log_get_kappa(d['age'],v('g'),emp,v('pink'),pt_factor,d['children_under3'],d['puoliso'],other_emp,v('prefnoise'))
+
+        if emp in {0,1,4,5,6,7,10,13,14}:
+            var = f' wb {v("basis_wage"):.0f}'
+        elif emp in {2,3,8,9}:
+            var = f' pd_k {v("kansanelake"):.0f}'
+        else:
+            var = ''
+
+        dead = '*' if emp==15 else ''
+        married = '+' if d['puoliso'] else ''
+        kassassa = '+' if d['kassanjasen'] else '-'
+        who = 's' if spouse else 'm'
+
+        out = f'{dead}{who}{married} {emp:2d} g {v("g"):d} a {d["age"]:.2f}'+\
+            f' w {v("old_wage"):.0f} ({v("paid_wage"):.0f}) nw {v("next_wage"):.0f} ({next_paid_wage:.0f} #{v("pt_act"):d})'+\
+            f' red {v("wage_reduction"):.2f} tis {v("time_in_state"):.2f} kr {v("karenssia_jaljella"):.2f}'+\
+            f' pen {v("pension"):.0f} pd_e {v("tyoelake_maksussa"):.0f}{var} ueb {v("used_unemp_benefit"):.2f}'+\
+            f' toe {v("toe"):.2f}({v("toe58"):d}){kassassa} tk {v("toekesto"):.2f} ura {v("tyoura"):.2f}'+\
+            f' uew {v("unempwage"):.0f} (b {v("unempwage_basis"):.0f}) ult {v("unemp_left"):.2f}'+\
+            f' aa {v("alkanut_ansiosidonnainen"):d} ove {v("ove_paid"):d}'+\
+            f' pk {v("pink"):d} hc {v("humancapital"):.1f} lf {v("life_left"):.1f} k {kappa:.2f}'
+
+        if spouse:
+            out += f' c{d["children_under3"]}/{d["children_under7"]}/{d["children_under18"]}'
+        #if self.include_preferencenoise:
+        out += f' pn {v("prefnoise"):.2f}'
+        if reward is not None:
+            out += f' r {reward:.4f}'
+        if netto is not None:
+            out += f' n {netto:.0f}'
+
+        return out
 
     def __str__(self):
         '''
-        Tulostus-rutiini
+        Nykyinen tila samassa muodossa kuin render
         '''
-        emp,g,spouse_g,pension,wage,age,time_in_state,tyoelake_maksussa,pink,toe,toekesto,tyohist,used_unemp_benefit,\
-            wage_red,unemp_after_ra,unempwage,unempwage_basis,prefnoise,spouse_prefnoise,c3,c7,c18,\
-            unemp_left,oikeus,toe58,ove_paid,jasen,\
-            puoliso,spouse_empstate,puoliso_old_wage,spouse_pension,\
-            spouse_wage_reduction,spouse_tyoelake_maksussa,puoliso_next_wage,\
-            puoliso_used_unemp_benefit,puoliso_unemp_benefit_left,\
-            puoliso_unemp_after_ra,puoliso_unempwage,puoliso_unempwage_basis,\
-            puoliso_alkanut_ansiosidonnainen,puoliso_toe58,puoliso_toe,\
-            puoliso_toekesto,puoliso_tyohist,spouse_time_in_state,puoliso_pink,puoliso_ove_paid,\
-            kansanelake,spouse_kansanelake,paid_pension,puoliso_paid_pension,\
-            next_wage,main_paid_wage,spouse_paid_wage,pt_act,s_pt_act,main_wage_basis,spouse_wage_basis,\
-            main_life_left,spouse_life_left,\
-            main_until_disab,spouse_until_disab,time_to_marriage,time_to_divorce,until_child,\
-            main_until_student,spouse_until_student,main_until_outsider,spouse_until_outsider,\
-            main_karenssia_jaljella,spouse_karenssia_jaljella,m_hc,sp_hc\
-                 = self.states.state_decode(self.state)
-
-        if jasen:
-            kassassa='+'
-        else:
-            kassassa='-'
-
-        if puoliso:
-            onpuoliso='+'
-        else:
-            onpuoliso=''
-
-        if emp==15:
-            m='*'
-        else:
-            m=''
-
-        if emp in set([0,1,10,4,5,6,7,13,14]):
-            var=f'wbas {main_wage_basis:.0f}'
-        elif emp in set([2,3,8,9]):
-            var=f'paid_k {kansanelake:.0f}'
-        else:
-            var=''
-
-        main_paid_wage,pt_factor,_ = self.get_paid_wage(wage,emp,pt_act,wage,time_in_state) # CHECK!
-        kappa = self.log_get_kappa(age,g,emp,pink,pt_factor,c3,puoliso,spouse_empstate,prefnoise)
-
-        out=f'{m}s{onpuoliso} {emp:2d} g {g:d} a {age:.2f} w {wage:.0f} (wp {main_paid_wage:.0f} pt {pt_act:d}) nw {next_wage:.0f}'+\
-            f' red {wage_red:.2f} tis {time_in_state:.2f}'+\
-            f' pen {pension:.0f} paid_e {tyoelake_maksussa:.0f} {var} ueb {used_unemp_benefit:.2f}'+\
-            f' toe {toe:.2f}{kassassa} tk{toekesto:.2f} ura {tyohist:.2f} uew {unempwage:.0f}'+\
-            f' (b {unempwage_basis:.0f}) uleft {unemp_left:.2f} aa {oikeus:.0f} 58 {toe58:.0f} ove {ove_paid}'+\
-            f' pink {pink:d} c{c3:.0f}/{c7:.0f}/{c18:.0f} k {kappa:.2f}'
-
-        if spouse_empstate==15:
-            m='*'
-        else:
-            m=''
-
-        spouse_paid_wage,s_pt_factor,_ = self.get_paid_wage(puoliso_old_wage,spouse_empstate,s_pt_act,puoliso_old_wage,spouse_time_in_state) # CHECK!
-        kappa = self.log_get_kappa(age,spouse_g,spouse_empstate,puoliso_pink,s_pt_factor,c3,puoliso,emp,spouse_prefnoise)
-
-        if spouse_empstate in set([0,1,4,10,5,6,7,13,14]):
-            var=f'wbas {spouse_wage_basis:.0f}'
-        elif spouse_empstate in set([2,3,8,9]):
-            var=f'paid_k {spouse_kansanelake:.0f}'
-        else:
-            var=''
-
-        puoliso=f'{m}ps{onpuoliso} {spouse_empstate:d} g {spouse_g:d} a {age:.2f} w {puoliso_old_wage:.0f} (wp {spouse_paid_wage:.0f} pt {s_pt_act:d}) nw {puoliso_next_wage:.0f} red {spouse_wage_reduction:.2f} tis {spouse_time_in_state:.2f}'+\
-                f' pen {spouse_pension:.0f} paid_e {spouse_tyoelake_maksussa:.0f} {var} ueb {puoliso_used_unemp_benefit:.2f}'\
-                f' toe {puoliso_toe:.2f}{kassassa} tk {puoliso_toekesto:.2f} ura {puoliso_tyohist:.2f} uew {puoliso_unempwage:.0f} (b {puoliso_unempwage_basis:.0f})'+\
-                f' uleft {puoliso_unemp_benefit_left:.2f} 58 {puoliso_toe58:d} aa {puoliso_alkanut_ansiosidonnainen:d}'+\
-                f' pink {puoliso_pink:d} k {kappa:.2f}'
-
-        return 'omat: '+out+'\npuoliso: '+puoliso
+        d = self.states.state_decode_dict(self.state)
+        return 'omat: '+self.render_person(d,spouse=False)+'\npuoliso: '+self.render_person(d,spouse=True)
 
     def close(self):
         '''
