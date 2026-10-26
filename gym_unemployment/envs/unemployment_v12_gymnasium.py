@@ -3746,7 +3746,7 @@ class UnemploymentEnv_v12(gym.Env):
         '''
         Eläkkeen karttumisrutiini
         '''
-        if age>=52 and age<63:
+        if age>=53 and age<63:
             acc = self.acc_over_52
         else:
             acc = self.acc
@@ -4458,9 +4458,9 @@ class UnemploymentEnv_v12(gym.Env):
 
         # työllisyyspreferenssin AR(1)-päivitys palkkion jälkeen, kerran neljänneksessä
         if main_empstate != 15:
-            main_prefnoise = self.update_prefnoise(main_prefnoise)
+            main_prefnoise = self.update_prefnoise(main_prefnoise,main_g)
         if spou_empstate != 15:
-            spou_prefnoise = self.update_prefnoise(spou_prefnoise)
+            spou_prefnoise = self.update_prefnoise(spou_prefnoise,spou_g)
 
         # seuraava palkka tiedoksi valuaatioapproksimaattorille
         if main_empstate in {15}:
@@ -4654,8 +4654,8 @@ class UnemploymentEnv_v12(gym.Env):
         #self.workfactor_w = 0.91
 
         # 2024 sopiva
-        self.workfactor_m = 1.60
-        self.workfactor_w = 1.35
+        self.workfactor_m = 1.63
+        self.workfactor_w = 1.27
 
         self.max_reduction_sigma = 0.60
 
@@ -4686,8 +4686,8 @@ class UnemploymentEnv_v12(gym.Env):
 
         # miesten utiliteetti-parametrit
         if True:
-            self.men_mu_scale_kokoaika_before = 0.090 # how much penalty is associated with work increase with age after mu_age
-            self.men_mu_scale_kokoaika_after = 0.050 # how much penalty is associated with work increase with age after mu_age
+            self.men_mu_scale_kokoaika_before = 0.070 # how much penalty is associated with work increase with age after mu_age
+            self.men_mu_scale_kokoaika_after = 0.040 # how much penalty is associated with work increase with age after mu_age
             self.men_mu_age  =  self.min_retirementage - 4.0
         else:
             self.men_mu_scale_kokoaika_before = self.workfactor_m * 0.040 # how much penalty is associated with work increase with age after mu_age
@@ -4702,14 +4702,14 @@ class UnemploymentEnv_v12(gym.Env):
         self.men_kappa_pinkslip_young_tmtuki = -0.100 # kuvaa sitä, että toimeentulotuessa huomioidaan varat (joita ei ole mallissa)
         self.men_kappa_pinkslip_middle = -0.100
         self.men_kappa_pinkslip_elderly = -0.200
-        self.men_kappa_pinkslip_putki = -1.20
-        self.men_kappa_param =  self.workfactor_m * np.array([-0.310, -0.330, -0.390, -0.480, -0.595, -1.200 ]) # np.array([-0.410, -0.450, -0.470, -0.500, -0.590, -1.650 ]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
+        self.men_kappa_pinkslip_putki = -0.60
+        self.men_kappa_param =  self.workfactor_m * np.array([-0.310, -0.330, -0.380, -0.480, -0.585, -1.200 ]) # np.array([-0.410, -0.450, -0.470, -0.500, -0.590, -1.650 ]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
         self.men_student_kappa_param = np.array([0.0, 0.0, 0.0, -100.0, -100.0, -100.0]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
 
         # naisten utiliteetti-parametrit
         if True:
-            self.women_mu_scale_kokoaika_before = 0.070 # how much penalty is associated with work increase with age after mu_age
-            self.women_mu_scale_kokoaika_after = 0.040  # how much penalty is associated with work increase with age after mu_age
+            self.women_mu_scale_kokoaika_before = 0.050 # how much penalty is associated with work increase with age after mu_age
+            self.women_mu_scale_kokoaika_after = 0.060  # how much penalty is associated with work increase with age after mu_age
             self.women_mu_age  =  self.min_retirementage - 4.0 
         else:
             self.women_mu_scale_kokoaika_before = self.workfactor_w * 0.045 # how much penalty is associated with work increase with age after mu_age
@@ -4724,8 +4724,8 @@ class UnemploymentEnv_v12(gym.Env):
         self.women_kappa_pinkslip_young_tmtuki = -0.100 # kuvaa sitä, että toimeentulotuessa huomioidaan varat (joita ei ole mallissa)
         self.women_kappa_pinkslip_middle = -0.100
         self.women_kappa_pinkslip_elderly = -0.100
-        self.women_kappa_pinkslip_putki = -0.70
-        self.women_kappa_param = self.workfactor_w * np.array([-0.300, -0.330, -0.380, -0.470, -0.580, -1.200]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
+        self.women_kappa_pinkslip_putki = -0.80
+        self.women_kappa_param = self.workfactor_w * np.array([-0.300, -0.330, -0.370, -0.470, -0.580, -1.200]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
         self.women_student_kappa_param = np.array([0.0, 0.0, 0.0, -100.0, -100.0, -100.0]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
 
         self.both_kappa_hoitovapaa = -1.0 # penalty, joka estää molempia menemästä hoitovapaalle yhtävaikaa
@@ -5488,7 +5488,7 @@ class UnemploymentEnv_v12(gym.Env):
             used_unemp_benefit,wage_reduction,unemp_after_ra,unempwage,unempwage_basis,\
             children_under3,children_under7,children_under18,unemp_benefit_left,alkanut_ansiosidonnainen,toe58,\
             ove_paid,kassanjasenyys,kansanelake,tyoelake_maksussa,main_pt_action,main_paid_wage,basis_wage,\
-            lleft,until_disab,until_student,until_outsider,karenssia_jaljella,humancapital,self.draw_prefnoise()
+            lleft,until_disab,until_student,until_outsider,karenssia_jaljella,humancapital,self.draw_prefnoise(group)
 
 
     def get_initial_state_immigration(self,puoliso: int,is_spouse:bool=False,init_g: int=-1,initialage: int=18):
@@ -5695,23 +5695,25 @@ class UnemploymentEnv_v12(gym.Env):
             used_unemp_benefit,wage_reduction,unemp_after_ra,unempwage,unempwage_basis,\
             children_under3,children_under7,children_under18,unemp_benefit_left,alkanut_ansiosidonnainen,toe58,\
             ove_paid,kassanjasenyys,kansanelake,tyoelake_maksussa,main_pt_action,main_paid_wage,basis_wage,\
-            lleft,until_disab,until_student,until_outsider,karenssia_jaljella,humancapital,self.draw_prefnoise()
+            lleft,until_disab,until_student,until_outsider,karenssia_jaljella,humancapital,self.draw_prefnoise(group)
 
-    def update_prefnoise(self,prefnoise) -> float:
+    def update_prefnoise(self,prefnoise,g) -> float:
         '''
         Työllisyyspreferenssin AR(1)-päivitys yhdelle neljännekselle
         '''
-        #if self.include_preferencenoise:
-        return min(1.0,max(-1.0,self.preferencenoise_rho * prefnoise + self.np_random.normal(loc=0.0,scale=self.preferencenoise_std)))
-        #else:
-        #    return 0.0
+        if g<3:
+            return min(1.0,max(-1.0,self.preferencenoise_men_rho * prefnoise + self.np_random.normal(loc=0.0,scale=self.preferencenoise_men_std)))
+        else:
+            return min(1.0,max(-1.0,self.preferencenoise_women_rho * prefnoise + self.np_random.normal(loc=0.0,scale=self.preferencenoise_women_std)))
 
-    def draw_prefnoise(self) -> float:
+    def draw_prefnoise(self,g) -> float:
         '''
         Henkilökohtainen työllisyyspreferenssin hajonta alkutilassa
         '''
-        #if self.include_preferencenoise:
-        return min(1.0,max(-1.0,self.np_random.normal(loc=0.0,scale=self.preferencenoise_ini_std)))
+        if g<3:
+            return min(1.0,max(-1.0,self.np_random.normal(loc=0.0,scale=self.preferencenoise_men_ini_std)))
+        else:
+            return min(1.0,max(-1.0,self.np_random.normal(loc=0.0,scale=self.preferencenoise_women_ini_std)))
         #else:
         #     return 0.0
 

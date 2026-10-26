@@ -5508,54 +5508,54 @@ class Rates():
         reemp_pt = np.zeros((100,6))
 
         reemp_ft_x    = np.array([ 0,25,50, 60,70, 75,100])
-        reemp_ft_base = np.array([40,40,30, 25, 10, 5,   1])/100
+        reemp_ft_base = np.array([35,35,30, 25, 10, 5,   1])/100
         reemp_ft[:,0] = interp_reemp(reemp_ft_x,reemp_ft_base)[:,0]
 
         reemp_ft_x    = np.array([ 0,25,50, 60, 70, 75,100])
-        reemp_ft_base = np.array([40,40,30, 25, 10,5,1])/100
+        reemp_ft_base = np.array([35,35,30, 25, 10,5,1])/100
         reemp_ft[:,1] = interp_reemp(reemp_ft_x,reemp_ft_base)[:,0]
 
         reemp_ft_x    = np.array([ 0,25,50,60,70,75,100])
-        reemp_ft_base = np.array([40,40,30,25,10, 5, 1])/100
+        reemp_ft_base = np.array([35,35,30,25,10, 5, 1])/100
         reemp_ft[:,2] = interp_reemp(reemp_ft_x,reemp_ft_base)[:,0]
 
         # naiset
         reemp_ft_x    = np.array([ 0,25,50, 60,70, 75,100])
-        reemp_ft_base = np.array([40,40,30, 25,10, 5,   1])/100
+        reemp_ft_base = np.array([35,35,30, 25,10, 5,   1])/100
         reemp_ft[:,3] = interp_reemp(reemp_ft_x,reemp_ft_base)[:,0]
 
         reemp_ft_x    = np.array([ 0,25,50,60,70,75,100])
-        reemp_ft_base = np.array([40,40,30,25,10, 5, 1])/100
+        reemp_ft_base = np.array([35,35,30,25,10, 5, 1])/100
         reemp_ft[:,4] = interp_reemp(reemp_ft_x,reemp_ft_base)[:,0]
 
         reemp_ft_x    = np.array([ 0,25,50,60,70,75,100])
-        reemp_ft_base = np.array([40,40,30,25,10, 5,  1])/100
+        reemp_ft_base = np.array([35,35,30,25,10, 5,  1])/100
         reemp_ft[:,5] = interp_reemp(reemp_ft_x,reemp_ft_base)[:,0]
 
         # miehet
         reemp_pt_x    = np.array([ 0,25,50,60,70, 75,100])
-        reemp_pt_base = np.array([80,80,60,50,20, 10, 2])/100
+        reemp_pt_base = np.array([70,70,60,50,20, 10, 2])/100
         reemp_pt[:,0] = interp_reemp(reemp_pt_x,reemp_pt_base)[:,0]
 
         reemp_pt_x    = np.array([ 0,25,50,60,70, 75,100])
-        reemp_pt_base = np.array([80,80,60,50,20, 10, 2])/100
+        reemp_pt_base = np.array([70,70,60,50,20, 10, 2])/100
         reemp_pt[:,1] = interp_reemp(reemp_pt_x,reemp_pt_base)[:,0]
 
         reemp_pt_x    = np.array([ 0,25,50,60,70, 75,100])
-        reemp_pt_base = np.array([80,80,60,50,20, 10,  2])/100
+        reemp_pt_base = np.array([70,70,60,50,20, 10,  2])/100
         reemp_pt[:,2] = interp_reemp(reemp_pt_x,reemp_pt_base)[:,0]
 
         # naiset
         reemp_pt_x    = np.array([ 0,25,50,60,70, 75,100])
-        reemp_pt_base = np.array([80,80,60,50,20, 10,  2])/100
+        reemp_pt_base = np.array([70,70,60,50,20, 10,  2])/100
         reemp_pt[:,3] = interp_reemp(reemp_pt_x,reemp_pt_base)[:,0]
 
         reemp_pt_x    = np.array([ 0,25,50,60,70, 75,100])
-        reemp_pt_base = np.array([80,80,60,50,20, 10,  2])/100
+        reemp_pt_base = np.array([70,70,60,50,20, 10,  2])/100
         reemp_pt[:,4] = interp_reemp(reemp_pt_x,reemp_pt_base)[:,0]
 
         reemp_pt_x    = np.array([ 0,25,50,60,70, 75,100])
-        reemp_pt_base = np.array([80,80,60,50,20, 10,  2])/100
+        reemp_pt_base = np.array([70,70,60,50,20, 10,  2])/100
         reemp_pt[:,5] = interp_reemp(reemp_pt_x,reemp_pt_base)[:,0]
 
         scale_men = 0.70
