@@ -4654,8 +4654,8 @@ class UnemploymentEnv_v12(gym.Env):
         #self.workfactor_w = 0.91
 
         # 2024 sopiva
-        self.workfactor_m = 1.63
-        self.workfactor_w = 1.27
+        self.workfactor_m = 1.50
+        self.workfactor_w = 1.15
 
         self.max_reduction_sigma = 0.60
 
@@ -4694,16 +4694,16 @@ class UnemploymentEnv_v12(gym.Env):
             self.men_mu_scale_kokoaika_after = self.workfactor_m * 0.025 # how much penalty is associated with work increase with age after mu_age
             self.men_mu_age  =  self.min_retirementage - 10.0
 
-        self.men_kappa_hoitovapaa = 0.050 # hyöty henkilölle hoitovapaalla olosta
-        self.men_kappa_under_3y = 0.050
+        self.men_kappa_hoitovapaa = 0.080 # hyöty henkilölle hoitovapaalla olosta
+        self.men_kappa_under_3y = 0.080
         self.men_kappa_ve = 0.0
         self.men_kappa_ve_spouse = 0.200
         self.men_kappa_pinkslip_young = -0.100
-        self.men_kappa_pinkslip_young_tmtuki = -0.100 # kuvaa sitä, että toimeentulotuessa huomioidaan varat (joita ei ole mallissa)
+        self.men_kappa_pinkslip_young_tmtuki = -0.200 # kuvaa sitä, että toimeentulotuessa huomioidaan varat (joita ei ole mallissa)
         self.men_kappa_pinkslip_middle = -0.100
         self.men_kappa_pinkslip_elderly = -0.200
         self.men_kappa_pinkslip_putki = -0.60
-        self.men_kappa_param =  self.workfactor_m * np.array([-0.310, -0.330, -0.380, -0.480, -0.585, -1.200 ]) # np.array([-0.410, -0.450, -0.470, -0.500, -0.590, -1.650 ]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
+        self.men_kappa_param =  self.workfactor_m * np.array([-0.310, -0.340, -0.380, -0.480, -0.590, -1.200 ]) # np.array([-0.410, -0.450, -0.470, -0.500, -0.590, -1.650 ]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
         self.men_student_kappa_param = np.array([0.0, 0.0, 0.0, -100.0, -100.0, -100.0]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
 
         # naisten utiliteetti-parametrit
@@ -4716,16 +4716,16 @@ class UnemploymentEnv_v12(gym.Env):
             self.women_mu_scale_kokoaika_after = self.workfactor_w * 0.030  # how much penalty is associated with work increase with age after mu_age
             self.women_mu_age  =  self.min_retirementage - 10.0 
 
-        self.women_kappa_hoitovapaa = 0.100
-        self.women_kappa_under_3y = 0.100
+        self.women_kappa_hoitovapaa = 0.080
+        self.women_kappa_under_3y = 0.080
         self.women_kappa_ve = 0.0
         self.women_kappa_ve_spouse = 0.2
         self.women_kappa_pinkslip_young = -0.100
         self.women_kappa_pinkslip_young_tmtuki = -0.100 # kuvaa sitä, että toimeentulotuessa huomioidaan varat (joita ei ole mallissa)
         self.women_kappa_pinkslip_middle = -0.100
         self.women_kappa_pinkslip_elderly = -0.100
-        self.women_kappa_pinkslip_putki = -0.80
-        self.women_kappa_param = self.workfactor_w * np.array([-0.300, -0.330, -0.370, -0.470, -0.580, -1.200]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
+        self.women_kappa_pinkslip_putki = -0.40
+        self.women_kappa_param = self.workfactor_w * np.array([-0.320, -0.360, -0.420, -0.440, -0.560, -1.200]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
         self.women_student_kappa_param = np.array([0.0, 0.0, 0.0, -100.0, -100.0, -100.0]) # osa-aika 8h, 16h, 24h, kokoaika 32h, 40h, 48h
 
         self.both_kappa_hoitovapaa = -1.0 # penalty, joka estää molempia menemästä hoitovapaalle yhtävaikaa
